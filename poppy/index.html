@@ -28,10 +28,11 @@ h1,h2,h3,.lora{font-family:"Baloo 2",Nunito,sans-serif;font-weight:800}
 .tb-btn{background:transparent;border:1px solid var(--c2);color:var(--c2l);border-radius:10px;padding:6px 10px;font-size:13px}
 #stageWrap{position:relative;flex:1;min-height:0;overflow:hidden}
 #stage3d{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
-#toolbar{background:var(--c1d);display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
-#toolbar button{background:var(--c1);border:1px solid var(--c1l);color:#fff;border-radius:14px;padding:8px 2px;font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:54px}
+#toolbar{background:var(--c1d);display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+#toolbar button{min-width:0;overflow:hidden;background:var(--c1);border:1px solid var(--c1l);color:#fff;border-radius:14px;padding:8px 2px;font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:54px}
 #toolbar button .ic{font-size:22px;line-height:1}
 #toolbar button.on{background:var(--c2);color:var(--c1d);border-color:var(--c2)}
+@media (max-width:520px){#toolbar{gap:3px;padding:6px 5px;padding-bottom:max(6px,env(safe-area-inset-bottom))}#toolbar button{font-size:10.5px;padding:6px 0;border-radius:10px;line-height:1.15}}
 #ring{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
 .ringBtn{position:absolute;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:3px solid var(--c2);background:var(--c1d);color:var(--c2l);font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:auto;box-shadow:0 4px 12px rgba(0,0,0,.25);transform:scale(.2);opacity:0;transition:transform .18s ease,opacity .18s ease}
 .ringBtn .ic{font-size:22px;line-height:1.1}
@@ -118,6 +119,7 @@ textarea{width:100%;min-height:70px;font-size:12px;border-radius:10px;border:2px
     <button id="stopPlay">⏹ Dừng chơi <span id="stopPlayTime">0:00</span></button>
   </div>
   <div id="toolbar">
+    <button id="tCall"><span class="ic">📣</span><span id="tCallLbl">Gọi tên</span></button>
     <button id="tBall"><span class="ic">⚽</span><span id="tBallLbl">Bóng</span></button>
     <button id="tBone"><span class="ic">🦴</span><span id="tBoneLbl">Xương</span></button>
     <button id="tGym"><span class="ic">🏃</span>Tập</button>
@@ -269,7 +271,7 @@ function ik(hx,hy,fx,fy,L1,L2,bend){
 
 function standPose(){
   return {cy:0, tilt:0, fF:0, bF:0, fLift:0, bLift:0, fLiftFar:0, bLiftFar:0, fFFar:0, bFFar:0,
-          head:0, ear:0, tail:0, wag:0.25, wagSpd:6, eye:1, happy:0, tongue:0, mouth:0, chew:0, sleep:0, fStretch:1};
+          head:0, ear:0, tail:0, wag:0.25, wagSpd:6, eye:1, happy:0, tongue:0, mouth:0, chew:0, sleep:0, fStretch:1, shake:0};
 }
 
 function poseFor(type, B){
@@ -692,8 +694,9 @@ function stepTime(p, now){
    Chó quay mặt theo +z cục bộ. Tư thế dùng lại poseFor() của bản 2D (đơn vị px), đổi sang mét bằng K.
    ========================================================= */
 var QS = new URLSearchParams(location.search);
+const SIM = !!QS.get("sim");   // chạy thử: khung hình theo đồng hồ, không cần rAF (máy chạy ngầm)
 const canvas = $("stage3d");
-const renderer = new THREE.WebGLRenderer({canvas, antialias: true, powerPreference: "high-performance"});
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: SIM});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -880,12 +883,14 @@ function buildRoom(){
   const box = new THREE.Group(); box.position.set(2.55, 0, 0.75);
   const bx = rbox(0.6, 0.38, 0.45, 0.04, "#2A9AA0"); bx.position.y = 0.19; box.add(bx);
   const lab = rbox(0.3, 0.1, 0.02, 0.01, "#FFB547"); lab.position.set(0, 0.22, 0.23); box.add(lab);
-  const tb = sph(0.08, "#E5533D"); tb.position.set(-0.12, 0.42, 0); box.add(tb);
-  const tb2 = rbox(0.2, 0.05, 0.05, 0.02, "#F3EBDC"); tb2.position.set(0.1, 0.4, 0.05); tb2.rotation.z = 0.5; box.add(tb2);
+  const tb = sph(0.08, "#E5533D"); tb.position.set(-0.12, 0.42, 0); tb.userData.kind = "toyBall"; pickables.push(tb); box.add(tb);
+  const tb2 = rbox(0.2, 0.05, 0.05, 0.02, "#F3EBDC"); tb2.position.set(0.1, 0.4, 0.05); tb2.rotation.z = 0.5; tb2.userData.kind = "toyBone"; pickables.push(tb2); box.add(tb2);
+  // ô bấm lớn hơn quanh xương và bóng trong hộp (dễ bấm trên điện thoại)
+  for (const [kd, x] of [["toyBall", -0.14], ["toyBone", 0.14]]){ const hb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.45), new THREE.MeshBasicMaterial({visible: false})); hb.position.set(x, 0.45, 0); hb.userData.kind = kd; box.add(hb); pickables.push(hb); }
   scene.add(box); addObstacle(2.55, 0.75, 0.65, 0.5);
 
   // cửa sổ trên tường trái + rèm
-  const win = new THREE.Group(); win.position.set(-2.99, 1.45, -0.9);
+  const win = new THREE.Group(); win.position.set(-2.99, 1.3, -0.9);
   room.sky = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.95), new THREE.MeshBasicMaterial({color:"#BFE3F7"}));
   room.sky.rotation.y = Math.PI/2; room.sky.position.x = 0.005; win.add(room.sky);
   room.sunDisc = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24), new THREE.MeshBasicMaterial({color:"#FFE07A"}));
@@ -897,6 +902,16 @@ function buildRoom(){
   const rod = cyl(0.015, 0.015, 1.9, "#7A5233"); rod.rotation.x = Math.PI/2; rod.position.set(0.06, 0.66, 0); win.add(rod);
   scene.add(win);
   room.windowSpot = {x: -2.45, z: -0.9};
+  // ghế đôn bọc nệm sát cửa sổ: chỗ yêu thích, chó nhảy lên ngồi ngắm ra ngoài
+  room.chair = {x: -2.52, z: -0.9, y: 0.53};
+  const chair = new THREE.Group(); chair.position.set(room.chair.x, 0, room.chair.z);
+  const cSeat = rbox(0.6, 0.12, 0.66, 0.05, "#FFB547"); cSeat.position.y = 0.44; chair.add(cSeat);
+  const cTop = rbox(0.54, 0.05, 0.6, 0.025, "#FFC970"); cTop.position.y = 0.51; chair.add(cTop);
+  const cFrame = rbox(0.58, 0.05, 0.64, 0.015, "#B98252"); cFrame.position.y = 0.36; chair.add(cFrame);
+  for (const [dx,dz] of [[-0.24,-0.27],[0.24,-0.27],[-0.24,0.27],[0.24,0.27]]){ const l = cyl(0.03, 0.022, 0.36, "#8E5E36"); l.position.set(dx, 0.18, dz); chair.add(l); }
+  for (const s of [-1, 1]){ const b = sph(0.035, "#E98A5D"); b.position.set(0.1*s, 0.535, 0.12*s); chair.add(b); }
+  chair.traverse(o=>{ if (o.isMesh){ o.userData.kind = "chair"; pickables.push(o); } });
+  scene.add(chair); addObstacle(room.chair.x, room.chair.z, 0.62, 0.68);
 
   // tranh treo tường (trên sofa) và đồng hồ
   const art = canvasTex(256, 192, (g, w, h)=>{
@@ -1145,7 +1160,7 @@ function buildDog3D(look){
   const mouthMark = new THREE.Object3D(); mouthMark.position.set(0, snY - snH*0.6, snX + snL*0.9); head.add(mouthMark);
   // chữ Z khi ngủ
   const zTex = canvasTex(64, 64, (g,w,h)=>{ g.font = "800 52px 'Baloo 2', sans-serif"; g.fillStyle = "#1E6F78"; g.textAlign = "center"; g.fillText("z", w/2, 50); });
-  const zs = [0,1,2].map(i=>{ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: zTex, transparent: true, depthWrite: false})); sp.scale.setScalar(0.12); sp.visible = false; scene.add(sp); return sp; });
+  const zs = [0,1,2].map(i=>{ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: zTex, transparent: true, depthWrite: false, depthTest: false})); sp.renderOrder = 10; sp.scale.setScalar(0.12); sp.visible = false; scene.add(sp); return sp; });
   root.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.userData.kind = "dog"; pickables.push(o); } });
   // rig: lớp bên trong để lăn nghiêng cả con chó khi ngủ
   const rig = new THREE.Group(); while (root.children.length) rig.add(root.children[0]); root.add(rig);
@@ -1208,6 +1223,8 @@ function updateDog3D(pose, t){
   const neck = W2(hL*0.78, -hH*0.55);
   d.head.position.copy(P3(neck[0], neck[1]));
   d.head.rotation.x = pose.head + pose.tilt*0.35 + (pose.chew > 0.3 ? Math.sin(t*14)*0.04 : 0);
+  d.head.rotation.y = (pose.shake||0)*Math.sin(t*20)*0.45;                 // lắc đầu khi ngậm xương
+  d.head.rotation.z = pose.chew > 0.3 ? Math.sin(t*6)*0.2*pose.chew : 0;   // nghiêng đầu gặm
   const mouthOpen = pose.mouth + (pose.chew > 0.3 ? (Math.sin(t*14)*0.5+0.5)*0.5 : 0) + pose.tongue*0.35;
   d.jaw.rotation.x = clamp(mouthOpen, 0, 1.2)*0.45;
   d.tongue.visible = pose.tongue > 0.5;
@@ -1245,7 +1262,7 @@ function updateDog3D(pose, t){
   // chữ Z
   for (let i=0;i<3;i++){
     const z = d.zs[i]; z.visible = pose.sleep > 0.5;
-    if (z.visible){ const ph = (t*0.5 + i/3) % 1; d.topMark.getWorldPosition(_a); z.position.set(_a.x + ph*0.12, _a.y - 0.05 + ph*0.3, _a.z); z.material.opacity = 1 - ph; z.scale.setScalar(0.08 + ph*0.08); }
+    if (z.visible){ const ph = (t*0.45 + i/3) % 1; d.head.getWorldPosition(_a); z.position.set(_a.x + ph*0.18 + Math.sin(ph*6)*0.03, _a.y + d.R*1.2 + ph*0.45, _a.z); z.material.opacity = Math.min(1, (1 - ph)*1.6); z.scale.setScalar(0.1 + ph*0.12); }
   }
 }
 
@@ -1296,7 +1313,36 @@ function setState(state, ms, extra={}){
   dog.state = state; dog.until = ms ? performance.now()+ms : 0;
   Object.assign(dog, extra);
 }
+// ---- nhảy (lên / xuống ghế cửa sổ) ----
+function jumpTo(to, toY, then){
+  dog.path = []; dog.then = null; dog.until = 0; dog.faceCam = false; dog.lookAt = null;
+  dog.jump = {fx: dog.pos.x, fz: dog.pos.z, fy: dog.y, tx: to.x, tz: to.z, ty: toY, t0: tSec, dur: 0.6, then};
+  dog.state = "jump";
+  sfx(toY > dog.y ? "jump" : "whoosh");
+}
+function chairLaunch(){ return nearestFree({x: room.chair.x + 0.62, z: room.chair.z}); }
+function goChair(fromTap=false){
+  if (dog.onChair){ if (fromTap){ dog.faceCam = true; setState("happy", 1500); excite(); } return; }
+  if (fromTap){ stopPlay(true); if (restMode){ restMode = false; updateRestBtn(); } dog.pose.sleep = 0; excite(); }
+  walkTo(chairLaunch(), fromTap, ()=>{
+    dog.heading = Math.atan2(room.chair.x - dog.pos.x, room.chair.z - dog.pos.z);
+    jumpTo({x: room.chair.x + 0.06, z: room.chair.z}, room.chair.y, ()=>{
+      dog.onChair = true;
+      dog.lookAt = {x: -3.2, z: room.chair.z};
+      setState("sit", rnd(9000, 16000));
+      if (fromTap || Math.random() < 0.4) bubble(pick(["Chỗ yêu thích nè!","Ngắm trời nè","Bên ngoài vui ghê"]), 2000);
+    });
+  });
+}
 function walkTo(target, run=false, then=null){
+  if (dog.jump){ const j = dog.jump, up = j.ty > 0.1; j.then = ()=>{ if (up) dog.onChair = true; walkTo(target, run, then); }; return; }
+  if (dog.onChair){   // đang trên ghế: nhảy xuống trước rồi mới đi
+    dog.onChair = false;
+    const L = chairLaunch();
+    dog.heading = Math.atan2(L.x - dog.pos.x, L.z - dog.pos.z);
+    jumpTo(L, 0, ()=>walkTo(target, run, then));
+    return;
+  }
   dog.path = findPath(dog.pos, target);
   const leg = BREEDS[prof.dog.breed].legL;
   dog.speed = (run ? 1.7 : 0.62) * (leg < 16 ? 0.85 : 1) * [1, 0.75, 0.5, 0.4][curSick()];
@@ -1330,6 +1376,63 @@ function bark(times=2){
     }
   } catch(e){}
 }
+
+// ---- tiếng động (tự tạo bằng Web Audio, không cần tải file) ----
+let noiseBuf = null;
+function ac(){
+  if (!soundOn()) return null;
+  try { audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); return audioCtx; } catch(e){ return null; }
+}
+function noiseSrc(c){
+  if (!noiseBuf){ noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = noiseBuf.getChannelData(0); for (let i=0;i<d.length;i++) d[i] = Math.random()*2 - 1; }
+  const n = c.createBufferSource(); n.buffer = noiseBuf; return n;
+}
+function env(c, g, t0, a, peak, dur){ g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); }
+function noiseHit(c, t0, freq, q, peak, dur, type="bandpass"){
+  const n = noiseSrc(c), f = c.createBiquadFilter(), g = c.createGain();
+  f.type = type; f.frequency.value = freq; f.Q.value = q;
+  n.connect(f); f.connect(g); g.connect(c.destination); env(c, g, t0, Math.min(0.01, dur/3), peak, dur);
+  n.start(t0, Math.random()*0.5); n.stop(t0 + dur + 0.02);
+}
+function tone(c, t0, type, f0, f1, peak, dur, f2){
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t0);
+  if (f2){ o.frequency.exponentialRampToValueAtTime(f1, t0 + dur*0.4); o.frequency.exponentialRampToValueAtTime(f2, t0 + dur); }
+  else o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+  o.connect(g); g.connect(c.destination); env(c, g, t0, Math.min(0.02, dur/4), peak, dur);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function sfx(name){
+  const c = ac(); if (!c) return;
+  const t = c.currentTime + 0.01;
+  switch(name){
+    case "snore": {      // hít vào khò... thở ra phì
+      const n = noiseSrc(c), f = c.createBiquadFilter(), g = c.createGain(), o = c.createOscillator(), og = c.createGain(), lp = c.createBiquadFilter();
+      f.type = "bandpass"; f.frequency.setValueAtTime(380, t); f.frequency.linearRampToValueAtTime(620, t+0.9); f.Q.value = 3;
+      n.connect(f); f.connect(g); g.connect(c.destination);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t+0.6); g.gain.exponentialRampToValueAtTime(0.0001, t+1.0);
+      o.type = "sawtooth"; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(95, t+0.9);
+      lp.type = "lowpass"; lp.frequency.value = 320;
+      o.connect(lp); lp.connect(og); og.connect(c.destination);
+      og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.11, t+0.55); og.gain.exponentialRampToValueAtTime(0.0001, t+1.0);
+      n.start(t); n.stop(t+1.05); o.start(t); o.stop(t+1.05);
+      noiseHit(c, t+1.35, 900, 0.8, 0.035, 0.7);   // thở ra "phù"
+      break;
+    }
+    case "step": noiseHit(c, t, 2600 + Math.random()*800, 1.5, 0.025, 0.035); break;
+    case "crunch": for (let i=0;i<3;i++) noiseHit(c, t + i*0.045 + Math.random()*0.02, 1600 + Math.random()*1600, 1.2, 0.09, 0.04); break;
+    case "lap": tone(c, t, "sine", 420, 900, 0.07, 0.08); break;
+    case "jump": tone(c, t, "sine", 260, 640, 0.07, 0.22); noiseHit(c, t, 1200, 0.6, 0.03, 0.18); break;
+    case "land": tone(c, t, "sine", 130, 55, 0.18, 0.14); noiseHit(c, t, 400, 0.8, 0.06, 0.08); break;
+    case "bounce": tone(c, t, "sine", 210, 95, 0.12, 0.1); break;
+    case "squeak": tone(c, t, "square", 1250, 1900, 0.035, 0.22, 1150); break;
+    case "pant": for (let i=0;i<4;i++) noiseHit(c, t + i*0.17, 1500, 1.4, 0.05, 0.1); break;
+    case "chime": tone(c, t, "sine", 880, 880, 0.08, 0.25); tone(c, t+0.12, "sine", 1320, 1320, 0.07, 0.35); break;
+    case "whoosh": noiseHit(c, t, 900, 0.5, 0.05, 0.3); break;
+  }
+}
+// trình duyệt điện thoại chỉ cho phát tiếng sau lần chạm đầu tiên
+document.addEventListener("pointerdown", ()=>{ if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); else if (!audioCtx) ac(); }, {passive: true});
 function bubble(text, ms=2600, force=false){
   if (restMode && !force) return;
   bark(Math.random()<0.5 ? 1 : 2);
@@ -1409,6 +1512,7 @@ function showMarker(p, text){
 
 function petDog(){
   excite(6000);
+  if (!dog.jump && dog.state!=="sleep" && Math.random() < 0.6) sfx("pant");
   const p = prof, now = Date.now();
   const td = todayStr(gameNow(p));
   if (p.pets.date !== td) p.pets = {date: td, gained: 0, recent: []};
@@ -1447,6 +1551,7 @@ function giveTreat(){
     S.xp += 10; S.bond = Math.min(100, S.bond + 2);
     trainWin = null;
     setState("eat", 1200, {afterEat:"happy"});
+    sfx("chime");
     bubble(`Giỏi quá! ${COMMANDS[k].n} +${gain}`, 2400, true);
   } else {
     S.xp += 1;
@@ -1474,6 +1579,7 @@ function playToy(type){
   if (play && play.type === type){ stopPlay(); return; }
   stopPlay(true);
   if (restMode){ restMode=false; updateRestBtn(); }
+  if (dog.onChair || dog.jump){ walkTo(chairLaunch(), false, ()=>playToy(type)); return; }
   if (type==="ball" && curSick() >= 2){ setState("sad", 3000); bubble("Mệt quá, hông chơi nổi 🤒", 2200, true); return; }
   play = {type, start: performance.now(), rounds: 0};
   excite();
@@ -1483,9 +1589,11 @@ function playToy(type){
     toy = {type, p: new THREE.Vector3(dog.pos.x + f.x*0.35, 0.07, dog.pos.z + f.z*0.35), v: new THREE.Vector3(), held:false};
     setState("play", 900, {afterPlay: "throw"});
   } else {
-    toy = {type, p: new THREE.Vector3(dog.pos.x + f.x*0.45, 0.03, dog.pos.z + f.z*0.45), v: new THREE.Vector3(), held:false, spin:0};
-    setState("chew", 8000);
+    toy = {type, p: new THREE.Vector3(dog.pos.x + f.x*0.3, 0.03, dog.pos.z + f.z*0.3), v: new THREE.Vector3(), held:true, spin:0};
+    dog.faceCam = true;
+    setState("play", 1500, {afterPlay: "chewStart"});
   }
+  sfx("squeak");
   bubble(pick(["Chơi đi!","Vui quá!"]), 1800);
   updatePlayUI();
   persist();
@@ -1514,6 +1622,38 @@ function playRoundReward(){
   } else {
     S.happy = Math.min(happyCap(S.sick), S.happy + 2);
     S.bond = Math.min(100, S.bond + 0.3); S.xp += 0.5;
+  }
+}
+function callName(){   // chủ gọi tên: chó chạy ra giữa màn hình, đứng hai chân hoặc ngồi ngoan
+  closeRing(); stopPlay(true);
+  if (restMode){ restMode = false; updateRestBtn(); }
+  dog.pose.sleep = 0; excite(8000);
+  if (curSick() >= 3){ dog.faceCam = true; setState("sad", 3000); bubble("Ốm quá... 🤒", 2000, true); return; }
+  bubble(pick(["Dạ!","Gâu gâu!","Em nè!"]), 1400, true);
+  // điểm giữa màn hình trên sàn
+  raycaster.setFromCamera(_ndc.set(0, -0.1), camera);
+  const hit = raycaster.intersectObjects(pickables, false).find(h => h.object.userData.kind === "floor");
+  const spot = nearestFree(hit ? {x: hit.point.x, z: hit.point.z} : {x: -0.15, z: 0.6});
+  walkTo(spot, true, ()=>{
+    dog.faceCam = true;
+    const S = prof.stats, good = prof.skills.sit >= 50 && S.happy >= 40;
+    S.bond = Math.min(100, S.bond + 0.3); persist();
+    if (good && Math.random() < 0.7){ setState("sit", 4000); bubble(pick(["Em ngồi ngoan nè","Chủ gọi em hả?"]), 1800, true); }
+    else { setState("beg", 3000); sfx("pant"); bubble(pick(["Chơi với em đi!","Em đây, em đây!"]), 1800, true); }
+  });
+}
+function tapToy(){   // bấm vào đồ chơi đang nằm trên sàn
+  if (!play || !toy) return;
+  excite();
+  if (toy.type === "bone"){
+    if (toy.spin || dog.jump) return;
+    dog.path = []; dog.then = null; toy.held = true; dog.faceCam = true;
+    setState("play", 1600, {afterPlay: "toss"});
+    bubble(pick(["Của em!","Hông đưa đâu!"]), 1500);
+  } else if (!toy.held && toy.p.y < 0.12 && toy.v.length() < 0.3){
+    dog.afterPlay = null;
+    walkTo({x: toy.p.x, z: toy.p.z}, true, ()=>{ if (!play || !toy) return; toy.held = true;
+      walkTo(nearestFree({x: -0.15 + rnd(-0.5,0.5), z: 0.6 + rnd(-0.3,0.4)}), false, ()=>{ if (!play || !toy) return; toy.held = false; toy.v.set(0, 0.6, 0); playRoundReward(); persist(); dog.faceCam = true; setState("play", 1100, {afterPlay: "throw"}); }); });
   }
 }
 function stopPlay(silent=false){
@@ -1612,10 +1752,18 @@ function idleBrain(now){
   }
   if ((S.thirst||0) >= 100 && Math.random() < 0.35){ bubble(pick(["Khát nước quá","Cho uống nước nha"]), 2400); }
   if (isMealTime(prof) && S.hunger >= 70 && Math.random() < 0.5){ bubble("Tới giờ ăn rồi!", 2400); }
+  if (dog.onChair){   // trên ghế: thích ngồi ngắm lâu, thỉnh thoảng nằm, rồi mới nhảy xuống
+    const q = Math.random();
+    dog.lookAt = {x: -3.2, z: room.chair.z};
+    if (q < 0.55) setState("sit", rnd(8000, 14000));
+    else if (q < 0.75) setState("lie", rnd(6000, 10000));
+    else walkTo(randomFreePoint());
+    return;
+  }
   const r = Math.random();
   if (r < 0.4) walkTo(randomFreePoint());
-  else if (r < 0.5) walkTo(room.windowSpot, false, ()=>{ dog.lookAt = {x: -3, z: room.windowSpot.z}; setState("sit", rnd(4000,7000)); });
-  else if (r < 0.62){ dog.faceCam = Math.random() < 0.5; setState("sit", rnd(3000,6000)); }
+  else if (r < 0.62) goChair();          // chỗ yêu thích: ghế cạnh cửa sổ
+  else if (r < 0.64){ dog.faceCam = Math.random() < 0.5; setState("sit", rnd(3000,6000)); }
   else if (r < 0.74) setState("lie", rnd(4000,7000));
   else if (r < 0.87) setState("look", 2000);
   else setState("idle", 2500);
@@ -1631,9 +1779,18 @@ function turnTo(target, dt, rate=7){
 }
 function frame(now){
   const dt = clamp((now - lastFrame)/1000, 0, 0.05); lastFrame = Math.max(lastFrame, now); tSec += dt;
-  if (!prof || !dog3){ requestAnimationFrame(frame); return; }
+  if (!prof || !dog3){ if (!SIM) requestAnimationFrame(frame); return; }
   const B = BREEDS[prof.dog.breed];
 
+  // đang nhảy: bay theo đường cong, xong thì gọi bước tiếp
+  if (dog.jump){
+    const j = dog.jump, k = clamp((tSec - j.t0)/j.dur, 0, 1);
+    const e = k*k*(3 - 2*k);
+    dog.pos.x = lerp(j.fx, j.tx, e); dog.pos.z = lerp(j.fz, j.tz, e);
+    dog.y = lerp(j.fy, j.ty, e) + Math.sin(Math.PI*k)*0.28;
+    turnTo(Math.atan2(j.tx - j.fx, j.tz - j.fz), dt, 10);
+    if (k >= 1){ dog.jump = null; dog.y = j.ty; sfx("land"); if (dog.state==="jump") dog.state = "idle"; if (j.then) j.then(); }
+  }
   // di chuyển theo đường đi
   if (isMoving()){
     const wp = dog.path[0];
@@ -1652,7 +1809,9 @@ function frame(now){
       dog.pos.x += f.x*step; dog.pos.z += f.z*step;
       if (off > 0.6){ dog.pos.x += (dx/dist)*step*0.5; dog.pos.z += (dz/dist)*step*0.5; }
       const stride = Math.max(B.legL*0.5, 6)*K;
+      const ph0 = Math.floor(dog.walkPhase/(Math.PI/2));
       dog.walkPhase += step/(stride*2) * Math.PI;
+      if (Math.floor(dog.walkPhase/(Math.PI/2)) !== ph0) sfx("step");
     }
   } else {
     // đứng yên: quay mặt về người chơi hoặc về vật đang nhìn
@@ -1689,17 +1848,30 @@ function frame(now){
       };
       walkTo({x: toy.p.x + toy.v.x*0.8, z: toy.p.z + toy.v.z*0.8}, true, chase);
     } else if (st==="chew" && play && play.type==="bone"){
+      // gặm xong một lúc: ngậm xương lên lắc đầu, rồi tung lên chụp lại
       playRoundReward(); persist();
-      if (toy){ toy.v.set(0, 2.2, 0); toy.spin = 1; }
-      setState("play", 1300, {afterPlay: "chewAgain"});
-    } else if (st==="play" && play && play.type==="bone" && dog.afterPlay==="chewAgain"){
+      if (toy){ toy.held = true; toy.spin = 0; }
+      sfx("squeak");
+      setState("play", 1600, {afterPlay: "toss"});
+    } else if (st==="play" && play && play.type==="bone" && dog.afterPlay==="toss"){
+      if (toy){ toy.held = false; toy.p.copy(dog.mouth3 || toy.p); toy.v.set(0, 2.4, 0); toy.spin = 1; }
+      setState("play", 1050, {afterPlay: "chewStart"});
+    } else if (st==="play" && play && play.type==="bone" && dog.afterPlay==="chewStart"){
       dog.afterPlay=null;
-      if (toy){ const f = fwd(); toy.p.set(dog.pos.x + f.x*0.45, 0.03, dog.pos.z + f.z*0.45); toy.v.set(0,0,0); toy.spin = 0; }
-      setState("chew", rnd(7000, 10000));
+      if (toy){ toy.held = false; toy.v.set(0,0,0); toy.spin = 0; }
+      { const h = facingCamHeading() + (Math.random() < 0.5 ? 1 : -1)*1.0; dog.faceCam = false; dog.lookAt = {x: dog.pos.x + Math.sin(h), z: dog.pos.z + Math.cos(h)}; }   // nằm xoay nghiêng cho thấy khúc xương
+      setState("chew", rnd(6000, 9000));
     } else if (st==="chew"){ toy=null; setState("happy",1500); }
     else if (st!=="sleep"){ dog.lookAt = null; setState("idle", 0); }
   }
   if (dog.state==="idle" && !dog.until) idleBrain(now);
+  // tiếng theo trạng thái: ngáy khi ngủ, gặm rôm rốp, liếm nước
+  if (tSec > (dog.nextSfx||0)){
+    if (dog.state==="sleep" && dog.pose.sleep > 0.5){ sfx("snore"); dog.nextSfx = tSec + 3.4; }
+    else if (dog.state==="chew" || (dog.state==="eat" && !dog.drink)){ sfx("crunch"); dog.nextSfx = tSec + rnd(0.35, 0.6); }
+    else if (dog.state==="eat" && dog.drink){ sfx("lap"); dog.nextSfx = tSec + 0.28; }
+    else dog.nextSfx = tSec + 0.3;
+  }
 
   // tư thế mục tiêu (dùng chung poseFor của bản 2D)
   let target;
@@ -1723,12 +1895,21 @@ function frame(now){
     if (dog.state==="happy") target.cy += Math.max(0, Math.sin(tSec*9))*5;
     if (dog.state==="scratch") target.bF = B.legL*0.2 + Math.sin(tSec*30)*3;
     if (dog.state==="look") target.head = -0.35 + Math.sin(tSec*1.5)*0.15;
+    if (dog.state==="chew" && toy && toy.type==="bone"){ target.head = 0.62; }   // cúi xuống gặm xương giữa hai chân trước
+    if (dog.state==="play" && toy && toy.type==="bone" && toy.held){ target.shake = 1; target.head = -0.05; target.happy = 1; }
     if (dog.state==="sleep"){   // 3D: nằm nghiêng, chân duỗi thả lỏng, đầu gối xuống sàn
       const L = B.legL, H = B.bodyH;
       target.cy = (L + H*0.25)*0.88;
       target.fF = L*0.55; target.fFFar = L*0.3; target.bF = -L*0.45; target.bFFar = -L*0.2;
       target.head = 0.28; target.tail = 1.4; target.ear = 0.7;
     }
+  }
+  if (dog.jump){   // nhảy: co chân lại, thân ngóc lên rồi chúi xuống
+    const kj = clamp((tSec - dog.jump.t0)/dog.jump.dur, 0, 1), L = B.legL;
+    target = poseFor("stand", B);
+    target.fF = L*0.55; target.fFFar = L*0.45; target.bF = -L*0.5; target.bFFar = -L*0.4;
+    target.fLift = target.fLiftFar = L*0.35*Math.sin(Math.PI*kj); target.bLift = target.bLiftFar = L*0.25*Math.sin(Math.PI*kj);
+    target.tilt = kj < 0.5 ? -0.3 : 0.2; target.happy = 1; target.ear = 0.3;
   }
   if (target.sleep > 0.5) target.wag = 0;
   else if (play || now < excitedUntil){ target.wag = Math.max(target.wag, 0.7); target.wagSpd = 20; }
@@ -1741,16 +1922,19 @@ function frame(now){
   const k = 1 - Math.pow(0.0008, dt);
   for (const key in target){
     if (target[key] === 999 || dog.pose[key] === 999){ dog.pose[key] = target[key]; continue; }
-    dog.pose[key] = lerp(dog.pose[key] ?? target[key], target[key], moving ? Math.min(1,k*2.5) : k);
+    dog.pose[key] = lerp(dog.pose[key] ?? target[key], target[key], (moving || dog.jump) ? Math.min(1,k*2.5) : k);
   }
 
   // đồ chơi
   if (toy){
     if (toy.held && dog.mouth3){ toy.p.copy(dog.mouth3); toy.v.set(0,0,0); }
+    else if (toy.type==="bone" && dog.state==="chew" && dog.mouth3 && !toy.spin){   // xương nằm dưới miệng, giữa hai chân trước
+      const f = fwd(); toy.p.set(dog.mouth3.x + f.x*0.03, Math.max(dog.y + 0.035, dog.mouth3.y - 0.03), dog.mouth3.z + f.z*0.03); toy.v.set(0,0,0);
+    }
     else {
       toy.v.y -= 9.8*dt; toy.p.addScaledVector(toy.v, dt);
       const r = toy.type==="ball" ? 0.07 : 0.03;
-      if (toy.p.y < r){ toy.p.y = r; toy.v.y = Math.abs(toy.v.y) > 0.6 ? -toy.v.y*0.45 : 0; toy.v.x *= 0.8; toy.v.z *= 0.8; if (toy.type!=="ball") toy.spin = 0; }
+      if (toy.p.y < r){ toy.p.y = r; if (Math.abs(toy.v.y) > 0.8) sfx(toy.type==="ball" ? "bounce" : "land"); toy.v.y = Math.abs(toy.v.y) > 0.6 ? -toy.v.y*0.45 : 0; toy.v.x *= 0.8; toy.v.z *= 0.8; if (toy.type!=="ball") toy.spin = 0; }
       if (toy.p.x < ROOM.x0+0.1 || toy.p.x > ROOM.x1-0.1){ toy.v.x *= -0.5; toy.p.x = clamp(toy.p.x, ROOM.x0+0.1, ROOM.x1-0.1); }
       if (toy.p.z < ROOM.z0+0.1 || toy.p.z > ROOM.z1-0.1){ toy.v.z *= -0.5; toy.p.z = clamp(toy.p.z, ROOM.z0+0.1, ROOM.z1-0.1); }
       if (toy.p.y <= r + 0.001){ toy.v.x *= Math.pow(0.15, dt); toy.v.z *= Math.pow(0.15, dt); }
@@ -1760,7 +1944,7 @@ function frame(now){
 
   applyTime(prof, Date.now());
   render(now);
-  requestAnimationFrame(frame);
+  if (!SIM) requestAnimationFrame(frame);
 }
 function fmtTime(ms){ const s = Math.floor(ms/1000); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
 
@@ -1774,13 +1958,15 @@ function ensureToyMesh(type){
     for (const [x,z] of [[-0.1,-0.025],[-0.1,0.025],[0.1,-0.025],[0.1,0.025]]){ const k = sph(0.032, "#F3EBDC"); k.position.set(x, 0, z); m.add(k); }
     m.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
   }
+  m.traverse(o=>{ if (o.isMesh){ o.userData.kind = "toy"; pickables.push(o); } });
   scene.add(m); toyMesh[type] = m; return m;
 }
 function render(now){
   // chó
   dog.root = dog3.root;
   const onBed = Math.hypot(dog.pos.x - room.bed.x, dog.pos.z - room.bed.z) < 0.4;
-  dog.y = lerp(dog.y, onBed ? 0.08 : 0, 0.15);
+  if (dog.onChair && !dog.jump) dog.y = room.chair.y;
+  else if (!dog.jump) dog.y = lerp(dog.y, onBed ? 0.08 : 0, 0.15);
   dog3.root.position.set(dog.pos.x, dog.y, dog.pos.z);
   dog3.root.rotation.y = dog.heading;
   updateDog3D(dog.pose, tSec);
@@ -1793,7 +1979,9 @@ function render(now){
     const m = ensureToyMesh(toy.type); m.visible = true;
     m.position.copy(toy.p);
     if (toy.type==="ball") m.rotation.x += toy.v.length()*0.1;
-    else m.rotation.set(toy.spin ? tSec*12 : 0, toy.held ? dog.heading + Math.PI/2 : 0.6, 0);
+    else if (toy.spin) m.rotation.set(tSec*12, dog.heading + Math.PI/2, 0);
+    else if (toy.held || dog.state==="chew") m.rotation.set(0, dog.heading + Math.PI/2 + (dog.state==="chew" ? Math.sin(tSec*6)*0.25 : 0), dog.state==="chew" ? Math.sin(tSec*12)*0.12 : 0);
+    else m.rotation.set(0, 0.6, 0);
   }
   // bát, nước, đồng hồ, cửa sổ theo giờ
   room.food.visible = bowlFull;
@@ -1815,7 +2003,7 @@ function render(now){
   if (now > dog.bubbleUntil || ringOpen) bEl.classList.remove("show");
   bEl.style.left = clamp(dog.headTop[0], 70, W-70) + "px";
   bEl.style.top = Math.max(44, dog.headTop[1] - 6) + "px";
-  if (QS.get("dbg")) $("hint").textContent = `pos=${dog.pos.x.toFixed(2)},${dog.pos.z.toFixed(2)} st=${dog.state} path=${dog.path.length}`;
+  if (QS.get("dbg")) $("hint").textContent = `pos=${dog.pos.x.toFixed(2)},${dog.pos.z.toFixed(2)} st=${dog.state} path=${dog.path.length} chair=${!!dog.onChair} jump=${!!dog.jump} y=${dog.y.toFixed(2)} sp=${(dog.speed||0).toFixed(2)} wp=${dog.path[0]?dog.path[0].x.toFixed(2)+","+dog.path[0].z.toFixed(2):"-"} h=${dog.heading.toFixed(2)} t=${tSec.toFixed(1)}`;
 }
 
 /* ---------- menu lệnh tại chỗ bấm trên sàn ---------- */
@@ -1859,7 +2047,8 @@ function pickAt(x, y){
   _ndc.set(x/W*2 - 1, -(y/H)*2 + 1);
   raycaster.setFromCamera(_ndc, camera);
   const hits = raycaster.intersectObjects(pickables, false);
-  return hits.find(h => h.object.visible) || null;
+  const shown = o => { while (o){ if (!o.visible) return false; o = o.parent; } return true; };
+  return hits.find(h => shown(h.object)) || null;
 }
 canvas.addEventListener("pointerdown", e=>{
   if (!prof) return;
@@ -1870,6 +2059,9 @@ canvas.addEventListener("pointerdown", e=>{
   if (kind==="dog"){ closeRing(); petDog(); return; }
   if (kind==="bowl"){ closeRing(); feedBowl(); return; }
   if (kind==="water"){ closeRing(); drinkWater(); return; }
+  if (kind==="toyBall" || kind==="toyBone"){ closeRing(); const ty = kind==="toyBall" ? "ball" : "bone"; if (!(play && play.type===ty)) playToy(ty); return; }
+  if (kind==="toy"){ closeRing(); tapToy(); return; }
+  if (kind==="chair"){ closeRing(); goChair(true); return; }
   if (ringOpen){ closeRing(); return; }
   if (kind==="floor" || kind==="bed"){ openRing(x, y, {x: hit.point.x, z: hit.point.z}); return; }
   if (kind==="sofa") hint("Lệnh \"Lên đây\" (nhảy lên sofa) sẽ có ở đợt sau", 2500);
@@ -2001,7 +2193,7 @@ function startProfile(id){
   restMode = false; updateRestBtn();
   toy = null; trainWin = null; bowlFull = false;
   buildDog3D(prof.dog);
-  dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0;
+  dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0; dog.onChair = false; dog.jump = null;
   dog.pose = poseFor("stand", BREEDS[prof.dog.breed]); setState("happy", 1500); dog.next = 0; excite(8000);
   refreshTop();
   const S = prof.stats;
@@ -2193,6 +2385,7 @@ function showCompare(other){
 }
 
 /* ---------- nút dưới ---------- */
+$("tCall").onclick = callName;
 $("tBall").onclick = ()=>playToy("ball");
 $("tBone").onclick = ()=>playToy("bone");
 $("tRest").onclick = toggleRest;
@@ -2346,16 +2539,16 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   if (QS.get("sick")){ p.stats.sick = +QS.get("sick"); p.stats.hunger = 90; p.stats.happy = 25; }
   save = {version:SAVE_VERSION, profiles:[p], current:p.id};
   startProfile(p.id);
-  if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,showInfo,showCard,()=>{resize();}];
+  if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,callName,()=>goChair(true),tapToy,showInfo,showCard,()=>{resize();}];
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
-  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="info") showInfo(); else if(st==="card") showCard(); else setState(st, 600000); }, 300);
+  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="info") showInfo(); else if(st==="card") showCard(); else setState(st, 600000); }, 300);
 } else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); renderCreate();
 } else if (save.profiles.length === 0) openCreate(true);
 else {
   const id = save.current && save.profiles.some(p=>p.id===save.current) ? save.current : save.profiles[0].id;
   startProfile(id);
 }
-requestAnimationFrame(frame);
+if (SIM){ setInterval(()=>frame(performance.now()), 33); const simDraw = ()=>{ renderer.render(scene, camera); requestAnimationFrame(simDraw); }; requestAnimationFrame(simDraw); } else requestAnimationFrame(frame);
 </script>
 </body>
 </html>
