@@ -699,7 +699,15 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#F4EBDD");
+// nền ngoài căn phòng: chuyển màu xanh ngọc nhạt, hợp với thanh trên/dưới
+(function(){
+  const c = document.createElement("canvas"); c.width = 4; c.height = 256;
+  const g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, "#E6F2EF"); gr.addColorStop(0.55, "#CFE5E1"); gr.addColorStop(1, "#A9CFCB");
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  scene.background = t;
+})();
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
 const CAM_TARGET = new THREE.Vector3(-0.15, 0.3, 0.15);
 const CAM_DIR = new THREE.Vector3(0.42, 0.62, 0.66).normalize();
@@ -774,10 +782,27 @@ function buildRoom(){
   floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; floor.userData.kind = "floor";
   scene.add(floor); pickables.push(floor);
   // tường
-  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(6, 2.8), mat("#F6EEE2"));
-  backWall.position.set(0, 1.4, -2.5); backWall.receiveShadow = true; scene.add(backWall);
-  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 2.8), mat("#EEF3EE"));
-  leftWall.position.set(-3, 1.4, 0); leftWall.rotation.y = Math.PI/2; leftWall.receiveShadow = true; scene.add(leftWall);
+  // tường có độ dày + nẹp gỗ trên đỉnh, kiểu nhà búp bê (nhìn từ ngoài vào cho liền lạc)
+  const WT = 0.14, WH = 2.8;
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(6 + WT, WH, WT), mat("#F6EEE2"));
+  backWall.position.set(-WT/2, WH/2, -2.5 - WT/2); backWall.receiveShadow = true; scene.add(backWall);
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(WT, WH, 5), mat("#EEF3EE"));
+  leftWall.position.set(-3 - WT/2, WH/2, 0); leftWall.receiveShadow = true; scene.add(leftWall);
+  const cap1 = rbox(6 + WT + 0.04, 0.06, WT + 0.04, 0.015, "#C08A55"); cap1.position.set(-WT/2, WH + 0.03, -2.5 - WT/2); scene.add(cap1);
+  const cap2 = rbox(WT + 0.04, 0.06, 5 + 0.04, 0.015, "#C08A55"); cap2.position.set(-3 - WT/2, WH + 0.03, 0); scene.add(cap2);
+  // đế sàn dày (mép gỗ) + bệ tối bên dưới
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(6 + WT, 0.16, 5 + WT), mat("#C99560"));
+  slab.position.set(-WT/2, -0.081, -WT/2); slab.receiveShadow = true; scene.add(slab);
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(6 + WT - 0.12, 0.1, 5 + WT - 0.12), mat("#7A5233"));
+  plinth.position.set(-WT/2, -0.21, -WT/2); scene.add(plinth);
+  // bóng mờ dưới căn phòng
+  const shadowTex = canvasTex(256, 256, (g, w, h)=>{
+    const gr = g.createRadialGradient(w/2, h/2, w*0.18, w/2, h/2, w/2);
+    gr.addColorStop(0, "rgba(20,60,62,.42)"); gr.addColorStop(1, "rgba(20,60,62,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  });
+  const groundShadow = new THREE.Mesh(new THREE.PlaneGeometry(10, 8.6), new THREE.MeshBasicMaterial({map: shadowTex, transparent: true, depthWrite: false}));
+  groundShadow.rotation.x = -Math.PI/2; groundShadow.position.set(0.25, -0.5, 0.35); scene.add(groundShadow);
   const base1 = rbox(6, 0.12, 0.04, 0.01, "#FFFFFF"); base1.position.set(0, 0.06, -2.48); scene.add(base1);
   const base2 = rbox(0.04, 0.12, 5, 0.01, "#FFFFFF"); base2.position.set(-2.98, 0.06, 0); scene.add(base2);
 
@@ -819,7 +844,11 @@ function buildRoom(){
 
   // kệ sách sát tường trái
   const shelf = new THREE.Group(); shelf.position.set(-2.78, 0, 0.75);
-  const sh = rbox(0.36, 1.8, 1.2, 0.02, "#B98252"); sh.position.y = 0.9; shelf.add(sh);
+  // kệ mở phía trước (hướng +x) để thấy sách
+  const shBack = rbox(0.04, 1.8, 1.2, 0.01, "#9C6A40"); shBack.position.set(-0.16, 0.9, 0); shelf.add(shBack);
+  for (const s of [-1, 1]){ const sd = rbox(0.36, 1.8, 0.04, 0.01, "#B98252"); sd.position.set(0, 0.9, s*0.58); shelf.add(sd); }
+  const shTop = rbox(0.38, 0.04, 1.22, 0.01, "#B98252"); shTop.position.set(0, 1.8, 0); shelf.add(shTop);
+  const shBot = rbox(0.36, 0.08, 1.2, 0.01, "#B98252"); shBot.position.set(0, 0.04, 0); shelf.add(shBot);
   const bookCols = ["#E5533D","#2A9AA0","#FFB547","#1E6F78","#F3A47A","#7FB069","#FFFFFF"];
   let bi = 0;
   for (const y of [0.35, 0.8, 1.25, 1.65]){
@@ -1045,7 +1074,7 @@ function buildDog3D(look){
     curl: [[0,0],[-0.12,0.22],[0.02,0.42],[0.24,0.42],[0.3,0.24]], plume: [[0,0],[-0.1,0.2],[-0.12,0.42]],
     fox: [[0,0],[-0.18,0.08],[-0.36,0.16]], stub: [[0,0],[-0.06,0.03]], pompom: [[0,0],[-0.04,0.2],[-0.08,0.42]],
     straight: [[0,0],[-0.1,0.2],[-0.18,0.42]], sickle: [[0,0],[-0.15,0.18],[-0.05,0.42],[0.12,0.4]],
-    long: [[0,0],[-0.18,-0.02],[-0.3,0.04],[-0.38,0.16]], saber: [[0,0],[-0.15,0.04],[-0.26,0.18],[-0.3,0.36]]
+    long: [[0,0],[-0.16,-0.03],[-0.3,-0.02],[-0.4,0.06]], saber: [[0,0],[-0.15,0.04],[-0.26,0.18],[-0.3,0.36]]
   }[look.tail] || [[0,0],[-0.1,0.2]];
   const Lt = B.bodyL*K;
   const curve = new THREE.CatmullRomCurve3(tailPts.map(([x,y])=>new THREE.Vector3(0, y*Lt, x*Lt)));
@@ -1056,6 +1085,8 @@ function buildDog3D(look){
   const tip = sph(tipR, (look.tail==="fox"||look.tail==="sickle") ? second : main); tip.position.copy(tipP); tail.add(tip);
   if (look.tail==="plume" || (look.tail==="curl" && fluffy)){ for (let i=0;i<4;i++){ const f = sph(0.08*Lt, shade(main, 0.05), {}, true); f.position.copy(curve.getPoint(0.4 + i*0.18)); tail.add(f); } }
   if (look.tail==="fox"){ const f = sph(1, main); f.scale.set(0.07*Lt, 0.08*Lt, 0.2*Lt); f.position.copy(curve.getPoint(0.6)); f.lookAt(tail.localToWorld(curve.getPoint(1).clone())); tail.add(f); }
+  // gốc đuôi: khối tròn lấp chỗ nối với mông (không lộ khe hở khi vẫy)
+  const tailRoot = sph(Math.max(thick*Lt*0.5*1.7, hH*0.22), main); tail.add(tailRoot);
   // đầu
   const head = new THREE.Group(); root.add(head);
   const R = B.headR*K;
@@ -1116,8 +1147,10 @@ function buildDog3D(look){
   const zTex = canvasTex(64, 64, (g,w,h)=>{ g.font = "800 52px 'Baloo 2', sans-serif"; g.fillStyle = "#1E6F78"; g.textAlign = "center"; g.fillText("z", w/2, 50); });
   const zs = [0,1,2].map(i=>{ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: zTex, transparent: true, depthWrite: false})); sp.scale.setScalar(0.12); sp.visible = false; scene.add(sp); return sp; });
   root.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.userData.kind = "dog"; pickables.push(o); } });
+  // rig: lớp bên trong để lăn nghiêng cả con chó khi ngủ
+  const rig = new THREE.Group(); while (root.children.length) rig.add(root.children[0]); root.add(rig);
   scene.add(root);
-  dog3 = {root, body, torso, legs, tail, head, jaw, tongue, eyes, ears, topMark, mouthMark, zs, B, hL, hH, hW, legR, R, hx, hy};
+  dog3 = {root, rig, roll: 0, lastT: null, body, torso, legs, tail, head, jaw, tongue, eyes, ears, topMark, mouthMark, zs, B, hL, hH, hW, legR, R, hx, hy};
   buildGrid(Math.max(0.22, Math.min(0.42, hL*0.75)));
   return dog3;
 }
@@ -1162,9 +1195,15 @@ function updateDog3D(pose, t){
     lg.paw.position.set(sx, F.y + d.legR*0.25, F.z + d.legR*0.35);
   });
   // đuôi: gốc ở mông, vẫy sang hai bên
-  const tb = W2(-hL*0.92, -hH*0.45);
+  const tb = W2(-hL*0.84, -hH*0.3);              // gốc nằm lọt trong mông
   d.tail.position.copy(P3(tb[0], tb[1]));
-  d.tail.rotation.set(pose.tilt - pose.tail*0.55, Math.sin(t*pose.wagSpd)*pose.wag*1.3, 0);
+  d.tail.rotation.set(pose.tilt - pose.tail*0.55, Math.sin(t*pose.wagSpd)*Math.min(pose.wag, 0.7)*0.8, 0);
+  // ngủ: lăn nghiêng sang một bên, thân nằm trên sàn (chuyển mượt, không giật)
+  const dtR = d.lastT == null ? 1 : clamp(t - d.lastT, 0, 0.1); d.lastT = t;
+  d.roll += ((pose.sleep > 0.5 ? 1 : 0) - d.roll)*(dtR >= 1 ? 1 : 1 - Math.pow(0.02, dtR));
+  const ra = d.roll*1.38, cyM = pose.cy*K;
+  d.rig.rotation.z = ra;
+  d.rig.position.set(cyM*Math.sin(ra), (cyM*(1-d.roll) + d.hW*0.92*d.roll) - cyM*Math.cos(ra), 0);
   // đầu
   const neck = W2(hL*0.78, -hH*0.55);
   d.head.position.copy(P3(neck[0], neck[1]));
@@ -1684,6 +1723,12 @@ function frame(now){
     if (dog.state==="happy") target.cy += Math.max(0, Math.sin(tSec*9))*5;
     if (dog.state==="scratch") target.bF = B.legL*0.2 + Math.sin(tSec*30)*3;
     if (dog.state==="look") target.head = -0.35 + Math.sin(tSec*1.5)*0.15;
+    if (dog.state==="sleep"){   // 3D: nằm nghiêng, chân duỗi thả lỏng, đầu gối xuống sàn
+      const L = B.legL, H = B.bodyH;
+      target.cy = (L + H*0.25)*0.88;
+      target.fF = L*0.55; target.fFFar = L*0.3; target.bF = -L*0.45; target.bFFar = -L*0.2;
+      target.head = 0.28; target.tail = 1.4; target.ear = 0.7;
+    }
   }
   if (target.sleep > 0.5) target.wag = 0;
   else if (play || now < excitedUntil){ target.wag = Math.max(target.wag, 0.7); target.wagSpd = 20; }
@@ -2303,7 +2348,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   startProfile(p.id);
   if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,showInfo,showCard,()=>{resize();}];
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
-  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="info") showInfo(); else if(st==="card") showCard(); else setState(st, 600000); }, 300);
+  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="info") showInfo(); else if(st==="card") showCard(); else setState(st, 600000); }, 300);
 } else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); renderCreate();
 } else if (save.profiles.length === 0) openCreate(true);
 else {
