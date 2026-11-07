@@ -28,7 +28,7 @@ h1,h2,h3,.lora{font-family:"Baloo 2",Nunito,sans-serif;font-weight:800}
 .tb-btn{background:transparent;border:1px solid var(--c2);color:var(--c2l);border-radius:10px;padding:6px 10px;font-size:13px}
 #stageWrap{position:relative;flex:1;min-height:0;overflow:hidden}
 #stage3d{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
-#toolbar{background:var(--c1d);display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+#toolbar{background:var(--c1d);display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
 #toolbar button{min-width:0;overflow:hidden;background:var(--c1);border:1px solid var(--c1l);color:#fff;border-radius:14px;padding:8px 2px;font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:54px}
 #toolbar button .ic{font-size:22px;line-height:1}
 #toolbar button.on{background:var(--c2);color:var(--c1d);border-color:var(--c2)}
@@ -153,8 +153,6 @@ textarea{width:100%;min-height:70px;font-size:12px;border-radius:10px;border:2px
   </div>
   <div id="toolbar">
     <button id="tCall"><span class="ic">📣</span><span id="tCallLbl">Gọi tên</span></button>
-    <button id="tBall"><span class="ic">⚽</span><span id="tBallLbl">Bóng</span></button>
-    <button id="tBone"><span class="ic">🦴</span><span id="tBoneLbl">Xương</span></button>
     <button id="tGym"><span class="ic">🏃</span>Tập</button>
     <button id="tCloset"><span class="ic">🧺</span>Tủ đồ</button>
     <button id="tInfo"><span class="ic">📊</span>Thông tin</button>
@@ -273,6 +271,9 @@ const BREEDS = {
   }
 };
 const BREED_ORDER = ["pom","corgi","poodle","shiba","dachshund"];
+// Mẫu A (Thú bông), Sếp chốt 07/11/2026: đầu to, chân ngắn mũm mĩm, mõm ngắn (cùng tỉ lệ trang /mau-cho/)
+const STYLE_A = {headK: 1.6, legLenK: 0.72, legThickK: 1.55, snoutK: 0.55, eyeK: 0.2};
+for (const B of Object.values(BREEDS)){ B.headR *= STYLE_A.headK; B.legL *= STYLE_A.legLenK; B.legW *= STYLE_A.legThickK; B.snout *= STYLE_A.snoutK; B.snoutH *= 0.85; }
 const EYES = [
   {n:"Nâu đậm", c:"#2A1A10"}, {n:"Nâu", c:"#5C3A1E"},
   {n:"Hổ phách", c:"#A86F12"}, {n:"Xanh", c:"#3F6FA8"}
@@ -321,7 +322,7 @@ function ik(hx,hy,fx,fy,L1,L2,bend){
 
 function standPose(){
   return {cy:0, tilt:0, fF:0, bF:0, fLift:0, bLift:0, fLiftFar:0, bLiftFar:0, fFFar:0, bFFar:0,
-          head:0, ear:0, tail:0, wag:0.25, wagSpd:6, eye:1, happy:0, tongue:0, mouth:0, chew:0, sleep:0, fStretch:1, shake:0, belly:0};
+          head:0, yaw:0, cock:0, wiggle:0, bodyShake:0, ear:0, tail:0, wag:0.25, wagSpd:6, eye:1, happy:0, tongue:0, mouth:0, chew:0, sleep:0, fStretch:1, shake:0, belly:0};
 }
 
 function poseFor(type, B){
@@ -1044,7 +1045,7 @@ function buildRoom(){
     paw(w*0.5, h*0.62, 1.6);
   });
   const pad = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.012, 0.52), [mat("#FFFFFF"), mat("#FFFFFF"), new THREE.MeshStandardMaterial({map: padTex, roughness: 0.9}), mat("#FFFFFF"), mat("#FFFFFF"), mat("#FFFFFF")]);
-  pad.position.set(room.pad.x, 0.007, room.pad.z); pad.receiveShadow = true; pad.userData.kind = "floor"; scene.add(pad); pickables.push(pad);
+  pad.position.set(room.pad.x, 0.007, room.pad.z); pad.receiveShadow = true; pad.userData.kind = "pad"; scene.add(pad); pickables.push(pad);
   // chữ trên sàn cho trẻ biết
   for (const [txt, p] of [["bát ăn", room.bowl], ["nước", room.water], ["nệm", room.bed], ["vệ sinh", room.pad]]){
     const t = canvasTex(256, 64, (g,w,h)=>{ g.font = "700 40px Nunito, sans-serif"; g.textAlign = "center"; g.fillStyle = "rgba(20,80,90,.75)"; g.fillText(txt, w/2, 46); });
@@ -1149,7 +1150,7 @@ function buildDog3D(look){
   if (B.belly){ const bl = sph(1, second); bl.scale.set(hW*0.86, hH*0.6, hL*0.78); bl.position.set(0, -hH*0.4, hL*0.1); body.add(bl);
                 const ch = sph(1, second); ch.scale.set(hW*0.8, hH*0.78, hL*0.28); ch.position.set(0, -hH*0.05, hL*0.78); body.add(ch); }
   if (fluffy){
-    for (let i=0;i<10;i++){ const a = i/10*Math.PI*2; const f = sph(hH*0.42, main, {}, true); f.position.set(Math.cos(a)*hW*0.75, Math.sin(a)*hH*0.6 + hH*0.15, ((i*7)%5-2)/2*hL*0.55); body.add(f); }
+    if (!STYLE_A) for (let i=0;i<10;i++){ const a = i/10*Math.PI*2; const f = sph(hH*0.42, main, {}, true); f.position.set(Math.cos(a)*hW*0.75, Math.sin(a)*hH*0.6 + hH*0.15, ((i*7)%5-2)/2*hL*0.55); body.add(f); }
     const ruff = sph(hH*0.95, shade(main, 0.08)); ruff.position.set(0, hH*0.05, hL*0.72); body.add(ruff);
   }
   if (curly){
@@ -1172,16 +1173,17 @@ function buildDog3D(look){
   const tail = new THREE.Group(); root.add(tail);
   const tailPts = {
     curl: [[0,0],[-0.12,0.22],[0.02,0.42],[0.24,0.42],[0.3,0.24]], plume: [[0,0],[-0.1,0.2],[-0.12,0.42]],
-    fox: [[0,0],[-0.18,0.08],[-0.36,0.16]], stub: [[0,0],[-0.06,0.03]], pompom: [[0,0],[-0.04,0.2],[-0.08,0.42]],
+    fox: [[0,0],[-0.18,0.08],[-0.36,0.16]], stub: [[0,0],[-0.06,0.03]], pompom: [[0,0],[-0.07,0.12],[-0.12,0.25]],
     straight: [[0,0],[-0.1,0.2],[-0.18,0.42]], sickle: [[0,0],[-0.15,0.18],[-0.05,0.42],[0.12,0.4]],
     long: [[0,0],[-0.16,-0.03],[-0.3,-0.02],[-0.4,0.06]], saber: [[0,0],[-0.15,0.04],[-0.26,0.18],[-0.3,0.36]]
   }[look.tail] || [[0,0],[-0.1,0.2]];
+  if (look.tail==="curl" && !fluffy) tailPts.splice(0, 9, [0,0],[-0.07,0.15],[0.02,0.27],[0.15,0.27],[0.21,0.18]);   // Shiba: đuôi cuộn dày, nằm trên lưng
   const Lt = B.bodyL*K;
   const curve = new THREE.CatmullRomCurve3(tailPts.map(([x,y])=>new THREE.Vector3(0, y*Lt, x*Lt)));
-  const thick = {curl: fluffy ? 0.09 : 0.05, plume: 0.05, fox: 0.08, stub: 0.06, pompom: 0.025, straight: 0.03, sickle: 0.05, long: 0.03, saber: 0.03}[look.tail] || 0.04;
+  const thick = {curl: fluffy ? 0.09 : 0.1, plume: 0.05, fox: 0.08, stub: 0.06, pompom: 0.06, straight: 0.03, sickle: 0.05, long: 0.03, saber: 0.03}[look.tail] || 0.04;
   const tube = mesh(new THREE.TubeGeometry(curve, 16, thick*Lt*0.5, 8, false), mat(main)); tail.add(tube);
   const tipP = curve.getPoint(1);
-  const tipR = look.tail==="pompom" ? 0.13*Lt : (look.tail==="plume" ? 0.17*Lt : (look.tail==="fox" ? 0.09*Lt : thick*Lt*0.5));
+  const tipR = look.tail==="pompom" ? 0.1*Lt : (look.tail==="plume" ? 0.17*Lt : (look.tail==="fox" ? 0.09*Lt : thick*Lt*0.5));
   const tip = sph(tipR, (look.tail==="fox"||look.tail==="sickle") ? second : main); tip.position.copy(tipP); tail.add(tip);
   if (look.tail==="plume" || (look.tail==="curl" && fluffy)){ for (let i=0;i<4;i++){ const f = sph(0.08*Lt, shade(main, 0.05), {}, true); f.position.copy(curve.getPoint(0.4 + i*0.18)); tail.add(f); } }
   if (look.tail==="fox"){ const f = sph(1, main); f.scale.set(0.07*Lt, 0.08*Lt, 0.2*Lt); f.position.copy(curve.getPoint(0.6)); f.lookAt(tail.localToWorld(curve.getPoint(1).clone())); tail.add(f); }
@@ -1192,7 +1194,7 @@ function buildDog3D(look){
   const R = B.headR*K;
   const hx = B.headR*0.45*K, hy = B.headR*0.75*K;   // tâm đầu so với cổ: tới trước, lên trên
   const skull = sph(R, main); skull.position.set(0, hy, hx); skull.scale.set(R, R*0.95, R); head.add(skull);
-  if (fluffy){ for (let i=0;i<8;i++){ const a = i/8*Math.PI*2; const f = sph(R*0.34, main, {}, true); f.position.set(Math.cos(a)*R*0.9, hy + Math.sin(a)*R*0.55 - R*0.1, hx - R*0.25); head.add(f); } }
+  if (fluffy && !STYLE_A){ for (let i=0;i<8;i++){ const a = i/8*Math.PI*2; const f = sph(R*0.34, main, {}, true); f.position.set(Math.cos(a)*R*0.9, hy + Math.sin(a)*R*0.55 - R*0.1, hx - R*0.25); head.add(f); } }
   if (curly){ const topk = sph(R*0.62, main); topk.position.set(0, hy + R*0.75, hx - R*0.1); head.add(topk); }
   const snoutC = (B.belly || look.breed==="shiba") ? second : (points ? points : shade(main, 0.12));
   const snX = hx + R*0.62, snY = hy - R*0.3;
@@ -1204,14 +1206,14 @@ function buildDog3D(look){
   const nose = sph(Math.min(2.7*K, R*0.16), "#1A1412", {r:0.25}); nose.position.set(0, snY + snH*0.45, snX + B.snout*0.4*K + snL*0.95); head.add(nose);
   // mắt to tròn, long lanh
   const eyes = [];
-  const eyeR = R*0.27;
+  const eyeR = R*STYLE_A.eyeK;   // mẫu A: mắt cúc áo đen bóng
   for (const s of [-1, 1]){
     const g = new THREE.Group();
     const dir = new THREE.Vector3(s*0.5, 0.18, 0.85).normalize();
     g.position.set(dir.x*R*0.86, hy + dir.y*R*0.86, hx + dir.z*R*0.86);
     g.lookAt(new THREE.Vector3(g.position.x + dir.x, g.position.y + dir.y, g.position.z + dir.z));
-    const white = sph(eyeR*1.08, "#FFFFFF", {r:0.3}); g.add(white);
-    const iris = sph(eyeR*0.92, eyeC, {r:0.12}); iris.position.z = eyeR*0.22; g.add(iris);
+    const white = sph(eyeR*1.08, "#120C0A", {r:0.18}); g.add(white);
+    const iris = sph(eyeR*0.92, "#120C0A", {r:0.12}); iris.position.z = eyeR*0.22; g.add(iris);
     const pupil = sph(eyeR*0.55, "#0E0B0A", {r:0.08}); pupil.position.z = eyeR*0.55; g.add(pupil);
     const hl1 = new THREE.Mesh(SPHERE_LO, new THREE.MeshBasicMaterial({color:"#FFFFFF"})); hl1.scale.setScalar(eyeR*0.26); hl1.position.set(eyeR*0.3, eyeR*0.35, eyeR*0.92); g.add(hl1);
     const hl2 = new THREE.Mesh(SPHERE_LO, new THREE.MeshBasicMaterial({color:"#FFFFFF"})); hl2.scale.setScalar(eyeR*0.13); hl2.position.set(-eyeR*0.28, -eyeR*0.25, eyeR*0.95); g.add(hl2);
@@ -1220,6 +1222,7 @@ function buildDog3D(look){
     const tear = new THREE.Mesh(SPHERE_LO, new THREE.MeshStandardMaterial({color:"#9FD7FF", roughness:0.05, transparent:true, opacity:0.85})); tear.scale.set(eyeR*0.22, eyeR*0.32, eyeR*0.22); tear.visible = false; g.add(tear);
     head.add(g);
     eyes.push({g, white, iris, pupil, hl1, hl2, lid, brow, tear, s, base: g.quaternion.clone()});
+    const blush = sph(1, "#FF9AA8", {r:0.95}); blush.scale.set(R*0.16, R*0.09, R*0.04); blush.position.set(s*R*0.62, hy - R*0.22, hx + R*0.6); blush.rotation.y = s*0.75; head.add(blush);   // má hồng
   }
   // tai
   const ears = [];
@@ -1228,8 +1231,8 @@ function buildDog3D(look){
     const t = look.ear;
     if (t==="prick" || t==="bigPrick" || t==="fold"){
       const h = (t==="bigPrick" ? 1.05 : 0.75)*R, w = (t==="bigPrick" ? 0.62 : 0.5)*R;
-      const cone = mesh(new THREE.ConeGeometry(w*0.5, h, 4), mat(main)); cone.rotation.y = Math.PI/4; cone.position.y = h*0.45; cone.scale.z = 0.45; pivot.add(cone);
-      const inner = mesh(new THREE.ConeGeometry(w*0.3, h*0.7, 4), mat("#E9A9A0")); inner.rotation.y = Math.PI/4; inner.position.set(0, h*0.38, w*0.08); inner.scale.z = 0.3; pivot.add(inner);
+      const outer = sph(1, main); outer.scale.set(w*0.55, h*0.55, w*0.28); outer.position.y = h*0.45; pivot.add(outer);   // mẫu A: tai tròn mềm
+      const inner = sph(1, "#F2B1A8", {r:0.9}); inner.scale.set(w*0.32, h*0.36, w*0.12); inner.position.set(0, h*0.42, w*0.2); pivot.add(inner);
       if (t==="fold") pivot.userData.fold = true;
     } else {
       const len = (t==="longDrop" ? 1.45 : t==="curlyDrop" ? 1.35 : 1.1)*R;
@@ -1246,7 +1249,7 @@ function buildDog3D(look){
   // chữ Z khi ngủ
   const zTex = canvasTex(64, 64, (g,w,h)=>{ g.font = "800 52px 'Baloo 2', sans-serif"; g.fillStyle = "#1E6F78"; g.textAlign = "center"; g.fillText("z", w/2, 50); });
   const zs = [0,1,2].map(i=>{ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: zTex, transparent: true, depthWrite: false, depthTest: false})); sp.renderOrder = 10; sp.scale.setScalar(0.12); sp.visible = false; scene.add(sp); return sp; });
-  root.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.userData.kind = "dog"; pickables.push(o); } });
+  root.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.userData.kind = "dog"; pickables.push(o); o.material = plushMat(o.material); } });
   // rig: lớp bên trong để lăn nghiêng cả con chó khi ngủ
   const rig = new THREE.Group(); while (root.children.length) rig.add(root.children[0]); root.add(rig);
   scene.add(root);
@@ -1255,6 +1258,13 @@ function buildDog3D(look){
   return dog3;
 }
 
+// mẫu A: bề mặt mịn như vải nỉ (giữ nguyên mắt, mũi, lưỡi, nước mắt)
+const PLUSH = {};
+function plushMat(m){
+  if (!m || !m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.transparent || m.roughness < 0.85) return m;
+  const k = m.color.getHexString();
+  return PLUSH[k] || (PLUSH[k] = new THREE.MeshPhysicalMaterial({color: m.color.clone(), roughness: 1, sheen: 1, sheenRoughness: 0.75, sheenColor: new THREE.Color(shade("#"+k, 0.55))}));
+}
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _up = new THREE.Vector3(0,1,0), _q = new THREE.Quaternion();
 function placeLimb(m, a, b, r){
   _b.subVectors(b, a); const len = _b.length() || 0.0001;
@@ -1305,16 +1315,17 @@ function updateDog3D(pose, t){
   const ra = d.roll, cyM = pose.cy*K;
   const side = clamp(ra/1.38, 0, 1), back = clamp((ra - 1.38)/1.37, 0, 1);
   const hc = lerp(lerp(cyM, d.hW*0.92, side), d.hH*0.95, back);   // độ cao tâm thân: đứng → nằm nghiêng → nằm ngửa
-  d.rig.rotation.z = ra;
+  d.rig.rotation.z = ra + (pose.bodyShake||0)*Math.sin(t*26)*0.38;   // lắc cả mình
+  d.rig.rotation.y = (pose.wiggle||0)*Math.sin(t*13)*0.2;            // vẫy cả mông: thân lắc quanh vai
   d.head.position.y -= back*d.hH*1.1;   // nằm ngửa: nhấc đầu lên khỏi sàn (trục y cục bộ đã lộn ngược)
   d.rig.position.set(cyM*Math.sin(ra), hc - cyM*Math.cos(ra), 0);
   // đầu
   const neck = W2(hL*0.78, -hH*0.55);
   d.head.position.copy(P3(neck[0], neck[1]));
   d.head.rotation.x = pose.head + pose.tilt*0.35 + (pose.chew > 0.3 ? Math.sin(t*14)*0.04 : 0);
-  d.head.rotation.y = (pose.shake||0)*Math.sin(t*20)*0.45;                 // lắc đầu khi ngậm xương
+  d.head.rotation.y = (pose.shake||0)*Math.sin(t*20)*0.45 + (pose.yaw||0) - (pose.wiggle||0)*Math.sin(t*13)*0.25 + (pose.bodyShake||0)*Math.sin(t*26 + 0.6)*0.3;   // lắc đầu khi ngậm xương; quay đầu (đánh hơi, nhìn quanh)
   d.head.rotation.z = pose.chew > 0.3 ? Math.sin(t*6)*0.2*pose.chew : 0;   // nghiêng đầu gặm
-  d.head.rotation.z += clamp(d.roll - 1.38, 0, 2)*(-0.9);   // nằm ngửa: đầu xoay nghiêng lại cho thấy mặt
+  d.head.rotation.z += clamp(d.roll - 1.38, 0, 2)*(-0.9) + (pose.cock||0);   // cock: nghiêng đầu khi nghe gọi   // nằm ngửa: đầu xoay nghiêng lại cho thấy mặt
   const mouthOpen = pose.mouth + (pose.chew > 0.3 ? (Math.sin(t*14)*0.5+0.5)*0.5 : 0) + pose.tongue*0.35;
   d.jaw.rotation.x = clamp(mouthOpen, 0, 1.2)*0.45;
   d.tongue.visible = pose.tongue > 0.5;
@@ -1332,22 +1343,22 @@ function updateDog3D(pose, t){
   const crying = sad && (curSick() >= 2 || (prof && prof.stats.happy < 35));
   for (const e of d.eyes){
     const sy = happyEyes ? 0.28 : Math.max(0.08, open);
-    e.white.scale.set(d.R*0.27*1.08, d.R*0.27*1.08*sy, d.R*0.27*1.08);
+    e.white.scale.set(d.R*STYLE_A.eyeK*1.08, d.R*STYLE_A.eyeK*1.08*sy, d.R*STYLE_A.eyeK*1.08);
     e.iris.visible = e.pupil.visible = !happyEyes && open > 0.2;
     e.hl1.visible = e.hl2.visible = !happyEyes && open > 0.2;
     const big = sad ? 1.12 : 1;   // mắt to long lanh khi buồn
-    e.iris.scale.setScalar(d.R*0.27*0.92*big); e.pupil.scale.setScalar(d.R*0.27*0.55*big);
+    e.iris.scale.setScalar(d.R*STYLE_A.eyeK*0.92*big); e.pupil.scale.setScalar(d.R*STYLE_A.eyeK*0.55*big);
     e.iris.scale.y *= Math.max(0.1, open); e.pupil.scale.y *= Math.max(0.1, open);
-    e.hl2.scale.setScalar(d.R*0.27*(sad ? 0.2 : joy ? 0.18 : 0.13));
-    e.hl1.scale.setScalar(d.R*0.27*(joy ? 0.34 : 0.26));
+    e.hl2.scale.setScalar(d.R*STYLE_A.eyeK*(sad ? 0.2 : joy ? 0.18 : 0.13));
+    e.hl1.scale.setScalar(d.R*STYLE_A.eyeK*(joy ? 0.34 : 0.26));
     e.lid.visible = open < 0.9;
-    e.lid.scale.y = d.R*0.27*1.16*Math.max(0.05, (1 - open)*0.95);
-    e.lid.position.y = d.R*0.27*(0.55 + (1-open)*0.2);
-    e.white.material = happyEyes ? mat("#1A1412") : mat("#FFFFFF", {r:0.3});
+    e.lid.scale.y = d.R*STYLE_A.eyeK*1.16*Math.max(0.05, (1 - open)*0.95);
+    e.lid.position.y = d.R*STYLE_A.eyeK*(0.55 + (1-open)*0.2);
+    e.white.material = happyEyes ? mat("#1A1412") : mat("#120C0A", {r:0.18});
     e.brow.visible = sad;
     e.brow.rotation.z = -e.s*0.45;
     e.tear.visible = crying;
-    if (crying){ const ph = (t*0.6 + (e.s>0?0.5:0)) % 1; e.tear.position.set(e.s*0.2*d.R*0.27, -d.R*0.27*(0.8 + ph*1.6), d.R*0.27*0.7); e.tear.material.opacity = 0.9*(1-ph); }
+    if (crying){ const ph = (t*0.6 + (e.s>0?0.5:0)) % 1; e.tear.position.set(e.s*0.2*d.R*STYLE_A.eyeK, -d.R*STYLE_A.eyeK*(0.8 + ph*1.6), d.R*STYLE_A.eyeK*0.7); e.tear.material.opacity = 0.9*(1-ph); }
   }
   // chữ Z
   for (let i=0;i<3;i++){
@@ -1527,6 +1538,12 @@ function sfx(name){
     case "pant": for (let i=0;i<4;i++) noiseHit(c, t + i*0.17, 1500, 1.4, 0.05, 0.1); break;
     case "chime": tone(c, t, "sine", 880, 880, 0.08, 0.25); tone(c, t+0.12, "sine", 1320, 1320, 0.07, 0.35); break;
     case "whoosh": noiseHit(c, t, 900, 0.5, 0.05, 0.3); break;
+    case "bark": tone(c, t, "square", 470, 260, 0.05, 0.16, 230); noiseHit(c, t, 900, 1.2, 0.05, 0.12); break;
+    case "yawn": tone(c, t, "sine", 520, 300, 0.035, 1.0, 240); noiseHit(c, t + 0.1, 700, 0.8, 0.02, 0.9, "lowpass"); break;
+    case "shakeOff": for (let i=0;i<7;i++) noiseHit(c, t + i*0.075, 1400 + (i%2)*500, 1.1, 0.06, 0.07); break;
+    case "sigh": noiseHit(c, t, 500, 0.7, 0.04, 0.9, "lowpass"); break;
+    case "dream": tone(c, t, "sine", 780, 1000, 0.012, 0.22, 700); tone(c, t + 0.3, "sine", 820, 1050, 0.01, 0.2, 720); break;
+    case "whine": tone(c, t, "sine", 900, 1250, 0.03, 0.35, 820); tone(c, t + 0.4, "sine", 950, 1300, 0.03, 0.4, 780); break;
     case "moan": tone(c, t, "sine", 520, 760, 0.045, 0.55, 470); tone(c, t, "triangle", 1040, 1500, 0.012, 0.5, 940); break;
   }
 }
@@ -1644,7 +1661,8 @@ function petDog(fromRub=false){
     bubble(pick(["Gãi bụng em đi!","Bụng nè!"]), 1600, true);
     floatHeart(); persist(); return;
   }
-  if (!["sleep","eat","chew","walk","run","toBed","belly","jump"].includes(dog.state) && !play){ dog.faceCam = true; setState("happy", 1500); }
+  if (dog.state === "sit" && !dog.onChair && !play && Math.random() < 0.35){ dog.faceCam = true; gesture("paw"); { const h = facingCamHeading() + 0.55; dog.faceCam = false; dog.lookAt = {x: dog.pos.x + Math.sin(h), z: dog.pos.z + Math.cos(h)}; } bubble("Bắt tay nè!", 1300); floatHeart(); persist(); return; }   // đang ngồi: giơ chân bắt tay
+  if (!["sleep","eat","chew","walk","run","toBed","belly","jump","gest","potty","sniff"].includes(dog.state) && !play){ dog.faceCam = true; setState("happy", 1500); }
   if (Math.random() < 0.35) bubble(pick(["Thích quá!","Gâu!","Hihi","Cưng nữa đi!"]), 1400);
   floatHeart();
   persist();
@@ -1732,7 +1750,7 @@ function playToy(type){
   const f = fwd();
   if (type==="ball"){
     toy = {type, p: new THREE.Vector3(dog.pos.x + f.x*0.35, 0.07, dog.pos.z + f.z*0.35), v: new THREE.Vector3(), held:false};
-    setState("play", 900, {afterPlay: "throw"});
+    dog.faceCam = true; gesture("bow", ()=>{ if (play && toy) setState("play", 500, {afterPlay: "throw"}); });
   } else {
     toy = {type, p: new THREE.Vector3(dog.pos.x + f.x*0.3, 0.03, dog.pos.z + f.z*0.3), v: new THREE.Vector3(), held:true, spin:0};
     dog.faceCam = true;
@@ -1784,6 +1802,8 @@ function callName(){   // chủ gọi tên: chó chạy ra giữa màn hình, đ
     dog.faceCam = true;
     const S = prof.stats, good = prof.skills.sit >= 50 && S.happy >= 40;
     S.bond = Math.min(100, S.bond + 0.3); persist();
+    if (Math.random() < 0.45 && !dog.calledTilt){ dog.calledTilt = true; gesture("tilt", ()=>{ dog.faceCam = true; good && Math.random() < 0.7 ? setState("sit", 4000) : (setState("beg", 3000), sfx("pant")); }); bubble("Chủ gọi em hả?", 1500, true); return; }
+    dog.calledTilt = false;
     if (good && Math.random() < 0.7){ setState("sit", 4000); bubble(pick(["Em ngồi ngoan nè","Chủ gọi em hả?"]), 1800, true); }
     else { setState("beg", 3000); sfx("pant"); bubble(pick(["Chơi với em đi!","Em đây, em đây!"]), 1800, true); }
   });
@@ -1812,10 +1832,6 @@ function stopPlay(silent=false){
   persist();
 }
 function updatePlayUI(){
-  $("tBall").classList.toggle("on", !!play && play.type==="ball");
-  $("tBone").classList.toggle("on", !!play && play.type==="bone");
-  $("tBallLbl").textContent = play && play.type==="ball" ? "Dừng" : "Bóng";
-  $("tBoneLbl").textContent = play && play.type==="bone" ? "Dừng" : "Xương";
   $("stopPlay").classList.toggle("show", !!play);
 }
 
@@ -1867,13 +1883,13 @@ function toggleRest(){
   updateRestBtn();
   if (restMode){
     $("bubble").classList.remove("show");
-    walkTo(room.bed, false, ()=>{ dog.faceCam = true; setState("sleep"); });
+    walkTo(room.bed, false, ()=>gesture("circle", ()=>{ if (!restMode) return; dog.faceCam = true; setState("sleep"); }));
     dog.state = "toBed";
   } else {
     dog.path = []; dog.then = null;
     dog.pose.sleep = 0;
     excite(); dog.faceCam = true;
-    setState("happy", 1500);
+    gesture("stretch", ()=>gesture("shake", ()=>{ dog.faceCam = true; setState("happy", 1200); }));
     bubble("Dậy rồi!", 1500, true);
   }
 }
@@ -1894,7 +1910,28 @@ function openCloset(){
 }
 
 // ---- tự đi lại khi rảnh ----
-function idleBrain(now){
+function idleBrain(now){ return idleBrainCore(now); }
+function idleGesture(S){   // thỉnh thoảng mới làm, để không lặp lại
+  const E = S.energy ?? 80, q = Math.random();
+  if (performance.now() - (dog.lastGest||0) < 9000) return false;
+  const go = (name, fn)=>{ dog.lastGest = performance.now(); fn ? fn() : (dog.faceCam = Math.random() < 0.6, gesture(name)); return true; };
+  if (E < 45 && q < 0.25) return go("yawn");
+  if (q < 0.07 && S.happy > 65 && E > 55) return go("chase", ()=>{ gesture("chase", ()=>{ bubble("Chóng mặt quá 😵", 1400); setState("happy", 1200); }); });
+  if (q < 0.13 && S.happy > 60 && E > 50) return go("bow", ()=>{ dog.faceCam = true; gesture("bow"); bubble(pick(["Chơi hông?","Gâu!"]), 1300); });
+  if (q < 0.22) return go("sniff", ()=>{ walkTo(randomFreePoint(), false, ()=>setState("sniff", rnd(1800, 2800))); });
+  if (q < 0.27) return go("tilt", ()=>{ dog.faceCam = true; gesture("tilt"); });
+  if (q < 0.33 && S.happy > 50) return go("restHead", ()=>{ dog.faceCam = true; gesture("restHead"); });
+  if (q < 0.36 && E > 80 && S.happy > 60) return go("zoom", zoomies);
+  return false;
+}
+function zoomies(){   // chạy vòng vòng quanh thảm khi vui quá
+  const pts = []; const n = 7, c = {x: -0.1, z: 0.55}, dir = Math.random() < 0.5 ? 1 : -1;
+  for (let i = 0; i <= n*2; i++){ const a = dir*i/n*Math.PI*2; pts.push(nearestFree({x: c.x + Math.cos(a)*0.95, z: c.z + Math.sin(a)*0.7})); }
+  let i = 0; excite(9000); sfx("bark");
+  const next = ()=>{ if (++i >= pts.length || play || restMode){ dog.faceCam = true; setState("happy", 1500); sfx("pant"); return; } walkTo(pts[i], true, next); };
+  walkTo(pts[0], true, next);
+}
+function idleBrainCore(now){
   if (restMode) return;
   const S = prof.stats;
   if (now < dog.next) return;
@@ -1927,6 +1964,7 @@ function idleBrain(now){
     return;
   }
   if (Math.random() < chewChance()){ startGnaw(); return; }
+  if (idleGesture(S)) return;
   const r = Math.random();
   if (r < 0.4) walkTo(randomFreePoint());
   else if (r < 0.62) goChair();          // chỗ yêu thích: ghế cạnh cửa sổ
@@ -1936,6 +1974,110 @@ function idleBrain(now){
   else setState("idle", 2500);
 }
 
+// ---------- cử chỉ: động tác có thời gian, chuyển mượt (vào, giữ, ra) ----------
+// Cách làm cho mềm: mỗi cử chỉ là đường cong theo thời gian k (0→1); dùng hàm êm (smoothstep) để vào và ra,
+// thêm dao động nhỏ (thở, nhún) để không cứng như robot. Tư thế cuối vẫn qua bộ lọc lerp chung.
+const GEST = {
+  bow:     {dur: 1700, sfx: "bark"},     // cúi người mời chơi
+  tilt:    {dur: 1500},                  // nghiêng đầu khi nghe gọi
+  stretch: {dur: 2700, sfx: "yawn", sfxAt: 0.22}, // vươn vai sau khi dậy: duỗi trước + ngáp, rồi duỗi sau
+  yawn:    {dur: 1500, sfx: "yawn"},
+  circle:  {dur: 1500, spin: 1},         // xoay một vòng trước khi nằm / đi vệ sinh
+  chase:   {dur: 3000, spin: 3},         // đuổi đuôi
+  wiggle:  {dur: 1900, sfx: "whine"},    // vẫy cả mông mừng chủ
+  shake:   {dur: 1100, sfx: "shakeOff"}, // lắc cả mình
+  paw:     {dur: 1900},                  // giơ một chân trước
+  restHead:{dur: 7000, sfx: "sigh"},     // nằm tựa cằm lên chân, mắt ngước nhìn
+};
+const sstep = (a, b, x) => { const k = clamp((x - a)/(b - a), 0, 1); return k*k*(3 - 2*k); };
+const env3 = (k, i=0.18, o=0.82) => sstep(0, i, k)*(1 - sstep(o, 1, k));   // vào – giữ – ra
+function gesture(name, then=null, opt={}){
+  const g = GEST[name]; if (!g || !prof) { if (then) then(); return; }
+  dog.path = []; dog.then = null;
+  dog.gest = {name, t0: tSec, dur: g.dur/1000, then, h0: dog.heading, dir: opt.dir || (Math.random() < 0.5 ? 1 : -1), sfxDone: false};
+  if (g.sfx && !g.sfxAt){ sfx(g.sfx); dog.gest.sfxDone = true; }
+  if (name === "bow" || name === "wiggle" || name === "chase") excite(g.dur + 800);
+  setState("gest", g.dur);
+}
+const GK = QS.get("gk") != null ? +QS.get("gk") : null;   // chạy thử: đứng hình cử chỉ ở thời điểm gk
+function gestK(){ const g = dog.gest; if (GK != null && g) return GK; return g ? clamp((tSec - g.t0)/g.dur, 0, 1) : 1; }
+// bước chân tại chỗ (xoay vòng, đuổi đuôi)
+function stepInPlace(T, B, speed){
+  const ph = tSec*speed, L = B.legL, st = Math.max(L*0.25, 3), lf = Math.max(L*0.3, 3.5);
+  T.fF = Math.sin(ph)*st; T.fLift = Math.max(0, Math.cos(ph))*lf;
+  T.fFFar = Math.sin(ph + Math.PI)*st; T.fLiftFar = Math.max(0, Math.cos(ph + Math.PI))*lf;
+  T.bF = Math.sin(ph + Math.PI + 0.3)*st; T.bLift = Math.max(0, Math.cos(ph + Math.PI + 0.3))*lf;
+  T.bFFar = Math.sin(ph + 0.3)*st; T.bLiftFar = Math.max(0, Math.cos(ph + 0.3))*lf;
+}
+function gestPose(B){
+  const g = dog.gest, k = gestK(), L = B.legL, H = B.bodyH;
+  if (GEST[g.name].sfxAt && !g.sfxDone && k >= GEST[g.name].sfxAt){ g.sfxDone = true; sfx(GEST[g.name].sfx); }
+  let T;
+  switch (g.name){
+    case "bow": {
+      T = poseFor("stand", B); const a = env3(k, 0.2, 0.8);
+      T.tilt = 0.42*a; T.cy -= L*0.12*a - Math.max(0, Math.sin(tSec*9))*L*0.06*a;   // nhún nhún
+      T.fF = L*0.95*a; T.fFFar = L*0.8*a; T.head = -0.4*a; T.ear = -0.2*a;
+      T.tail = -0.6*a; T.wag = 0.9; T.wagSpd = 20; T.happy = 1; T.tongue = a > 0.5 ? 1 : 0; T.mouth = 0.25*a;
+      break;
+    }
+    case "tilt": {
+      T = poseFor("stand", B); const a = env3(k, 0.15, 0.75), b = env3(k, 0.5, 0.95);
+      T.cock = g.dir*0.42*a - g.dir*0.3*b*(1 - a);   // nghiêng một bên, rồi thoáng nghiêng bên kia
+      T.ear = -0.35*Math.max(a, b); T.head = -0.12; T.eye = 1; T.wag = 0.3;
+      break;
+    }
+    case "stretch": {
+      T = poseFor("stand", B);
+      const a = env3(clamp(k/0.55, 0, 1), 0.3, 0.75);          // pha 1: chồm trước, mông chổng
+      const b = env3(clamp((k - 0.5)/0.5, 0, 1), 0.3, 0.7);    // pha 2: rướn ngực, duỗi chân sau
+      T.tilt = 0.5*a - 0.32*b; T.cy -= L*0.18*a + L*0.22*b;
+      T.fF = L*1.1*a - L*0.2*b; T.fFFar = L*1.0*a - L*0.15*b;
+      T.bF = -L*0.15*a - L*1.15*b; T.bFFar = -L*0.1*a - L*0.9*b; T.bLift = L*0.15*b;
+      const y = env3(clamp((k - 0.15)/0.35, 0, 1), 0.25, 0.7);   // ngáp trong lúc chồm
+      T.mouth = 1.25*y; T.eye = 1 - 0.85*y - 0.3*b; T.head = -0.45*a - 0.3*y - 0.4*b; T.ear = 0.35*a + 0.3*b;
+      T.tail = 0.3; T.wag = 0.1;
+      break;
+    }
+    case "yawn": {
+      T = poseFor(dog.gestBase || "stand", B); const y = env3(k, 0.3, 0.7);
+      T.mouth = 1.25*y; T.eye = 1 - 0.9*y; T.head = (T.head || 0) - 0.35*y; T.tongue = y > 0.7 ? 1 : 0; T.ear = 0.3*y;
+      break;
+    }
+    case "circle": case "chase": {
+      T = poseFor("stand", B); const fast = g.name === "chase";
+      stepInPlace(T, B, fast ? 22 : 13);
+      T.yaw = g.dir*(fast ? 0.95 : 0.35); T.cock = g.dir*(fast ? 0.2 : 0.05);
+      T.head = fast ? 0.15 : 0.35; T.tail = fast ? -0.4 : 0.2;
+      if (fast){ T.happy = 1; T.tongue = 1; T.wag = 0.9; T.wagSpd = 22; } else { T.wag = 0.15; }
+      break;
+    }
+    case "wiggle": {
+      T = poseFor("stand", B); const a = env3(k, 0.12, 0.85);
+      T.wiggle = a; T.happy = 1; T.tongue = 1; T.ear = 0.45*a; T.head = -0.15; T.wag = 1; T.wagSpd = 24;
+      T.cy -= L*0.08*a;   // hạ thấp người khi mừng
+      break;
+    }
+    case "shake": {
+      T = poseFor("stand", B); const a = env3(k, 0.1, 0.75);
+      T.bodyShake = a; T.ear = 0.2; T.eye = 1 - 0.6*a; T.wag = 0;
+      break;
+    }
+    case "paw": {
+      T = poseFor("sit", B); const a = env3(k, 0.2, 0.8);
+      const fs = T.fStretch || 1; T.fLift = L*0.62*fs*a; T.fF = 2 + L*0.4*fs*a; T.head -= 0.15*a; T.cock = g.dir*0.15*a; T.happy = 1; T.wag = 0.6;
+      break;
+    }
+    case "restHead": {
+      T = poseFor("lie", B); const a = env3(k, 0.15, 0.9);
+      T.head = 0.05 + 0.6*a; T.eye = 1 - 0.15*a + Math.sin(tSec*0.7)*0.05; T.ear = 0.45*a; T.tail = 1.2; T.wag = 0.05;
+      T.fF = L*1.1; T.fFFar = L*1.05;   // hai chân trước duỗi thẳng để tựa cằm
+      break;
+    }
+    default: T = poseFor("stand", B);
+  }
+  return T;
+}
 // ---- vòng lặp ----
 function turnTo(target, dt, rate=7){
   let d = target - dog.heading;
@@ -1982,7 +2124,11 @@ function frame(now){
     }
   } else {
     // đứng yên: quay mặt về người chơi hoặc về vật đang nhìn
-    if (dog.lookAt){ turnTo(Math.atan2(dog.lookAt.x - dog.pos.x, dog.lookAt.z - dog.pos.z), dt, 4); }
+    if (dog.state === "gest" && dog.gest && GEST[dog.gest.name].spin){
+      const g = dog.gest, k = gestK(), e = k*k*(3 - 2*k);
+      dog.heading = g.h0 + g.dir*GEST[g.name].spin*Math.PI*2*e;
+    }
+    else if (dog.lookAt){ turnTo(Math.atan2(dog.lookAt.x - dog.pos.x, dog.lookAt.z - dog.pos.z), dt, 4); }
     else if (dog.faceCam) turnTo(facingCamHeading(), dt, 4);
   }
   if (isMoving()) dog.lookAt = null;
@@ -2030,14 +2176,20 @@ function frame(now){
       setState("chew", rnd(6000, 9000));
     } else if (st==="chew"){ toy=null; setState("happy",1500); }
     else if (st==="potty"){ finishPotty(); }
+    else if (st==="sniff" && dog.pottyNext){ dog.pottyNext = false; afterPadSniff(); }
+    else if (st==="gest"){ const g = dog.gest; dog.gest = null; if (g && g.then) g.then(); else { dog.lookAt = null; setState("idle", 0); } }
     else if (st==="gnaw"){ finishGnaw(); }
     else if (st==="shake" && dog.afterShake){ dog.afterShake = false; dog.faceCam = true; setState("sit", 3000); if (Math.random() < 0.5) bubble("Nữa hông?", 1400); }
     else if (st!=="sleep"){ dog.lookAt = null; setState("idle", 0); }
   }
+  if (prof.bladder >= 75 && !dog.pottyWarned && !dog.pottyBusy && canPotty()){   // mắc rồi: đánh hơi, rên ư ử để chủ biết mà dắt ra thảm
+    dog.pottyWarned = true; sfx("whine"); bubble("Em mắc tè... 🥺", 2400, true); hint("Chó muốn đi vệ sinh! Bấm vào thảm vệ sinh để dắt chó đi", 4500);
+    setState("sniff", 2200);
+  }
   if (prof.bladder >= 100 && !dog.pottyBusy && canPotty()) goPotty();
   else if (prof.bladder >= 140 && !dog.pottyBusy && !dog.jump && !play && dog.state !== "sleep"){ goPotty(true); }
   $("noBtn").classList.toggle("show", dog.state === "gnaw");
-  if (dog.state==="belly" && now > (dog.bellyUntil||0)){ setState("shake", 900, {afterShake: true}); sfx("whoosh"); }
+  if (dog.state==="belly" && now > (dog.bellyUntil||0)){ sfx("whoosh"); gesture("shake", ()=>{ dog.faceCam = true; setState("sit", 3000); if (Math.random() < 0.5) bubble("Nữa hông?", 1400); }); }
   if (dog.state==="idle" && !dog.until) idleBrain(now);
   // tiếng theo trạng thái: ngáy khi ngủ, gặm rôm rốp, liếm nước
   if (tSec > (dog.nextSfx||0)){
@@ -2064,7 +2216,7 @@ function frame(now){
     if (prof.stats.happy < 35){ target.ear = 0.8; target.tail = 1.2; }
   } else {
     const map = {idle:"stand", sit:"sit", beg:"beg", lie:"lie", sleep:"sleep", sad:"sad", eat:"eat",
-                 chew:"chew", happy:"happy", play:"play", scratch:"scratch", look:"look", hungry:"hungry", belly:"belly", shake:"stand", potty:"sit", gnaw:"chew"};
+                 chew:"chew", happy:"happy", play:"play", scratch:"scratch", look:"look", hungry:"hungry", belly:"belly", shake:"stand", potty:"sit", gnaw:"chew", sniff:"stand"};
     target = poseFor(map[dog.state]||"stand", B);
     if (dog.state==="happy") target.cy += Math.max(0, Math.sin(tSec*9))*5;
     if (dog.state==="scratch") target.bF = B.legL*0.2 + Math.sin(tSec*30)*3;
@@ -2074,6 +2226,12 @@ function frame(now){
     if (dog.state==="shake"){ target.shake = 1; target.happy = 1; }
     if (dog.state==="potty"){ target.tail = -0.7; target.head = 0.15; target.ear = 0.2; target.wag = 0; }   // ngồi xổm, đuôi dựng
     if (dog.state==="gnaw"){ target.head = 0.4; target.happy = 0.6; }
+    if (dog.state==="gest" && dog.gest) target = gestPose(B);
+    if (dog.state==="idle" || dog.state==="sit" || dog.state==="lie"){   // đứng yên vẫn nhúc nhích: liếc quanh, tai động đậy
+      target.yaw = (target.yaw||0) + Math.sin(tSec*0.37)*0.16 + Math.sin(tSec*1.13 + 1)*0.05;
+      if (Math.sin(tSec*0.23) > 0.96) target.cock = (target.cock||0) + 0.12;
+    }
+    if (dog.state==="sniff"){ target.head = 0.95; target.yaw = Math.sin(tSec*3.2)*0.45; target.ear = 0.15; target.tail = -0.2; target.wag = 0.3; target.fF = B.legL*0.12; target.cy -= B.legL*0.08; }
     if (dog.state==="sit" && dog.sorry && now < dog.until){ target.ear = 1; target.head = 0.3; target.tail = 1.2; target.wag = 0.05; }   // cúi xuống gặm xương giữa hai chân trước
     if (dog.state==="play" && toy && toy.type==="bone" && toy.held){ target.shake = 1; target.head = -0.05; target.happy = 1; }
     if (dog.state==="sleep"){   // 3D: nằm nghiêng, chân duỗi thả lỏng, đầu gối xuống sàn
@@ -2081,6 +2239,10 @@ function frame(now){
       target.cy = (L + H*0.25)*0.88;
       target.fF = L*0.55; target.fFFar = L*0.3; target.bF = -L*0.45; target.bFFar = -L*0.2;
       target.head = 0.28; target.tail = 1.4; target.ear = 0.7;
+      if (!dog.dreamAt) dog.dreamAt = tSec + rnd(12, 25);
+      if (tSec > dog.dreamAt){ dog.dreamUntil = tSec + 2.6; dog.dreamAt = tSec + rnd(18, 35); sfx("dream"); }
+      if (tSec < (dog.dreamUntil||0)){ const tw = Math.sin(tSec*19), tw2 = Math.sin(tSec*23 + 1);
+        target.fF += tw*L*0.18; target.fFFar += tw2*L*0.14; target.bF += tw2*L*0.16; target.bFFar += tw*L*0.12; target.wag = 0.15; target.wagSpd = 9; target.ear = 0.55 + tw*0.08; }
     }
   }
   if (dog.jump){   // nhảy: co chân lại, thân ngóc lên rồi chúi xuống
@@ -2092,7 +2254,7 @@ function frame(now){
   }
   if (target.sleep > 0.5) target.wag = 0;
   else if (play || now < excitedUntil){ target.wag = Math.max(target.wag, 0.7); target.wagSpd = 20; }
-  else { target.wag = Math.min(target.wag, 0.12); target.wagSpd = 4; }
+  else if (dog.state !== "gest"){ target.wag = Math.min(target.wag, 0.12); target.wagSpd = 4; }
   if (curSick() >= 1 && !target.sleep){
     target.eye = Math.min(target.eye, curSick() >= 2 ? 0.5 : 0.75);
     target.ear = Math.max(target.ear, curSick() >= 2 ? 0.8 : 0.4);
@@ -2185,6 +2347,7 @@ function render(now){
   if (now > dog.bubbleUntil || ringOpen) bEl.classList.remove("show");
   bEl.style.left = clamp(dog.headTop[0], 70, W-70) + "px";
   bEl.style.top = Math.max(44, dog.headTop[1] - 6) + "px";
+  if (QS.get("dbgpose")) document.title = JSON.stringify({st: dog.state, g: dog.gest && dog.gest.name, k: dog.gest && +gestK().toFixed(2), tilt: +dog.pose.tilt.toFixed(2), bF: +dog.pose.bF.toFixed(1), fF: +dog.pose.fF.toFixed(1), fL: +dog.pose.fLift.toFixed(1), fS: +(dog.pose.fStretch||1).toFixed(2)});
   if (QS.get("dbg")) $("hint").textContent = `pos=${dog.pos.x.toFixed(2)},${dog.pos.z.toFixed(2)} st=${dog.state} path=${dog.path.length} chair=${!!dog.onChair} jump=${!!dog.jump} y=${dog.y.toFixed(2)} sp=${(dog.speed||0).toFixed(2)} wp=${dog.path[0]?dog.path[0].x.toFixed(2)+","+dog.path[0].z.toFixed(2):"-"} h=${dog.heading.toFixed(2)} t=${tSec.toFixed(1)}`;
 }
 
@@ -2256,6 +2419,7 @@ canvas.addEventListener("pointerdown", e=>{
   closeFoodMenu();
   if (kind==="bed"){ closeRing(); if (!restMode) toggleRest(); else hint("Chó đang ngủ. Chạm vào chó hoặc bấm Gọi tên để đánh thức", 2500); return; }
   if (ringOpen){ closeRing(); return; }
+  if (kind==="pad"){ closeRing(); remindPotty(); return; }
   if (kind==="floor"){ openRing(x, y, {x: hit.point.x, z: hit.point.z}); return; }
   if (kind==="sofa"){ goPerch("sofa", true); return; }
   hint("Bấm lên sàn để ra lệnh", 2000);
@@ -2388,6 +2552,7 @@ function startProfile(id){
   buildDog3D(prof.dog);
   dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0; dog.onChair = false; dog.jump = null; dog.pendingPerch = null;
   dog.pose = poseFor("stand", BREEDS[prof.dog.breed]); setState("happy", 1500); dog.next = 0; excite(8000);
+  if (sickLevel(prof.stats.sick) < 2) setTimeout(()=>{ if (dog.state === "happy" && !isMoving()){ dog.faceCam = true; gesture("wiggle"); } }, 700);
   dog.pottyBusy = false; dog.gnawSpot = null; messKey = "#"; buildMesses(); buildMarks();
   if (prof.messes.length) setTimeout(()=>hint(`Có ${prof.messes.length} vết bẩn chó đi bậy lúc vắng nhà. Bấm vào để dọn`, 4000), 1500);
   refreshTop();
@@ -2459,19 +2624,47 @@ function offlinePotty(p, t){   // lúc tắt app: chó tự đi; chưa học th�
   p.messes.push({x: sp.x + rnd(-0.2,0.2), z: sp.z + rnd(-0.2,0.2), t});
   p.stats.clean = Math.max(0, p.stats.clean - 5);
 }
-function canPotty(){ return !play && !dog.jump && !restMode && !["eat","chew","gnaw","belly","potty","jump","sleep","toBed"].includes(dog.state) && !isMoving(); }
+function canPotty(){ return !play && !dog.jump && !restMode && !["eat","chew","gnaw","belly","potty","jump","sleep","toBed","gest","sniff"].includes(dog.state) && !isMoving(); }
 function goPotty(force=false){
   const ok = !force && Math.random() < successChance(prof.skills.potty || 0);
   dog.pottyBusy = true;
-  if (ok) walkTo(nearestFree(room.pad), false, ()=>{ dog.faceCam = true; setState("potty", 2600, {pottyOk: true}); });
+  if (ok) walkTo(nearestFree(room.pad), false, ()=>{ dog.lookAt = {x: room.pad.x, z: room.pad.z}; setState("sniff", 1200, {pottyNext: false}); setTimeout(()=>{ if (dog.state === "sniff") gesture("circle", ()=>{ dog.faceCam = true; setState("potty", 2600, {pottyOk: true}); }); }, 1200); });
   else {
     const a = Math.random()*Math.PI*2;
     walkTo(nearestFree({x: dog.pos.x + Math.cos(a)*0.5, z: dog.pos.z + Math.sin(a)*0.5}), false, ()=>{ dog.faceCam = true; setState("potty", 2600, {pottyOk: false}); });
   }
 }
+// chủ bấm thảm: dắt chó tới thảm. Mắc thì đi đúng chỗ (chắc chắn), chưa mắc thì đánh hơi làm quen chỗ, vẫn học chút ít
+const REMIND_COOLDOWN_MS = 4*60000;
+function remindPotty(){
+  if (!prof) return;
+  if (dog.state === "potty" || dog.pottyBusy){ hint("Chó đang đi vệ sinh rồi", 1800); return; }
+  if (dog.state === "sleep" || restMode){ hint("Chó đang ngủ. Chạm vào chó để đánh thức trước nha", 2500); return; }
+  if (play) stopPlay(true);
+  if (dog.jump || ["eat","belly","toBed"].includes(dog.state)){ hint("Đợi chó xong việc rồi nhắc nha", 2000); return; }
+  dog.pottyBusy = true;
+  sfx("chime"); bubble(pick(["Đi vệ sinh hả?","Dạ!","Em đi liền"]), 1400, true);
+  walkTo(nearestFree(room.pad), false, ()=>{
+    dog.faceCam = false; dog.lookAt = {x: room.pad.x, z: room.pad.z};
+    setState("sniff", 1700, {pottyNext: true});     // đánh hơi thảm, xoay một vòng rồi mới ngồi
+  });
+}
+function afterPadSniff(){
+  const p = prof;
+  if ((p.bladder || 0) >= 25){ gesture("circle", ()=>{ dog.faceCam = true; setState("potty", 2600, {pottyOk: true}); }); return; }
+  dog.pottyBusy = false;
+  const fresh = performance.now() - (dog.lastRemindLearn || -1e9) > REMIND_COOLDOWN_MS;
+  if (fresh){
+    dog.lastRemindLearn = performance.now();
+    p.skills.potty = Math.min(100, (p.skills.potty || 0) + 1); p.practiced.potty = gameNow(p);
+    bubble("Em chưa mắc, nhưng em nhớ chỗ này rồi", 2200, true); hint("Dạy đi vệ sinh +1. Lúc chó mắc (đánh hơi, đi lòng vòng) bấm thảm sẽ học nhanh hơn", 4000);
+    persist();
+  } else bubble("Em chưa mắc mà", 1600, true);
+  dog.faceCam = true; setState("sit", 1800);
+}
 function finishPotty(){
   const p = prof, S = p.stats, B = BREEDS[p.dog.breed];
-  p.bladder = 0; dog.pottyBusy = false;
+  p.bladder = 0; dog.pottyBusy = false; dog.pottyWarned = false;
   if (dog.pottyOk){
     S.clean = Math.min(100, S.clean + 3);
     const gain = Math.max(1, Math.round(B.learn*3*(1 - p.skills.potty/120)));
@@ -2772,8 +2965,6 @@ $("tCall").onclick = callName;
 $("alertChip").onclick = ()=>showStats(8000);
 $("statsPanel").onclick = ()=>{ statsUntil = 0; $("statsPanel").classList.remove("show"); };
 setInterval(()=>{ if (prof) refreshAlert(); }, 1500);
-$("tBall").onclick = ()=>playToy("ball");
-$("tBone").onclick = ()=>playToy("bone");
 $("tCloset").onclick = openCloset;
 $("noBtn").onclick = sayNo;
 $("noBtn").addEventListener("pointerdown", e => e.stopPropagation());
@@ -2866,7 +3057,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   const bond0 = prof.stats.bond; dog.rubPetAt = 0; rubBelly(); ok("gãi bụng: chân sau đạp (đang gãi), thân thiết tăng", performance.now() - dog.rubAt < 50 && prof.stats.bond >= bond0);
   ok("bảng chỉ số hiện khi chạm vào chó", $("statsPanel").classList.contains("show") && $("statsPanel").textContent.includes("Tình cảm"));
   ok("bảng có đủ 5 thanh", ["Tình cảm","Ăn","Nước uống","Vệ sinh","Thể dục"].every(n => $("statsPanel").textContent.includes(n)));
-  dog.bellyUntil = 0; frame(lastFrame+16); ok("ngừng gãi: lật dậy lắc mình", dog.state === "shake", dog.state);
+  dog.bellyUntil = 0; frame(lastFrame+16); ok("ngừng gãi: lật dậy lắc mình", dog.state === "gest" && dog.gest.name === "shake", dog.state);
   dog.touches = Array(13).fill(performance.now()); setState("idle", 0); petDog();
   ok("chạm quá nhiều: chó né đi chỗ khác", dog.state === "run" || dog.state === "walk", dog.state);
   dog.path = []; setState("idle", 0); dog.touches = [];
@@ -2881,6 +3072,13 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   fresh(); prof.stats.clean = 5; prof.last = Date.now() - 3600000; applyTime(prof, Date.now()); ok("Vệ sinh dưới 10% thì chó bệnh", prof.stats.sick > 0);
   fresh(); dog.pottyOk = true; const ps0 = prof.skills.potty; finishPotty(); ok("đi đúng thảm: học dần, có cửa sổ thưởng", prof.skills.potty > ps0 && trainWin && trainWin.cmd === "potty");
   giveTreat(); ok("thưởng ngay sau khi đi đúng chỗ thì học nhanh hơn", prof.skills.potty > ps0 + 1);
+  ok("thảm vệ sinh bấm được", pickables.some(o => o.userData.kind === "pad"));
+  fresh(); setState("idle", 0); dog.path = []; dog.pottyBusy = false; prof.bladder = 60; remindPotty();
+  ok("bấm thảm: chó đi tới thảm", dog.pottyBusy && dog.path.length > 0);
+  dog.path = []; dog.pottyNext = true; afterPadSniff(); ok("tới thảm lúc đang mắc: xoay một vòng rồi chắc chắn đi đúng chỗ", dog.state === "gest" && dog.gest.name === "circle" && (dog.gest.then(), dog.state === "potty" && dog.pottyOk));
+  { const s0 = prof.skills.potty; finishPotty(); ok("được nhắc đi đúng chỗ: tăng điểm dạy", prof.skills.potty > s0); }
+  fresh(); setState("idle", 0); prof.bladder = 5; dog.lastRemindLearn = 0; { const s0 = prof.skills.potty; dog.pottyNext = true; afterPadSniff(); ok("chưa mắc: đánh hơi làm quen, vẫn +1 điểm dạy", prof.skills.potty === s0 + 1 && !dog.pottyBusy); afterPadSniff(); ok("nhắc liên tục không cộng điểm thêm", prof.skills.potty === s0 + 1); }
+  setState("idle", 0);
   fresh(); dog.pottyOk = false; finishPotty(); ok("đi bậy: có vết bẩn tại chỗ", prof.messes.length === 1); prof.messes = []; buildMesses();
   ok("thảm vệ sinh có đường đi tới", (()=>{ const L = nearestFree(room.pad); const pth = findPath({x:0, z:0.6}, L); const e = pth[pth.length-1]; return pth.length > 0 && Math.hypot(e.x-L.x, e.z-L.z) < 0.3 && Math.hypot(L.x-room.pad.x, L.z-room.pad.z) < 0.45; })());
   // bát ăn
@@ -2911,7 +3109,8 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   excite(999999); for (let i=0;i<60;i++) frame(lastFrame+16);
   ok("chủ tương tác thì vẫy đuôi mạnh", dog.pose.wag >= 0.5, dog.pose.wag.toFixed(2)); window.requestAnimationFrame = realRAF;
   playToy("ball");
-  ok("bấm bóng thì bắt đầu phiên chơi, có nút Dừng", !!play && $("stopPlay").classList.contains("show") && $("tBallLbl").textContent==="Dừng");
+  ok("bấm bóng thì bắt đầu phiên chơi, có nút Dừng", !!play && $("stopPlay").classList.contains("show"));
+  ok("thanh dưới không còn nút Bóng, Xương", !$("tBall") && !$("tBone") && $("toolbar").children.length === 5);
   ok("bóng không tự biến mất sau vài giây", toy && !toy.until);
   play.start = performance.now() - 3*60000;
   ok("chơi hơn 2 phút vẫn còn chơi (chưa bấm Dừng)", !!play);
@@ -2978,7 +3177,8 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   startProfile(p.id);
   if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,callName,()=>goChair(true),tapToy,openFoodMenu,closeFoodMenu,()=>feedBowl("bo",50),()=>startGnaw(),sayNo,()=>{prof.bladder=100;},()=>{ if(prof.messes.length) cleanMess(0); },openCloset,()=>$("ovCloset").classList.remove("show"),()=>{ petDog(); petDog(); },rubBelly,showInfo,showCard,()=>{resize();}];
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
-  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="sofa") goPerch("sofa", true); else if(st==="belly"){ petDog(); setTimeout(petDog, 300); setInterval(()=>{ if (dog.state==="belly") rubBelly(); }, 600); } else if(st==="stats") showStats(600000); else if(st==="potty"){ prof.skills.potty = +(QS.get("skill")||0); prof.bladder = 100; } else if(st==="mess"){ prof.messes = [{x:0.6,z:1.0,t:0},{x:-0.6,z:1.3,t:gameNow(prof)}]; buildMesses(); } else if(st==="gnaw") startGnaw(QS.get("spot")||"sofa"); else if(st==="marks"){ prof.marks = {sofa: 7, table: 4, cab: 2}; buildMarks(); } else if(st==="food") openFoodMenu(); else if(st==="closet") openCloset(); else if(st==="info") showInfo(); else if(st==="card") showCard(); else setState(st, 600000); }, 300);
+  if (QS.get("side")) setInterval(()=>{ if (!dog.path.length){ dog.faceCam = false; dog.lookAt = {x: dog.pos.x + 1, z: dog.pos.z + 0.25}; } }, 150);   // chạy thử: nhìn chó từ bên hông
+  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="sofa") goPerch("sofa", true); else if(st==="belly"){ petDog(); setTimeout(petDog, 300); setInterval(()=>{ if (dog.state==="belly") rubBelly(); }, 600); } else if(st==="stats") showStats(600000); else if(st==="potty"){ prof.skills.potty = +(QS.get("skill")||0); prof.bladder = 100; } else if(st==="mess"){ prof.messes = [{x:0.6,z:1.0,t:0},{x:-0.6,z:1.3,t:gameNow(prof)}]; buildMesses(); } else if(st==="gnaw") startGnaw(QS.get("spot")||"sofa"); else if(st==="marks"){ prof.marks = {sofa: 7, table: 4, cab: 2}; buildMarks(); } else if(st==="food") openFoodMenu(); else if(st==="closet") openCloset(); else if(st==="info") showInfo(); else if(st==="card") showCard(); else if(st.startsWith("g_")){ const gn = st.slice(2); const again = ()=>gesture(gn, ()=>setTimeout(again, 400), {dir: 1}); dog.faceCam = true; again(); } else if(st==="dream"){ toggleRest(); } else setState(st, 600000); }, 300);
 } else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); renderCreate();
 } else if (save.profiles.length === 0) openCreate(true);
 else {
