@@ -82,6 +82,10 @@ input[type=text]:focus{outline:none;border-color:var(--c1)}
 .chip{background:#fff;border:2px solid #c8cfdf;border-radius:999px;padding:8px 14px;font-size:14px}
 .chip.sel{border-color:var(--c2);background:#fbf3e2;font-weight:600}
 #preview{width:100%;height:190px;background:linear-gradient(var(--sky1),var(--sky2));border-radius:14px;display:block}
+#prev3d{width:100%;height:230px;background:linear-gradient(var(--sky1),var(--sky2));border-radius:14px;overflow:hidden;touch-action:pan-y}
+#prev3d canvas{width:100%!important;height:100%!important;display:block}
+.sw.small i{width:30px;height:30px}
+.lock{background:#fff4d6;border:2px solid #f0c95c;border-radius:12px;padding:8px 12px;margin-top:10px;font-size:14px;line-height:1.4}
 .stat{margin:8px 0}
 .stat .lbl{display:flex;justify-content:space-between;font-size:14px}
 .bar{height:12px;background:#e6e0d2;border-radius:999px;overflow:hidden;margin-top:3px}
@@ -273,6 +277,29 @@ const BREEDS = {
 const BREED_ORDER = ["pom","corgi","poodle","shiba","dachshund"];
 // Mẫu A (Thú bông), Sếp chốt 07/11/2026: đầu to, chân ngắn mũm mĩm, mõm ngắn (cùng tỉ lệ trang /mau-cho/)
 const STYLE_A = {headK: 1.6, legLenK: 0.72, legThickK: 1.55, snoutK: 0.55, eyeK: 0.2};
+// Bảng màu định sẵn: Sếp chốt 07/11 "chọn trong màu định sẵn"
+const PALETTE = [["Trắng","#F6F2EA"],["Kem","#EED5A8"],["Vàng nhạt","#E2B373"],["Mơ","#E8B07A"],["Cam","#E8913A"],["Đỏ","#D2772F"],
+  ["Nâu đỏ","#B5541F"],["Nâu","#6B4226"],["Sô-cô-la","#4A2E1E"],["Xám","#9A9590"],["Đen","#2B2522"],["Hồng","#F2B1A8"]];
+const REGION_NAMES = {body:"Thân", head:"Đầu", back:"Lưng", chest:"Ngực và bụng", legs:"Chân", muzzle:"Mõm", earOut:"Tai ngoài", earIn:"Tai trong", tail:"Đuôi", blaze:"Vệt trán"};
+const UPRIGHT_EARS = ["prick","bigPrick","fold"];
+function breedRegions(look){   // chỉ các vùng hình chó thật sự có (thêm Đầu, Lưng theo ý Sếp)
+  const B = BREEDS[look.breed], r = ["body","head","back"];
+  if (B.belly) r.push("chest");
+  r.push("legs","muzzle","earOut");
+  if (UPRIGHT_EARS.includes(look.ear)) r.push("earIn");
+  r.push("tail");
+  if (look.breed==="corgi") r.push("blaze");
+  return r;
+}
+function lookColors(look){   // màu từng vùng: bộ màu gợi ý của giống, rồi đè bằng màu bé chọn
+  const B = BREEDS[look.breed], c = B.coats[look.coat] || B.coats[0];
+  const main = c.main, second = c.second, points = c.points || null;
+  const base = {body: main, head: main, back: main, chest: second,
+    legs: points || (B.belly ? second : main),
+    muzzle: (B.belly || look.breed==="shiba") ? second : (points || shade(main, 0.12)),
+    earOut: UPRIGHT_EARS.includes(look.ear) ? main : shade(main, -0.1), earIn: "#F2B1A8", tail: main, blaze: second};
+  return look.colors ? Object.assign(base, look.colors) : base;
+}
 for (const B of Object.values(BREEDS)){ B.headR *= STYLE_A.headK; B.legL *= STYLE_A.legLenK; B.legW *= STYLE_A.legThickK; B.snout *= STYLE_A.snoutK; B.snoutH *= 0.85; }
 const EYES = [
   {n:"Nâu đậm", c:"#2A1A10"}, {n:"Nâu", c:"#5C3A1E"},
@@ -415,10 +442,10 @@ function poseFor(type, B){
 // vẽ một con chó, trả về chuỗi SVG (hệ toạ độ: mặt đất y=0, chó quay sang phải)
 function dogSVG(look, pose, t, opts={}){
   const B = BREEDS[look.breed];
-  const coat = B.coats[look.coat] || B.coats[0];
-  const main = coat.main, second = coat.second, points = coat.points || null;
+  const C = lookColors(look);   // màu theo vùng (hình 2D nhỏ: thân, ngực, chân, đầu, mõm)
+  const main = C.body, second = C.chest, points = null;
   const dark = shade(main, -0.28), outline = shade(main, -0.55);
-  const eyeC = (EYES[look.eye]||EYES[0]).c;
+  const eyeC = "#120C0A";   // mẫu A: mắt cúc áo đen
   const L1 = B.legL*0.55, L2 = B.legL*0.55;
   const hL = B.bodyL*0.5, hH = B.bodyH*0.5;
   const ct = Math.cos(pose.tilt), st = Math.sin(pose.tilt);
@@ -430,7 +457,7 @@ function dogSVG(look, pose, t, opts={}){
   // hông/vai
   const sh = W(hL - B.legW*0.9, hH*0.5);
   const hp = W(-hL + B.legW*0.9, hH*0.5);
-  const legColor = points || (B.belly ? second : main);
+  const legColor = C.legs;
   const leg = (hx,hy,fx,lift,bend,color,far) => {
     let fy = -lift;
     const st = (bend<0) ? (pose.fStretch||1) : 1;
@@ -513,12 +540,12 @@ function dogSVG(look, pose, t, opts={}){
   const ears = earShape(look.ear, B, R, main, second, outline, earDroop, t);
   head += `<g transform="translate(${(hx-R*0.15).toFixed(1)},${hy.toFixed(1)})">${ears.far}</g>`;
   if (B.fur==="curly") head += `<circle cx="${(hx-R*0.2).toFixed(1)}" cy="${(hy-R*0.75).toFixed(1)}" r="${(R*0.62).toFixed(1)}" fill="${main}" stroke="${shade(main,-0.12)}" stroke-width="1.5"/>`;
-  head += `<circle cx="${hx}" cy="${hy.toFixed(1)}" r="${R}" fill="${main}" stroke="${outline}" stroke-width="2"/>`;
+  head += `<circle cx="${hx}" cy="${hy.toFixed(1)}" r="${R}" fill="${C.head}" stroke="${outline}" stroke-width="2"/>`;
   if (B.fur==="fluffy"){
     for (let i=0;i<6;i++){ const a=Math.PI*(0.55+i*0.17); head += `<circle cx="${(hx+Math.cos(a)*R*0.95).toFixed(1)}" cy="${(hy+Math.sin(a)*R*0.95).toFixed(1)}" r="${(R*0.28).toFixed(1)}" fill="${main}"/>`; }
   }
   // má/mõm
-  const snoutC = (B.belly || look.breed==="shiba") ? second : (points ? points : shade(main,0.12));
+  const snoutC = C.muzzle;
   const mouthOpen = pose.mouth + (pose.chew > 0.3 ? (Math.sin(t*14)*0.5+0.5)*0.5 : 0) + pose.tongue*0.3;
   const snX = hx + R*0.62, snY = hy + R*0.3;
   head += `<ellipse cx="${(snX+B.snout*0.35).toFixed(1)}" cy="${(snY+mouthOpen*2).toFixed(1)}" rx="${(B.snout*0.75+3).toFixed(1)}" ry="${(B.snoutH*0.45).toFixed(1)}" fill="${shade(snoutC,-0.1)}" stroke="${outline}" stroke-width="1.5"/>`;
@@ -660,7 +687,7 @@ function newProfile(owner, look, name){
   const now = Date.now();
   return {
     id: uid(), owner, created: now,
-    dog: {name, breed: look.breed, coat: look.coat, ear: look.ear, tail: look.tail, eye: look.eye},
+    dog: {name, breed: look.breed, coat: look.coat, ear: look.ear, tail: look.tail, eye: look.eye, colors: Object.assign({}, look.colors||{})},
     stats: {xp: 0, hunger: 20, happy: 75, bond: 10, weight: 50, thirst: 0, fit: 50, sick: 0, energy: 85, clean: 95},
     skills: {come: 0, sit: 0, stand: 0, lie: 0, potty: 0, no: 0},
     practiced: {come: now, sit: now, stand: now, lie: now, potty: now, no: now},
@@ -1136,11 +1163,12 @@ function randomFreePoint(){
 
 // ---------- con chó 3D ----------
 let dog3 = null;
-function buildDog3D(look){
-  if (dog3){ scene.remove(dog3.root); }
-  const B = BREEDS[look.breed], coat = B.coats[look.coat] || B.coats[0];
-  const main = coat.main, second = coat.second, points = coat.points || null;
-  const legColor = points || (B.belly ? second : main);
+function buildDog3D(look, opt={}){   // opt.preview: dựng riêng cho khung xem trước, không đụng vào phòng
+  const preview = !!opt.preview;
+  if (dog3 && !preview){ scene.remove(dog3.root); }
+  const B = BREEDS[look.breed], C = lookColors(look);
+  const main = C.body, second = C.chest;
+  const legColor = C.legs;
   const eyeC = (EYES[look.eye]||EYES[0]).c;
   const fluffy = B.fur === "fluffy", curly = B.fur === "curly";
   const root = new THREE.Group();
@@ -1157,6 +1185,7 @@ function buildDog3D(look){
     const cc = shade(main, main==="#262222" ? 0.12 : -0.06);
     for (let i=0;i<22;i++){ const a = i*2.39, y = ((i%5)/4 - 0.5)*1.6; const r = Math.sqrt(Math.max(0, 1 - y*y*0.35)); const f = sph(hH*0.34, i%3 ? main : cc, {}, true); f.position.set(Math.cos(a)*hW*0.82*r, y*hH*0.62, Math.sin(a)*hL*0.85*r); body.add(f); }
   }
+  if (C.back !== C.body){ const bk = sph(1, C.back); bk.scale.set(hW*0.93, hH*0.62, hL*0.74); bk.position.set(0, hH*0.42, -hL*0.04); body.add(bk); }   // vùng Lưng
   // chân: 4 chân × (đùi + cẳng + bàn)
   const legR = B.legW*0.5*K;
   const legMat = mat(legColor), legMatFar = mat(shade(legColor, -0.12));
@@ -1181,22 +1210,23 @@ function buildDog3D(look){
   const Lt = B.bodyL*K;
   const curve = new THREE.CatmullRomCurve3(tailPts.map(([x,y])=>new THREE.Vector3(0, y*Lt, x*Lt)));
   const thick = {curl: fluffy ? 0.09 : 0.1, plume: 0.05, fox: 0.08, stub: 0.06, pompom: 0.06, straight: 0.03, sickle: 0.05, long: 0.03, saber: 0.03}[look.tail] || 0.04;
-  const tube = mesh(new THREE.TubeGeometry(curve, 16, thick*Lt*0.5, 8, false), mat(main)); tail.add(tube);
+  const tube = mesh(new THREE.TubeGeometry(curve, 16, thick*Lt*0.5, 8, false), mat(C.tail)); tail.add(tube);
   const tipP = curve.getPoint(1);
   const tipR = look.tail==="pompom" ? 0.1*Lt : (look.tail==="plume" ? 0.17*Lt : (look.tail==="fox" ? 0.09*Lt : thick*Lt*0.5));
-  const tip = sph(tipR, (look.tail==="fox"||look.tail==="sickle") ? second : main); tip.position.copy(tipP); tail.add(tip);
-  if (look.tail==="plume" || (look.tail==="curl" && fluffy)){ for (let i=0;i<4;i++){ const f = sph(0.08*Lt, shade(main, 0.05), {}, true); f.position.copy(curve.getPoint(0.4 + i*0.18)); tail.add(f); } }
-  if (look.tail==="fox"){ const f = sph(1, main); f.scale.set(0.07*Lt, 0.08*Lt, 0.2*Lt); f.position.copy(curve.getPoint(0.6)); f.lookAt(tail.localToWorld(curve.getPoint(1).clone())); tail.add(f); }
+  const tip = sph(tipR, (look.tail==="fox"||look.tail==="sickle") ? second : C.tail); tip.position.copy(tipP); tail.add(tip);
+  if (look.tail==="plume" || (look.tail==="curl" && fluffy)){ for (let i=0;i<4;i++){ const f = sph(0.08*Lt, shade(C.tail, 0.05), {}, true); f.position.copy(curve.getPoint(0.4 + i*0.18)); tail.add(f); } }
+  if (look.tail==="fox"){ const f = sph(1, C.tail); f.scale.set(0.07*Lt, 0.08*Lt, 0.2*Lt); f.position.copy(curve.getPoint(0.6)); f.lookAt(tail.localToWorld(curve.getPoint(1).clone())); tail.add(f); }
   // gốc đuôi: khối tròn lấp chỗ nối với mông (không lộ khe hở khi vẫy)
-  const tailRoot = sph(Math.max(thick*Lt*0.5*1.7, hH*0.22), main); tail.add(tailRoot);
+  const tailRoot = sph(Math.max(thick*Lt*0.5*1.7, hH*0.22), C.tail); tail.add(tailRoot);
   // đầu
   const head = new THREE.Group(); root.add(head);
   const R = B.headR*K;
   const hx = B.headR*0.45*K, hy = B.headR*0.75*K;   // tâm đầu so với cổ: tới trước, lên trên
-  const skull = sph(R, main); skull.position.set(0, hy, hx); skull.scale.set(R, R*0.95, R); head.add(skull);
-  if (fluffy && !STYLE_A){ for (let i=0;i<8;i++){ const a = i/8*Math.PI*2; const f = sph(R*0.34, main, {}, true); f.position.set(Math.cos(a)*R*0.9, hy + Math.sin(a)*R*0.55 - R*0.1, hx - R*0.25); head.add(f); } }
-  if (curly){ const topk = sph(R*0.62, main); topk.position.set(0, hy + R*0.75, hx - R*0.1); head.add(topk); }
-  const snoutC = (B.belly || look.breed==="shiba") ? second : (points ? points : shade(main, 0.12));
+  const skull = sph(R, C.head); skull.position.set(0, hy, hx); skull.scale.set(R, R*0.95, R); head.add(skull);
+  if (fluffy && !STYLE_A){ for (let i=0;i<8;i++){ const a = i/8*Math.PI*2; const f = sph(R*0.34, C.head, {}, true); f.position.set(Math.cos(a)*R*0.9, hy + Math.sin(a)*R*0.55 - R*0.1, hx - R*0.25); head.add(f); } }
+  if (curly){ const topk = sph(R*0.62, C.head); topk.position.set(0, hy + R*0.75, hx - R*0.1); head.add(topk); }
+  const snoutC = C.muzzle;
+  if (look.breed==="corgi"){ const bz = sph(1, C.blaze); bz.scale.set(R*0.17, R*0.62, R*0.34); bz.position.set(0, hy + R*0.34, hx + R*0.78); bz.rotation.x = -0.35; head.add(bz); }   // vệt trán Corgi
   const snX = hx + R*0.62, snY = hy - R*0.3;
   const snL = (B.snout*0.8 + 4)*K, snH = B.snoutH*0.55*K;
   const snout = sph(1, snoutC); snout.scale.set(snH*1.15, snH, snL); snout.position.set(0, snY, snX + B.snout*0.4*K); head.add(snout);
@@ -1217,8 +1247,8 @@ function buildDog3D(look){
     const pupil = sph(eyeR*0.55, "#0E0B0A", {r:0.08}); pupil.position.z = eyeR*0.55; g.add(pupil);
     const hl1 = new THREE.Mesh(SPHERE_LO, new THREE.MeshBasicMaterial({color:"#FFFFFF"})); hl1.scale.setScalar(eyeR*0.26); hl1.position.set(eyeR*0.3, eyeR*0.35, eyeR*0.92); g.add(hl1);
     const hl2 = new THREE.Mesh(SPHERE_LO, new THREE.MeshBasicMaterial({color:"#FFFFFF"})); hl2.scale.setScalar(eyeR*0.13); hl2.position.set(-eyeR*0.28, -eyeR*0.25, eyeR*0.95); g.add(hl2);
-    const lid = sph(eyeR*1.16, main); lid.scale.y = 0.01; g.add(lid);
-    const brow = rbox(eyeR*1.3, eyeR*0.22, eyeR*0.2, eyeR*0.08, shade(main, -0.35)); brow.position.set(0, eyeR*1.25, eyeR*0.4); brow.visible = false; g.add(brow);
+    const lid = sph(eyeR*1.16, C.head); lid.scale.y = 0.01; g.add(lid);
+    const brow = rbox(eyeR*1.3, eyeR*0.22, eyeR*0.2, eyeR*0.08, shade(C.head, -0.35)); brow.position.set(0, eyeR*1.25, eyeR*0.4); brow.visible = false; g.add(brow);
     const tear = new THREE.Mesh(SPHERE_LO, new THREE.MeshStandardMaterial({color:"#9FD7FF", roughness:0.05, transparent:true, opacity:0.85})); tear.scale.set(eyeR*0.22, eyeR*0.32, eyeR*0.22); tear.visible = false; g.add(tear);
     head.add(g);
     eyes.push({g, white, iris, pupil, hl1, hl2, lid, brow, tear, s, base: g.quaternion.clone()});
@@ -1231,14 +1261,14 @@ function buildDog3D(look){
     const t = look.ear;
     if (t==="prick" || t==="bigPrick" || t==="fold"){
       const h = (t==="bigPrick" ? 1.05 : 0.75)*R, w = (t==="bigPrick" ? 0.62 : 0.5)*R;
-      const outer = sph(1, main); outer.scale.set(w*0.55, h*0.55, w*0.28); outer.position.y = h*0.45; pivot.add(outer);   // mẫu A: tai tròn mềm
-      const inner = sph(1, "#F2B1A8", {r:0.9}); inner.scale.set(w*0.32, h*0.36, w*0.12); inner.position.set(0, h*0.42, w*0.2); pivot.add(inner);
+      const outer = sph(1, C.earOut); outer.scale.set(w*0.55, h*0.55, w*0.28); outer.position.y = h*0.45; pivot.add(outer);   // mẫu A: tai tròn mềm
+      const inner = sph(1, C.earIn, {r:0.9}); inner.scale.set(w*0.32, h*0.36, w*0.12); inner.position.set(0, h*0.42, w*0.2); pivot.add(inner);
       if (t==="fold") pivot.userData.fold = true;
     } else {
       const len = (t==="longDrop" ? 1.45 : t==="curlyDrop" ? 1.35 : 1.1)*R;
       pivot.position.set(s*R*0.78, hy + R*0.35, hx - R*0.1);
-      if (t==="curlyDrop"){ for (let i=0;i<4;i++){ const c = sph(R*0.34, i%2 ? main : shade(main,-0.06), {}, true); c.position.set(s*R*0.05, -i*len*0.24, 0); pivot.add(c); } }
-      else { const e = sph(1, shade(main, -0.1)); e.scale.set(R*0.12, len*0.5, R*0.36); e.position.set(s*R*0.05, -len*0.42, 0); pivot.add(e); }
+      if (t==="curlyDrop"){ for (let i=0;i<4;i++){ const c = sph(R*0.34, i%2 ? C.earOut : shade(C.earOut,-0.06), {}, true); c.position.set(s*R*0.05, -i*len*0.24, 0); pivot.add(c); } }
+      else { const e = sph(1, C.earOut); e.scale.set(R*0.12, len*0.5, R*0.36); e.position.set(s*R*0.05, -len*0.42, 0); pivot.add(e); }
       pivot.userData.drop = true;
     }
     ears.push({pivot, s});
@@ -1248,12 +1278,13 @@ function buildDog3D(look){
   const mouthMark = new THREE.Object3D(); mouthMark.position.set(0, snY - snH*0.6, snX + snL*0.9); head.add(mouthMark);
   // chữ Z khi ngủ
   const zTex = canvasTex(64, 64, (g,w,h)=>{ g.font = "800 52px 'Baloo 2', sans-serif"; g.fillStyle = "#1E6F78"; g.textAlign = "center"; g.fillText("z", w/2, 50); });
-  const zs = [0,1,2].map(i=>{ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: zTex, transparent: true, depthWrite: false, depthTest: false})); sp.renderOrder = 10; sp.scale.setScalar(0.12); sp.visible = false; scene.add(sp); return sp; });
-  root.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.userData.kind = "dog"; pickables.push(o); o.material = plushMat(o.material); } });
+  const zs = preview ? [] : [0,1,2].map(i=>{ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: zTex, transparent: true, depthWrite: false, depthTest: false})); sp.renderOrder = 10; sp.scale.setScalar(0.12); sp.visible = false; scene.add(sp); return sp; });
+  root.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.userData.kind = "dog"; if (!preview) pickables.push(o); o.material = plushMat(o.material); } });
   // rig: lớp bên trong để lăn nghiêng cả con chó khi ngủ
   const rig = new THREE.Group(); while (root.children.length) rig.add(root.children[0]); root.add(rig);
-  scene.add(root);
-  dog3 = {root, rig, roll: 0, lastT: null, body, torso, legs, tail, head, jaw, tongue, eyes, ears, topMark, mouthMark, zs, B, hL, hH, hW, legR, R, hx, hy};
+  const made = {root, rig, roll: 0, lastT: null, body, torso, legs, tail, head, jaw, tongue, eyes, ears, topMark, mouthMark, zs, B, hL, hH, hW, legR, R, hx, hy};
+  if (preview) return made;
+  scene.add(root); dog3 = made;
   buildGrid(Math.max(0.22, Math.min(0.42, hL*0.75)));
   return dog3;
 }
@@ -1274,8 +1305,8 @@ function placeLimb(m, a, b, r){
 }
 // toạ độ 2D (px, x tới trước, y hướng xuống) -> 3D cục bộ của chó
 const P3 = (x2, y2, side=0) => new THREE.Vector3(side, -y2*K, x2*K);
-function updateDog3D(pose, t){
-  const d = dog3, B = d.B;
+function updateDog3D(pose, t, d = dog3){
+  const B = d.B;
   const L1 = B.legL*0.55, L2 = B.legL*0.55;
   const hL = B.bodyL*0.5, hH = B.bodyH*0.5;
   const ct = Math.cos(pose.tilt), st = Math.sin(pose.tilt);
@@ -1361,7 +1392,7 @@ function updateDog3D(pose, t){
     if (crying){ const ph = (t*0.6 + (e.s>0?0.5:0)) % 1; e.tear.position.set(e.s*0.2*d.R*STYLE_A.eyeK, -d.R*STYLE_A.eyeK*(0.8 + ph*1.6), d.R*STYLE_A.eyeK*0.7); e.tear.material.opacity = 0.9*(1-ph); }
   }
   // chữ Z
-  for (let i=0;i<3;i++){
+  for (let i=0;i<d.zs.length;i++){
     const z = d.zs[i]; z.visible = pose.sleep > 0.5;
     if (z.visible){ const ph = (t*0.45 + i/3) % 1; d.head.getWorldPosition(_a); z.position.set(_a.x + ph*0.18 + Math.sin(ph*6)*0.03, _a.y + d.R*1.2 + ph*0.45, _a.z); z.material.opacity = Math.min(1, (1 - ph)*1.6); z.scale.setScalar(0.1 + ph*0.12); }
   }
@@ -2432,7 +2463,7 @@ buildRoom();
    ========================================================= */
 let draft = null, previewRAF = null;
 function openCreate(firstTime){
-  draft = {step: 0, owner: "", look: {breed:"pom", coat:0, ear:"prick", tail:"curl", eye:0}, name:"", firstTime};
+  draft = {step: 0, owner: "", look: {breed:"pom", coat:0, ear:"prick", tail:"curl", eye:0, colors:{}}, name:"", region:"body", firstTime};
   renderCreate();
   $("ovCreate").classList.add("show");
 }
@@ -2457,30 +2488,36 @@ function renderCreate(){
       <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn ghost" id="cBack">Quay lại</button><button class="btn gold" id="cNext">Tiếp</button></div>`;
     el.querySelectorAll(".card").forEach(c=>c.onclick=()=>{
       const k=c.dataset.b, B=BREEDS[k];
-      d.look = {breed:k, coat:0, ear:B.ears[0][0], tail:B.tails[0][0], eye:0};
+      d.look = {breed:k, coat:0, ear:B.ears[0][0], tail:B.tails[0][0], eye:0, colors:{}}; d.region = "body";
       el.querySelectorAll(".card").forEach(x=>x.classList.toggle("sel", x===c));
     });
     $("cBack").onclick=()=>{d.step=0;renderCreate();};
     $("cNext").onclick=()=>{d.step=2;renderCreate();};
   } else if (d.step===2){
-    const B = BREEDS[d.look.breed];
-    el.innerHTML = `<h2>${B.name} của ${esc(d.owner)}</h2><div class="sub">Chọn màu lông, tai, đuôi và màu mắt</div>
-      <svg id="preview"></svg>
-      <div class="opt-label">Màu lông</div><div class="swatches">${B.coats.map((c,i)=>`<button class="sw ${d.look.coat===i?"sel":""}" data-coat="${i}"><i style="background:${c.points?`linear-gradient(135deg,${c.main} 60%,${c.points} 60%)`:(c.second!==c.main&&B.belly?`linear-gradient(135deg,${c.main} 60%,${c.second} 60%)`:c.main)}"></i>${c.n}</button>`).join("")}</div>
+    const B = BREEDS[d.look.breed], C = lookColors(d.look), regs = breedRegions(d.look);
+    if (!regs.includes(d.region)) d.region = "body";
+    const sw = (hex, name, attr, on, cls="") => `<button class="sw ${cls} ${on?"sel":""}" ${attr}><i style="background:${hex}"></i>${name}</button>`;
+    el.innerHTML = `<h2>${B.name} của ${esc(d.owner)}</h2><div class="sub">Chọn bộ màu, rồi tô từng vùng cho đẹp. Kéo ngang để xoay chó.</div>
+      <div id="prev3d"></div>
+      <div class="opt-label">Bộ màu gợi ý</div><div class="swatches">${B.coats.map((c,i)=>{ const cc = lookColors({breed:d.look.breed, coat:i, ear:d.look.ear});
+        return `<button class="sw ${d.look.coat===i && !Object.keys(d.look.colors).length?"sel":""}" data-coat="${i}"><i style="background:linear-gradient(135deg,${cc.body} 55%,${cc.chest!==cc.body?cc.chest:cc.legs} 55%)"></i>${c.n}</button>`; }).join("")}</div>
+      <div class="opt-label">Tô từng vùng</div><div class="row">${regs.map(r=>`<button class="chip ${d.region===r?"sel":""}" data-reg="${r}"><i style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${C[r]};border:1px solid #0002;margin-right:5px;vertical-align:-1px"></i>${REGION_NAMES[r]}</button>`).join("")}</div>
+      <div class="swatches" style="margin-top:8px">${PALETTE.map(([n,hex])=>sw(hex, n, `data-col="${hex}"`, C[d.region].toLowerCase()===hex.toLowerCase(), "small")).join("")}</div>
       <div class="opt-label">Tai</div><div class="row">${B.ears.map(([k,n])=>`<button class="chip ${d.look.ear===k?"sel":""}" data-ear="${k}">${n}</button>`).join("")}</div>
       <div class="opt-label">Đuôi</div><div class="row">${B.tails.map(([k,n])=>`<button class="chip ${d.look.tail===k?"sel":""}" data-tail="${k}">${n}</button>`).join("")}</div>
-      <div class="opt-label">Màu mắt</div><div class="swatches">${EYES.map((e,i)=>`<button class="sw ${d.look.eye===i?"sel":""}" data-eye="${i}"><i style="background:${e.c}"></i>${e.n}</button>`).join("")}</div>
       <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn ghost" id="cBack">Quay lại</button><button class="btn gold" id="cNext">Tiếp</button></div>`;
-    el.querySelectorAll("[data-coat]").forEach(b=>b.onclick=()=>{d.look.coat=+b.dataset.coat; renderCreate();});
+    el.querySelectorAll("[data-coat]").forEach(b=>b.onclick=()=>{d.look.coat=+b.dataset.coat; d.look.colors={}; renderCreate();});
+    el.querySelectorAll("[data-reg]").forEach(b=>b.onclick=()=>{d.region=b.dataset.reg; renderCreate();});
+    el.querySelectorAll("[data-col]").forEach(b=>b.onclick=()=>{d.look.colors[d.region]=b.dataset.col; renderCreate();});
     el.querySelectorAll("[data-ear]").forEach(b=>b.onclick=()=>{d.look.ear=b.dataset.ear; renderCreate();});
     el.querySelectorAll("[data-tail]").forEach(b=>b.onclick=()=>{d.look.tail=b.dataset.tail; renderCreate();});
-    el.querySelectorAll("[data-eye]").forEach(b=>b.onclick=()=>{d.look.eye=+b.dataset.eye; renderCreate();});
     $("cBack").onclick=()=>{d.step=1;renderCreate();};
     $("cNext").onclick=()=>{d.step=3;renderCreate();};
-    runPreview();
+    runPreview3D();
   } else if (d.step===3){
     el.innerHTML = `<h2>Đặt tên cho chó</h2><div class="sub">Bé muốn gọi chó là gì?</div>
-      <svg id="preview"></svg>
+      <div id="prev3d"></div>
+      <div class="lock">🔒 Tạo xong thì <b>không đổi được giống và màu</b> nữa. Muốn chó khác thì tạo tài khoản mới nha.</div>
       <input type="text" id="cName" maxlength="16" placeholder="Tên chó" value="${esc(d.name)}" style="margin-top:12px">
       <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn ghost" id="cBack">Quay lại</button><button class="btn gold" id="cDone">Xong</button></div>`;
     const inp=$("cName"); setTimeout(()=>inp.focus(),50);
@@ -2495,9 +2532,49 @@ function renderCreate(){
       setTimeout(()=>hint(`Bấm lên sàn để ra lệnh. Chạm ${v} để cưng. Chạm bát để cho ăn.`, 6000), 600);
     };
     inp.onkeydown = e=>{ if(e.key==="Enter") $("cDone").click(); };
-    runPreview();
+    runPreview3D();
   }
   const c = $("cCancel"); if (c) c.onclick = ()=>{ $("ovCreate").classList.remove("show"); if(!prof) showProfiles(); };
+}
+let PV = null;   // khung xem trước 3D ở màn tạo chó (máy vẽ riêng, không đụng vào phòng)
+function runPreview3D(){
+  const box = $("prev3d"); if (!box) return;
+  if (!PV){
+    const r = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: SIM});
+    r.outputColorSpace = THREE.SRGBColorSpace; r.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+    const sc = new THREE.Scene();
+    sc.add(new THREE.HemisphereLight("#FFF6E8", "#B9A68A", 1.25));
+    const l = new THREE.DirectionalLight("#FFF1D6", 1.5); l.position.set(1.5, 2.5, 2); sc.add(l);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(0.55, 40), new THREE.MeshBasicMaterial({color: "#000000", transparent: true, opacity: 0.12}));
+    ground.rotation.x = -Math.PI/2; ground.position.y = 0.002; sc.add(ground);
+    const cam = new THREE.PerspectiveCamera(32, 1, 0.05, 20);
+    PV = {r, sc, cam, d: null, key: "", yaw: 0.6, drag: null};
+    r.domElement.addEventListener("pointerdown", e=>{ PV.drag = e.clientX; });
+    window.addEventListener("pointermove", e=>{ if (PV.drag != null){ PV.yaw += (e.clientX - PV.drag)*0.012; PV.drag = e.clientX; } });
+    window.addEventListener("pointerup", ()=>{ PV.drag = null; });
+  }
+  box.appendChild(PV.r.domElement);
+  const key = JSON.stringify(draft.look);
+  if (key !== PV.key){
+    if (PV.d) PV.sc.remove(PV.d.root);
+    PV.d = buildDog3D(draft.look, {preview: true}); PV.sc.add(PV.d.root); PV.key = key;
+  }
+  const B = BREEDS[draft.look.breed], t0 = performance.now();
+  cancelAnimationFrame(previewRAF);
+  const loop = (now)=>{
+    if (!$("prev3d")) return;
+    const w = box.clientWidth || 340, h = box.clientHeight || 230;
+    PV.r.setSize(w, h, false); PV.cam.aspect = w/h; PV.cam.updateProjectionMatrix();
+    const t = (now - t0)/1000;
+    if (PV.drag == null) PV.yaw += 0.006;
+    PV.d.root.rotation.y = PV.yaw;
+    updateDog3D(poseFor(Math.floor(t/4)%2 ? "sit" : "happy", B), t, PV.d);
+    const size = (B.bodyL + B.headR*2)*K;
+    PV.cam.position.set(0, size*0.5, size*1.75); PV.cam.lookAt(0, size*0.24, 0);
+    PV.r.render(PV.sc, PV.cam);
+    previewRAF = requestAnimationFrame(loop);
+  };
+  loop(performance.now());   // vẽ ngay khung đầu
 }
 function runPreview(){
   const svg = $("preview"); if (!svg) return;
@@ -2861,7 +2938,7 @@ $("fileIn").addEventListener("change", async e=>{
 
 /* ---------- thẻ chó + mã QR ---------- */
 function cardData(p){
-  return {v:1, n:p.dog.name, o:p.owner, b:p.dog.breed, c:p.dog.coat, e:p.dog.ear, t:p.dog.tail, y:p.dog.eye,
+  return {v:1, n:p.dog.name, o:p.owner, b:p.dog.breed, c:p.dog.coat, e:p.dog.ear, t:p.dog.tail, y:p.dog.eye, k:p.dog.colors||{},
           l:levelOf(p), s:[Math.round(p.skills.sit),Math.round(p.skills.stand),Math.round(p.skills.come),Math.round(p.skills.lie||0)],
           h:Math.round(p.stats.happy), d:Math.round(p.stats.bond), w:Math.round(p.stats.weight)};
 }
@@ -2880,7 +2957,7 @@ function decodeCard(str){
 }
 function cardHTML(c){
   const B = BREEDS[c.b];
-  const look = {breed:c.b, coat:c.c, ear:c.e, tail:c.t, eye:c.y};
+  const look = {breed:c.b, coat:c.c, ear:c.e, tail:c.t, eye:c.y, colors:c.k||{}};
   return `<div class="dogcard"><h3>${esc(c.n)}</h3><div class="meta">${esc(c.o)} · ${B.name} · Cấp ${c.l}</div>
     ${staticDog(look, 300, 140).replace("<svg ", '<svg class="portrait" ')}
     ${statRow("Lại đây", c.s[2], true)}${statRow("Ngồi", c.s[0], true)}${statRow("Đứng", c.s[1], true)}${statRow("Nằm", c.s[3]||0, true)}
@@ -3179,7 +3256,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
   if (QS.get("side")) setInterval(()=>{ if (!dog.path.length){ dog.faceCam = false; dog.lookAt = {x: dog.pos.x + 1, z: dog.pos.z + 0.25}; } }, 150);   // chạy thử: nhìn chó từ bên hông
   const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="sofa") goPerch("sofa", true); else if(st==="belly"){ petDog(); setTimeout(petDog, 300); setInterval(()=>{ if (dog.state==="belly") rubBelly(); }, 600); } else if(st==="stats") showStats(600000); else if(st==="potty"){ prof.skills.potty = +(QS.get("skill")||0); prof.bladder = 100; } else if(st==="mess"){ prof.messes = [{x:0.6,z:1.0,t:0},{x:-0.6,z:1.3,t:gameNow(prof)}]; buildMesses(); } else if(st==="gnaw") startGnaw(QS.get("spot")||"sofa"); else if(st==="marks"){ prof.marks = {sofa: 7, table: 4, cab: 2}; buildMarks(); } else if(st==="food") openFoodMenu(); else if(st==="closet") openCloset(); else if(st==="info") showInfo(); else if(st==="card") showCard(); else if(st.startsWith("g_")){ const gn = st.slice(2); const again = ()=>gesture(gn, ()=>setTimeout(again, 400), {dir: 1}); dog.faceCam = true; again(); } else if(st==="dream"){ toggleRest(); } else setState(st, 600000); }, 300);
-} else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); renderCreate();
+} else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); if (QS.get("coat")) draft.look.coat=+QS.get("coat"); if (QS.get("cols")) QS.get("cols").split(",").forEach(p=>{ const [k,v]=p.split(":"); draft.look.colors[k]="#"+v; }); if (QS.get("reg")) draft.region=QS.get("reg"); renderCreate();
 } else if (save.profiles.length === 0) openCreate(true);
 else {
   const id = save.current && save.profiles.some(p=>p.id===save.current) ? save.current : save.profiles[0].id;
