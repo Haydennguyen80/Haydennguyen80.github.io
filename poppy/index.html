@@ -824,6 +824,7 @@ function buildRoom(){
   for (const dx of [-1.0, 1.0]){ const a = rbox(0.22, 0.5, 0.9, 0.08, sc); a.position.set(dx*0.97, 0.38, 0); sofa.add(a); }
   for (const [dx,dz] of [[-0.9,-0.35],[0.9,-0.35],[-0.9,0.35],[0.9,0.35]]){ const l = cyl(0.03, 0.025, 0.1, "#7A5233"); l.position.set(dx, 0.05, dz); sofa.add(l); }
   const pil = rbox(0.42, 0.34, 0.12, 0.05, "#2A9AA0"); pil.position.set(-0.68, 0.66, -0.2); pil.rotation.z = 0.15; sofa.add(pil);
+  sofa.traverse(o=>{ if (o.isMesh && !o.userData.kind){ o.userData.kind = "sofa"; pickables.push(o); } });
   scene.add(sofa); addObstacle(-1.2, -2.0, 2.05, 0.95);
   room.sofaTop = {x: -1.2, z: -1.95, y: 0.55};
 
@@ -912,6 +913,11 @@ function buildRoom(){
   for (const s of [-1, 1]){ const b = sph(0.035, "#E98A5D"); b.position.set(0.1*s, 0.535, 0.12*s); chair.add(b); }
   chair.traverse(o=>{ if (o.isMesh){ o.userData.kind = "chair"; pickables.push(o); } });
   scene.add(chair); addObstacle(room.chair.x, room.chair.z, 0.62, 0.68);
+  // chỗ chó nhảy lên được: ghế cửa sổ, sofa (from = chỗ đứng lấy đà trên sàn, look = hướng nhìn, null = nhìn người chơi)
+  room.perch = {
+    chair: {x: room.chair.x + 0.06, z: room.chair.z, y: room.chair.y, from: {x: room.chair.x + 0.62, z: room.chair.z}, look: {x: -3.2, z: room.chair.z}},
+    sofa:  {x: -0.72, z: -1.92, y: 0.56, from: {x: 0.05, z: -1.35}, look: null}
+  };
 
   // tranh treo tường (trên sofa) và đồng hồ
   const art = canvasTex(256, 192, (g, w, h)=>{
@@ -1320,25 +1326,31 @@ function jumpTo(to, toY, then){
   dog.state = "jump";
   sfx(toY > dog.y ? "jump" : "whoosh");
 }
-function chairLaunch(){ return nearestFree({x: room.chair.x + 0.62, z: room.chair.z}); }
-function goChair(fromTap=false){
-  if (dog.onChair){ if (fromTap){ dog.faceCam = true; setState("happy", 1500); excite(); } return; }
+function perchLaunch(key){ return nearestFree(room.perch[key || "chair"].from); }
+function perchLook(key){ const P = room.perch[key]; if (P && P.look){ dog.faceCam = false; dog.lookAt = P.look; } else { dog.lookAt = null; dog.faceCam = true; } }
+function goChair(fromTap=false){ goPerch("chair", fromTap); }
+function goPerch(key, fromTap=false){   // dog.onChair = tên chỗ đang ngồi ("chair" | "sofa") hoặc false
+  closeRing();
+  if (dog.onChair === key){ if (fromTap){ perchLook(key); dog.faceCam = true; setState("happy", 1500); excite(); } return; }
   if (fromTap){ stopPlay(true); if (restMode){ restMode = false; updateRestBtn(); } dog.pose.sleep = 0; excite(); }
-  walkTo(chairLaunch(), fromTap, ()=>{
-    dog.heading = Math.atan2(room.chair.x - dog.pos.x, room.chair.z - dog.pos.z);
-    jumpTo({x: room.chair.x + 0.06, z: room.chair.z}, room.chair.y, ()=>{
-      dog.onChair = true;
-      dog.lookAt = {x: -3.2, z: room.chair.z};
-      setState("sit", rnd(9000, 16000));
-      if (fromTap || Math.random() < 0.4) bubble(pick(["Chỗ yêu thích nè!","Ngắm trời nè","Bên ngoài vui ghê"]), 2000);
+  if (curSick() >= 2 && fromTap){ dog.faceCam = true; setState("sad", 2500); bubble("Mệt quá, hông nhảy nổi 🤒", 2000, true); return; }
+  const P = room.perch[key];
+  walkTo(perchLaunch(key), fromTap, ()=>{
+    dog.heading = Math.atan2(P.x - dog.pos.x, P.z - dog.pos.z);
+    dog.pendingPerch = key;
+    jumpTo({x: P.x, z: P.z}, P.y, ()=>{
+      dog.onChair = key; dog.pendingPerch = null;
+      perchLook(key);
+      if (key === "sofa"){ setState(fromTap ? "happy" : "sit", fromTap ? 1500 : rnd(6000, 10000)); if (fromTap) bubble(pick(["Lên sofa rồi!","Êm quá!"]), 1800); }
+      else { setState("sit", rnd(9000, 16000)); if (fromTap || Math.random() < 0.4) bubble(pick(["Chỗ yêu thích nè!","Ngắm trời nè","Bên ngoài vui ghê"]), 2000); }
     });
   });
 }
 function walkTo(target, run=false, then=null){
-  if (dog.jump){ const j = dog.jump, up = j.ty > 0.1; j.then = ()=>{ if (up) dog.onChair = true; walkTo(target, run, then); }; return; }
+  if (dog.jump){ const j = dog.jump, up = j.ty > 0.1; j.then = ()=>{ if (up){ dog.onChair = dog.pendingPerch || "chair"; dog.pendingPerch = null; } walkTo(target, run, then); }; return; }
   if (dog.onChair){   // đang trên ghế: nhảy xuống trước rồi mới đi
+    const L = perchLaunch(dog.onChair);
     dog.onChair = false;
-    const L = chairLaunch();
     dog.heading = Math.atan2(L.x - dog.pos.x, L.z - dog.pos.z);
     jumpTo(L, 0, ()=>walkTo(target, run, then));
     return;
@@ -1579,7 +1591,7 @@ function playToy(type){
   if (play && play.type === type){ stopPlay(); return; }
   stopPlay(true);
   if (restMode){ restMode=false; updateRestBtn(); }
-  if (dog.onChair || dog.jump){ walkTo(chairLaunch(), false, ()=>playToy(type)); return; }
+  if (dog.onChair || dog.jump){ walkTo(perchLaunch(dog.onChair || dog.pendingPerch), false, ()=>playToy(type)); return; }
   if (type==="ball" && curSick() >= 2){ setState("sad", 3000); bubble("Mệt quá, hông chơi nổi 🤒", 2200, true); return; }
   play = {type, start: performance.now(), rounds: 0};
   excite();
@@ -1754,7 +1766,7 @@ function idleBrain(now){
   if (isMealTime(prof) && S.hunger >= 70 && Math.random() < 0.5){ bubble("Tới giờ ăn rồi!", 2400); }
   if (dog.onChair){   // trên ghế: thích ngồi ngắm lâu, thỉnh thoảng nằm, rồi mới nhảy xuống
     const q = Math.random();
-    dog.lookAt = {x: -3.2, z: room.chair.z};
+    perchLook(dog.onChair);
     if (q < 0.55) setState("sit", rnd(8000, 14000));
     else if (q < 0.75) setState("lie", rnd(6000, 10000));
     else walkTo(randomFreePoint());
@@ -1965,7 +1977,7 @@ function render(now){
   // chó
   dog.root = dog3.root;
   const onBed = Math.hypot(dog.pos.x - room.bed.x, dog.pos.z - room.bed.z) < 0.4;
-  if (dog.onChair && !dog.jump) dog.y = room.chair.y;
+  if (dog.onChair && !dog.jump) dog.y = room.perch[dog.onChair].y;
   else if (!dog.jump) dog.y = lerp(dog.y, onBed ? 0.08 : 0, 0.15);
   dog3.root.position.set(dog.pos.x, dog.y, dog.pos.z);
   dog3.root.rotation.y = dog.heading;
@@ -1979,8 +1991,8 @@ function render(now){
     const m = ensureToyMesh(toy.type); m.visible = true;
     m.position.copy(toy.p);
     if (toy.type==="ball") m.rotation.x += toy.v.length()*0.1;
-    else if (toy.spin) m.rotation.set(tSec*12, dog.heading + Math.PI/2, 0);
-    else if (toy.held || dog.state==="chew") m.rotation.set(0, dog.heading + Math.PI/2 + (dog.state==="chew" ? Math.sin(tSec*6)*0.25 : 0), dog.state==="chew" ? Math.sin(tSec*12)*0.12 : 0);
+    else if (toy.spin) m.rotation.set(tSec*12, dog.heading, 0);
+    else if (toy.held || dog.state==="chew") m.rotation.set(0, dog.heading + (dog.state==="chew" ? Math.sin(tSec*6)*0.25 : 0), dog.state==="chew" ? Math.sin(tSec*12)*0.12 : 0);
     else m.rotation.set(0, 0.6, 0);
   }
   // bát, nước, đồng hồ, cửa sổ theo giờ
@@ -2014,7 +2026,7 @@ function openRing(x, y, world){
   $("bubble").classList.remove("show"); dog.bubbleUntil = 0;
   const ring = $("ring");
   const left = prof.treats.left;
-  const items = [["come","👋","Lại đây"],["sit","🪑","Ngồi"],["stand","🐕","Đứng"],["lie","💤","Nằm"],["treat","🍪",`Thưởng (${left})`]];
+  const items = [["come","👋","Lại đây"],["sit","🪑","Ngồi"],["stand","🐕","Đứng"],["lie","💤","Nằm"],["sofa","🛋️","Lên sofa"],["treat","🍪",`Thưởng (${left})`]];
   ring.innerHTML = `<div class="tapDot"></div>` + items.map(([k,ic,n])=>`<button class="ringBtn" data-k="${k}" ${k==="treat"&&left<=0?"disabled":""}><span class="ic">${ic}</span>${n}</button>`).join("");
   placeRing();
   requestAnimationFrame(()=>ring.querySelectorAll(".ringBtn").forEach(b=>b.classList.add("show")));
@@ -2022,16 +2034,16 @@ function openRing(x, y, world){
   ring.querySelectorAll(".ringBtn").forEach(b=>b.addEventListener("click", e=>{
     e.stopPropagation();
     const k = b.dataset.k;
-    if (k==="treat") giveTreat(); else doCommand(k, ringWorld);
+    if (k==="treat") giveTreat(); else if (k==="sofa") goPerch("sofa", true); else doCommand(k, ringWorld);
   }));
 }
 function placeRing(){
   const ring = $("ring");
   const dot = ring.querySelector(".tapDot"); if (dot){ dot.style.left = ringX+"px"; dot.style.top = ringY+"px"; }
   const btns = ring.querySelectorAll(".ringBtn");
-  const r = 92;
+  const r = 106;
   const cx = clamp(ringX, r + 34, W - r - 34), cy = clamp(ringY - 10, r + 40, H);
-  const angs = [-175, -132, -90, -48, -5];
+  const angs = btns.length > 5 ? [-178, -142, -106, -70, -34, 2] : [-175, -132, -90, -48, -5];
   btns.forEach((b,i)=>{ const a = angs[i]*Math.PI/180; b.style.left = (cx + Math.cos(a)*r) + "px"; b.style.top = (cy + Math.sin(a)*r) + "px"; });
 }
 function closeRing(){
@@ -2064,8 +2076,8 @@ canvas.addEventListener("pointerdown", e=>{
   if (kind==="chair"){ closeRing(); goChair(true); return; }
   if (ringOpen){ closeRing(); return; }
   if (kind==="floor" || kind==="bed"){ openRing(x, y, {x: hit.point.x, z: hit.point.z}); return; }
-  if (kind==="sofa") hint("Lệnh \"Lên đây\" (nhảy lên sofa) sẽ có ở đợt sau", 2500);
-  else hint("Bấm lên sàn để ra lệnh", 2000);
+  if (kind==="sofa"){ goPerch("sofa", true); return; }
+  hint("Bấm lên sàn để ra lệnh", 2000);
 });
 
 buildRoom();
@@ -2193,7 +2205,7 @@ function startProfile(id){
   restMode = false; updateRestBtn();
   toy = null; trainWin = null; bowlFull = false;
   buildDog3D(prof.dog);
-  dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0; dog.onChair = false; dog.jump = null;
+  dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0; dog.onChair = false; dog.jump = null; dog.pendingPerch = null;
   dog.pose = poseFor("stand", BREEDS[prof.dog.breed]); setState("happy", 1500); dog.next = 0; excite(8000);
   refreshTop();
   const S = prof.stats;
@@ -2490,6 +2502,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   ok("mức cao: chó chạy tới đúng chỗ bấm", dog.state==="run" && lastWp && Math.hypot(lastWp.x-tx.x, lastWp.z-tx.z) < 0.3, dog.state);
   ok("đường đi không xuyên đồ đạc", (()=>{ let a = dog.pos; for (const p of dog.path){ if (!lineFree(a, p)) return false; a = p; } return true; })());
   ok("từ nệm tới bát ăn có đường đi", (()=>{ const pth = findPath(room.bed, room.bowl); const e = pth[pth.length-1]; return pth.length > 0 && Math.hypot(e.x-room.bowl.x, e.z-room.bowl.z) < 0.6; })());
+  ok("có chỗ lấy đà để nhảy lên sofa và ghế cửa sổ", ["sofa","chair"].every(k=>{ const L = perchLaunch(k), P = room.perch[k]; const pth = findPath({x:0.4, z:1.2}, L); const e = pth[pth.length-1]; return pth.length > 0 && Math.hypot(e.x-L.x, e.z-L.z) < 0.3 && Math.hypot(L.x-P.x, L.z-P.z) < 1.0; }));
   ok("bấm vào sofa thì chó không đi xuyên sofa", (()=>{ const p = findPath({x:-1.2, z:0.4}, {x:-1.2, z:-2.0}); const e = p[p.length-1]; return isFree(e) && !(e.x > -2.25 && e.x < -0.15 && e.z > -2.5 && e.z < -1.5); })());
   prof.skills.lie = 100; dog.pos = {x: 0, z: 0.6}; doCommand("lie", {x: 0, z: 0.6});
   ok("lệnh Nằm đúng chỗ thì nằm và mở cửa sổ thưởng", dog.state==="lie" && trainWin && trainWin.cmd==="lie");
@@ -2541,7 +2554,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   startProfile(p.id);
   if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,callName,()=>goChair(true),tapToy,showInfo,showCard,()=>{resize();}];
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
-  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="info") showInfo(); else if(st==="card") showCard(); else setState(st, 600000); }, 300);
+  const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="sofa") goPerch("sofa", true); else if(st==="info") showInfo(); else if(st==="card") showCard(); else setState(st, 600000); }, 300);
 } else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); renderCreate();
 } else if (save.profiles.length === 0) openCreate(true);
 else {
