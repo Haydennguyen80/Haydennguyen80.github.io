@@ -56,7 +56,7 @@ section.styles > p{margin:4px 0 0;color:var(--muted)}
 <div class="wrap">
   <header>
     <h1>Mẫu chó mới cho Poppy</h1>
-    <p>Ba kiểu vẽ, mỗi kiểu đủ 5 giống. Sếp bấm vào một ô để xem to, kéo ngang để xoay chó. Trang này để chọn mẫu, chưa đụng vào game.</p>
+    <p>Bốn kiểu vẽ, mỗi kiểu đủ 5 giống. Mẫu D là mẫu Sếp đặt: thân mẫu C, mắt và nét mặt mẫu A. Sếp bấm vào một ô để xem to, kéo ngang để xoay chó. Trang này để chọn mẫu, chưa đụng vào game.</p>
   </header>
 
   <div class="viewer">
@@ -70,7 +70,7 @@ section.styles > p{margin:4px 0 0;color:var(--muted)}
   </div>
 
   <section class="styles">
-    <h2>Xem cả 15 mẫu</h2>
+    <h2>Xem cả 20 mẫu</h2>
     <p>Mỗi hàng là một kiểu vẽ.</p>
     <div id="rows"></div>
   </section>
@@ -110,7 +110,10 @@ const STYLES = {
       headK:1.3, legLenK:.9, legThickK:1.2, snoutK:.85, eye:"toon", mat:"toon", outline:true, blush:true, fluff:.85, tongue:true },
   C:{ name:"Mẫu C · Gần thật", short:"Tỉ lệ gần chó thật, lông có vân, mắt nhỏ tự nhiên, rõ đặc điểm từng giống.",
       long:"Tỉ lệ gần với chó thật hơn: đầu vừa phải, mõm dài đúng giống, chân thật. Lông có vân nhẹ, mắt nhỏ và tự nhiên. Nhìn là nhận ra giống ngay. Hợp với bé lớn hơn, thích chó thật.",
-      headK:1.05, legLenK:.92, legThickK:1.4, snoutK:1.1, eye:"real", mat:"real", outline:false, blush:false, fluff:1.6 }
+      headK:1.05, legLenK:.92, legThickK:1.4, snoutK:1.1, eye:"real", mat:"real", outline:false, blush:false, fluff:1.6 },
+  D:{ name:"Mẫu D · Thật + mắt A", short:"Thân gần thật như mẫu C, mắt cúc áo long lanh và má hồng như mẫu A.",
+      long:"Theo ý Sếp: thân, chân, mõm, tai và lông có vân lấy từ mẫu C (gần chó thật). Mắt cúc áo đen bóng có đốm sáng, má hồng và nét mặt dễ thương lấy từ mẫu A. Đầu nhỉnh hơn mẫu C một chút để mắt to vừa mặt.",
+      headK:1.15, legLenK:.92, legThickK:1.4, snoutK:1.0, eye:"button", mat:"real", outline:false, blush:true, fluff:1.6 }
 };
 
 /* ================= Tiện ích ================= */
@@ -322,7 +325,7 @@ function lights(sc){
 lights(scene);
 
 const QS0 = new URLSearchParams(location.search);
-const state = {style: STYLES[QS0.get("s")] ? QS0.get("s") : "A", breed: BREEDS[QS0.get("b")] ? QS0.get("b") : "pom", coat:0};
+const state = {style: STYLES[QS0.get("s")] ? QS0.get("s") : "D", breed: BREEDS[QS0.get("b")] ? QS0.get("b") : "pom", coat:0};
 let cur = null, spin = -.6, dragging = false, lastX = 0, idleT = 0;
 
 function frame(cam, root, w, h){
@@ -388,7 +391,7 @@ function loop(){
 const DBG = new URLSearchParams(location.search).has("dbg");
 if (SIM) setInterval(loop, 33); else renderer.setAnimationLoop(loop);
 
-/* ================= Ảnh nhỏ 15 mẫu ================= */
+/* ================= Ảnh nhỏ 20 mẫu ================= */
 document.getElementById("rows").innerHTML = Object.keys(STYLES).map(sk=>`
   <div class="row"><div class="head"><b>${STYLES[sk].name}</b><span>${STYLES[sk].short}</span></div>
   <div class="thumbs">${ORDER.map(bk=>`<button class="th" data-s="${sk}" data-b="${bk}"><div class="ph" id="ph-${sk}-${bk}"></div>${BREEDS[bk].name}</button>`).join("")}</div></div>`).join("");
