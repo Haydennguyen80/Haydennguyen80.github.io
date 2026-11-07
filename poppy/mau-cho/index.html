@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mẫu chó Poppy</title>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<script src="../lib/three.min.js"></script>
+<style>
+:root{
+  --cream:#F9F4E9; --ink:#0F0D0B; --muted:#6B6259; --line:#E6DCC8;
+  --teal:#1E6F78; --teal-l:#DDEFEC; --sun:#FFB547; --card:#FFFFFF;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--cream);color:var(--ink);font-family:Nunito,"Segoe UI",Arial,sans-serif}
+h1,h2,h3{font-family:"Baloo 2",Nunito,sans-serif;font-weight:800;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding:16px 16px 48px}
+header h1{font-size:30px;line-height:1.1}
+header p{margin:6px 0 0;color:var(--muted);font-size:16px;line-height:1.45}
+.viewer{align-items:start;margin-top:16px;background:var(--card);border-radius:20px;box-shadow:0 2px 0 var(--line);overflow:hidden;display:grid;grid-template-columns:1.3fr 1fr}
+@media (max-width:760px){ .viewer{grid-template-columns:1fr} }
+.stage{position:relative;aspect-ratio:4/3.2;background:radial-gradient(120% 90% at 50% 25%,#FFFDF7 0%,#F3E9D6 60%,#E5D5B8 100%);touch-action:none;cursor:grab}
+.stage canvas{display:block;width:100%;height:100%}
+.stage .hint{position:absolute;left:12px;bottom:10px;font-size:13px;color:#8a7d6b;pointer-events:none}
+.stage .tag{position:absolute;left:12px;top:12px;background:var(--teal);color:#fff;font-family:"Baloo 2";font-weight:800;padding:2px 12px;border-radius:999px;font-size:16px}
+.panel{padding:16px;display:flex;flex-direction:column;gap:14px}
+.panel h3{font-size:15px;color:var(--muted);font-family:Nunito;font-weight:700;margin-bottom:6px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font:700 15px Nunito,sans-serif;color:var(--ink);cursor:pointer;min-height:44px}
+.chip.on{border-color:var(--teal);background:var(--teal-l);color:var(--teal)}
+.sw{width:44px;height:44px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--line);cursor:pointer;position:relative}
+.sw.on{box-shadow:0 0 0 3px var(--teal)}
+.sw i{position:absolute;right:-2px;bottom:-2px;width:18px;height:18px;border-radius:50%;border:2px solid #fff}
+.desc{background:#FBF6EC;border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.5}
+.desc b{font-family:"Baloo 2";font-size:18px}
+section.styles{margin-top:28px}
+section.styles h2{font-size:24px}
+section.styles > p{margin:4px 0 0;color:var(--muted)}
+.row{margin-top:16px;background:var(--card);border-radius:20px;padding:14px;box-shadow:0 2px 0 var(--line)}
+.row .head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.row .head b{font-family:"Baloo 2";font-size:22px}
+.row .head span{color:var(--muted);font-size:15px}
+.thumbs{margin-top:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:620px){ .thumbs{grid-template-columns:repeat(3,1fr)} }
+.th{border:2px solid transparent;border-radius:14px;background:#FBF6EC;padding:4px 4px 6px;text-align:center;cursor:pointer;font:700 13px Nunito,sans-serif;color:var(--ink)}
+.th.on{border-color:var(--teal)}
+.th img{display:block;width:100%;aspect-ratio:26/22;object-fit:contain}
+.th .ph{width:100%;aspect-ratio:26/22;border-radius:10px;background:linear-gradient(90deg,#f1e8d7,#faf4e8,#f1e8d7);background-size:200% 100%;animation:sh 1.2s infinite linear}
+@keyframes sh{to{background-position:-200% 0}}
+.how{margin-top:28px;background:var(--teal);color:#fff;border-radius:20px;padding:16px 18px;line-height:1.55}
+.how h2{font-size:22px}
+.how code{background:rgba(255,255,255,.18);padding:1px 8px;border-radius:8px;font-family:inherit;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Mẫu chó mới cho Poppy</h1>
+    <p>Ba kiểu vẽ, mỗi kiểu đủ 5 giống. Sếp bấm vào một ô để xem to, kéo ngang để xoay chó. Trang này để chọn mẫu, chưa đụng vào game.</p>
+  </header>
+
+  <div class="viewer">
+    <div class="stage" id="stage"><span class="tag" id="tag">Mẫu A</span><span class="hint">Kéo để xoay</span></div>
+    <div class="panel">
+      <div><h3>Kiểu vẽ</h3><div class="chips" id="styleChips"></div></div>
+      <div><h3>Giống chó</h3><div class="chips" id="breedChips"></div></div>
+      <div><h3>Màu lông</h3><div class="chips" id="coatChips"></div></div>
+      <div class="desc" id="desc"></div>
+    </div>
+  </div>
+
+  <section class="styles">
+    <h2>Xem cả 15 mẫu</h2>
+    <p>Mỗi hàng là một kiểu vẽ.</p>
+    <div id="rows"></div>
+  </section>
+
+  <div class="how">
+    <h2>Sếp chọn thế nào?</h2>
+    Sếp ưng kiểu nào thì nhắn Bi hoặc Bơ, ví dụ <code>chọn mẫu B</code>. Muốn trộn thì cứ nói, ví dụ <code>mắt mẫu B, thân mẫu A</code>, hoặc <code>Corgi mẫu C, còn lại mẫu A</code>. Sếp chốt xong Bi mới đưa vào game.
+  </div>
+</div>
+
+<script>
+/* ================= Dữ liệu ================= */
+const BREEDS = {
+  pom:{ name:"Pomeranian", bodyL:.50, bodyH:.42, legL:.13, legW:.05, head:.19, snout:.07, snoutW:.46,
+        ear:"prick", earH:.55, earW:.42, tail:"plume", fur:"fluffy", muzzleSecond:true,
+        coats:[{n:"Cam",main:"#E8913A",second:"#F7D7AE"},{n:"Trắng",main:"#F6F1E7",second:"#FFFFFF"},{n:"Kem",main:"#EED5A8",second:"#FBF0DC"},{n:"Đen",main:"#2E2724",second:"#4A403A"}] },
+  corgi:{ name:"Corgi", bodyL:.82, bodyH:.36, legL:.12, legW:.064, head:.165, snout:.14, snoutW:.5,
+        ear:"prick", earH:1.0, earW:.56, tail:"fox", belly:true, legSecond:true, blaze:true, muzzleSecond:true,
+        coats:[{n:"Đỏ trắng",main:"#D9822B",second:"#FFFFFF"},{n:"Ba màu",main:"#2E2724",second:"#FFFFFF",points:"#C98A4B"},{n:"Vàng nhạt",main:"#E2B373",second:"#FFFFFF"}] },
+  poodle:{ name:"Poodle", bodyL:.55, bodyH:.34, legL:.36, legW:.045, head:.14, snout:.16, snoutW:.42,
+        ear:"curly", tail:"pompom", fur:"curly",
+        coats:[{n:"Mơ",main:"#E8B07A",second:"#F3CFA5"},{n:"Trắng",main:"#F5F2EA",second:"#FFFFFF"},{n:"Nâu",main:"#6B4226",second:"#86583A"},{n:"Đen",main:"#2A2424",second:"#3A3434"}] },
+  shiba:{ name:"Shiba", bodyL:.62, bodyH:.38, legL:.26, legW:.056, head:.165, snout:.12, snoutW:.5,
+        ear:"prick", earH:.7, earW:.5, tail:"curl", belly:true, cheeks:true, muzzleSecond:true, legSecond:true,
+        coats:[{n:"Đỏ",main:"#D2772F",second:"#F6E6CC"},{n:"Mè",main:"#A8763E",second:"#F2E2C6"},{n:"Đen nâu",main:"#2E2724",second:"#F2E2C6",points:"#C98A4B"},{n:"Kem",main:"#ECD9B5",second:"#FFF8EA"}] },
+  dachshund:{ name:"Dachshund", bodyL:.95, bodyH:.28, legL:.10, legW:.056, head:.135, snout:.21, snoutW:.42,
+        ear:"drop", tail:"long",
+        coats:[{n:"Đỏ",main:"#B5541F",second:"#C8703A"},{n:"Đen nâu",main:"#2B1D16",second:"#2B1D16",points:"#B8763A"},{n:"Sô-cô-la",main:"#5A3420",second:"#6E4530",points:"#B8763A"},{n:"Kem",main:"#E6C08F",second:"#F0D3AC"}] }
+};
+const ORDER = ["pom","corgi","poodle","shiba","dachshund"];
+const STYLES = {
+  A:{ name:"Mẫu A · Thú bông", short:"Đầu to, chân mũm mĩm, mắt cúc áo đen bóng, má hồng. Mềm như gấu bông.",
+      long:"Giống thú nhồi bông: đầu thật to so với thân, chân ngắn mũm mĩm, tai tròn mềm. Mắt là hai cúc áo đen bóng, có má hồng. Bề mặt mịn như vải nỉ. Hợp với các bé nhỏ.",
+      headK:1.6, legLenK:.72, legThickK:1.55, snoutK:.55, eye:"button", mat:"plush", outline:false, blush:true, fluff:.5, roundEars:true },
+  B:{ name:"Mẫu B · Hoạt hình", short:"Viền đen như phim hoạt hình, mắt to long lanh có lông mày, thè lưỡi.",
+      long:"Kiểu phim hoạt hình: có viền đen quanh hình, tô màu theo mảng rõ ràng. Mắt to long lanh, có lông mày để làm vẻ mặt (vui, buồn, ngạc nhiên), hay thè lưỡi. Nhìn vui nhộn, dễ đọc cảm xúc.",
+      headK:1.3, legLenK:.9, legThickK:1.2, snoutK:.85, eye:"toon", mat:"toon", outline:true, blush:true, fluff:.85, tongue:true },
+  C:{ name:"Mẫu C · Gần thật", short:"Tỉ lệ gần chó thật, lông có vân, mắt nhỏ tự nhiên, rõ đặc điểm từng giống.",
+      long:"Tỉ lệ gần với chó thật hơn: đầu vừa phải, mõm dài đúng giống, chân thật. Lông có vân nhẹ, mắt nhỏ và tự nhiên. Nhìn là nhận ra giống ngay. Hợp với bé lớn hơn, thích chó thật.",
+      headK:1.05, legLenK:.92, legThickK:1.4, snoutK:1.1, eye:"real", mat:"real", outline:false, blush:false, fluff:1.6 }
+};
+
+/* ================= Tiện ích ================= */
+function shade(hex, f){
+  const n = parseInt(hex.slice(1),16); let r=n>>16, g=(n>>8)&255, b=n&255;
+  if (f<0){ r*=1+f; g*=1+f; b*=1+f; } else { r+=(255-r)*f; g+=(255-g)*f; b+=(255-b)*f; }
+  return "#"+[r,g,b].map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,"0")).join("");
+}
+const SPH = new THREE.SphereGeometry(1, 40, 28);
+const SPH_LO = new THREE.SphereGeometry(1, 18, 12);
+const toonGrad = (()=>{ const t = new THREE.DataTexture(new Uint8Array([90,90,90,255, 175,175,175,255, 255,255,255,255]), 3, 1); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const furTex = (()=>{
+  const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+  g.fillStyle = "#808080"; g.fillRect(0,0,256,256);
+  for (let i=0;i<2600;i++){ const x=Math.random()*256, y=Math.random()*256, l=6+Math.random()*10, v=Math.random()*90+80;
+    g.strokeStyle = `rgb(${v},${v},${v})`; g.lineWidth = 1 + Math.random(); g.beginPath(); g.moveTo(x,y); g.lineTo(x+(Math.random()-.5)*3, y+l); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3,3); return t;
+})();
+const blobTex = (()=>{
+  const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
+  const gr = g.createRadialGradient(64,64,4,64,64,62); gr.addColorStop(0,"rgba(60,40,20,.42)"); gr.addColorStop(1,"rgba(60,40,20,0)");
+  g.fillStyle = gr; g.fillRect(0,0,128,128); return new THREE.CanvasTexture(c);
+})();
+const OUTLINE = new THREE.MeshBasicMaterial({color:"#3A2A20", side:THREE.BackSide});
+
+function makeMat(style, color, kind){
+  if (kind === "gloss") return style.mat==="toon" ? new THREE.MeshToonMaterial({color, gradientMap:toonGrad}) : new THREE.MeshStandardMaterial({color, roughness:.18, metalness:0});
+  if (kind === "flat")  return new THREE.MeshBasicMaterial({color});
+  if (style.mat === "plush") return new THREE.MeshPhysicalMaterial({color, roughness:1, sheen:1, sheenRoughness:.75, sheenColor:new THREE.Color(shade(color,.55))});
+  if (style.mat === "toon")  return new THREE.MeshToonMaterial({color, gradientMap:toonGrad});
+  return new THREE.MeshStandardMaterial({color, roughness:.88, bumpMap:furTex, bumpScale:1.2});
+}
+
+/* ================= Dựng chó ================= */
+function buildDog(breedKey, coatIdx, styleKey){
+  const s = BREEDS[breedKey], st = STYLES[styleKey], c = s.coats[coatIdx] || s.coats[0];
+  const main = c.main, second = c.second, points = c.points || null;
+  const root = new THREE.Group();
+  const anim = {eyes:[], tail:null, head:null, torso:null, ears:[]};
+  const mats = {};
+  const M = (col, kind="") => (mats[col+kind] ||= makeMat(st, col, kind));
+  function E(parent, col, rx, ry, rz, x, y, z, o={}){
+    const m = new THREE.Mesh(o.lo ? SPH_LO : SPH, o.mat || M(col, o.kind));
+    m.scale.set(rx, ry, rz); m.position.set(x, y, z);
+    if (o.rot) m.rotation.set(o.rot[0], o.rot[1], o.rot[2]);
+    m.userData.ol = o.ol !== false;
+    parent.add(m); return m;
+  }
+  const curly = s.fur === "curly", fluffy = s.fur === "fluffy";
+  const dark = parseInt(main.slice(1,3),16) < 0x70;
+  const coatC = curly ? shade(main, dark ? .1 : -.05) : main;
+
+  const legL = s.legL * st.legLenK, legR = s.legW * st.legThickK * .5;
+  const bl = s.bodyL/2, bh = s.bodyH/2, bw = bh*.86;
+  const ty = legL + bh*.78;
+  const body = new THREE.Group(); root.add(body); anim.torso = body;
+
+  // thân
+  E(body, main, bw, bh, bl*.92, 0, ty, 0);
+  E(body, main, bw*.96, bh*.92, bl*.42, 0, ty+bh*.02, -bl*.62);                    // mông tròn
+  E(body, s.belly ? second : main, bw*.88, bh*.88, bl*.36, 0, ty+bh*.04, bl*.66);    // ngực
+  if (s.belly) E(body, second, bw*.86, bh*.6, bl*.8, 0, ty-bh*.4, bl*.06);            // bụng
+  E(body, s.belly ? second : main, bw*.68, bh*.72, bh*.72, 0, ty+bh*.62, bl*.84);    // cổ
+
+  // chân
+  const legCol = s.legSecond ? second : (points || main);
+  const topY = ty - bh*.25;
+  for (const [sx, sz] of [[1,1],[-1,1],[1,-1],[-1,-1]]){
+    const x = sx*bw*.56, z = sz*bl*.64;
+    const len = Math.max(.001, topY - legR*1.2);
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(legR, len, 8, 16), M(legCol));
+    leg.position.set(x, legR*1.2 + len/2, z); leg.userData.ol = true; root.add(leg);
+    if (sz < 0 && st.mat === "real") E(root, main, bw*.42, bh*.62, bl*.3, x*.92, ty-bh*.25, z+legR*.6);   // đùi sau
+    E(root, legCol, legR*1.18, legR*.72, legR*1.55, x, legR*.72, z+legR*.45);                              // bàn chân
+    if (curly){ E(root, coatC, legR*2.3, legR*2.1, legR*2.3, x, legR*2.7, z); E(root, coatC, legR*2.4, legR*2.6, legR*2.4, x, topY-legR*.3, z); }
+  }
+
+  // lông xù / xoăn phủ thân
+  if (fluffy || curly){
+    // A: ít cục to, lún sâu (mịn như bông); B: vừa; C: nhiều cục nhỏ (lông có vân)
+    const n = (fluffy && st.mat==="plush") ? 0 : Math.round((curly ? 60 : 40) * st.fluff), rr = bh*(curly ? .3 : .36) / Math.sqrt(st.fluff), sink = st.mat==="plush" ? .62 : .78;
+    for (let i=0;i<n;i++){
+      const y = 1 - (i+.5)/n*2, r = Math.sqrt(1-y*y), a = i*2.39996;
+      if (y < -.55) continue;
+      const px = Math.cos(a)*r, pz = Math.sin(a)*r;
+      E(body, i%3 ? coatC : shade(coatC, curly ? -.07 : .06), rr, rr, rr, px*bw*sink, ty + y*bh*sink*1.05, pz*bl*sink, {lo:true});
+    }
+    if (fluffy){                                                                      // bờm cổ
+      for (let i=0;i<12;i++){ const a = i/12*Math.PI*2;
+        E(body, shade(second,-.02), bh*.42, bh*.42, bh*.42, Math.cos(a)*bw*.75, ty+bh*.5 + Math.sin(a)*bh*.55, bl*.8, {lo:true}); }
+    }
+  }
+
+  // đầu
+  const R = s.head * st.headK;
+  const head = new THREE.Group(); head.position.set(0, ty + bh*.95 + R*.42, bl*.98 + R*.12); root.add(head); anim.head = head;
+  E(head, main, R, R*.92, R*.94, 0, 0, 0);
+  if (fluffy){ for (let i=0;i<10;i++){ const a = i/10*Math.PI*2; E(head, i%2?main:shade(main,.06), R*.36, R*.36, R*.36, Math.cos(a)*R*.88, Math.sin(a)*R*.6 - R*.12, -R*.22, {lo:true}); } }
+  if (curly){ for (let i=0;i<9;i++){ const a = i/9*Math.PI*2; E(head, i%2?coatC:shade(coatC,-.07), R*.34, R*.34, R*.34, Math.cos(a)*R*.38, R*.82 + (i%2)*R*.1, Math.sin(a)*R*.3 - R*.05, {lo:true}); }
+              E(head, coatC, R*.4, R*.4, R*.4, 0, R*1.02, -R*.05, {lo:true}); }
+  if (s.cheeks){ const ck = st.mat==="real" ? .74 : 1; for (const sx of [-1,1]) E(head, second, R*.44*ck, R*.4*ck, R*.42*ck, sx*R*.48, -R*.32, R*.42); }
+  if (s.blaze) E(head, second, R*.17, R*.62, R*.34, 0, R*.34, R*.78, {rot:[-.35,0,0]});
+  if (points){ for (const sx of [-1,1]) E(head, points, R*.1, R*.07, R*.06, sx*R*.34, R*.4, R*.85, {ol:false}); }
+
+  // mõm
+  const snL = s.snout * st.snoutK;
+  const muzC = s.muzzleSecond ? second : (points || shade(main,.1));
+  const mzW = R*s.snoutW*(st.mat==="plush" ? 1.12 : .92), mzH = R*s.snoutW*.74, mzL = snL*.5 + R*.26;
+  const mzZ = R*.7 + snL*.34, mzY = -R*.3;
+  E(head, muzC, mzW, mzH, mzL, 0, mzY, mzZ);
+  E(head, shade(muzC,-.06), mzW*.82, mzH*.5, mzL*.8, 0, mzY - mzH*.5, mzZ - mzL*.05);   // hàm dưới
+  const noseR = R*(st.mat==="plush" ? .16 : .13);
+  E(head, "#1C1412", noseR*1.25, noseR*.85, noseR*.8, 0, mzY + mzH*.55, mzZ + mzL*.93, {kind:"gloss"});
+  if (st.tongue) E(head, "#EE7184", mzW*.42, mzH*.14, mzL*.45, 0, mzY - mzH*.82, mzZ + mzL*.55, {rot:[.5,0,0]});
+
+  // mắt
+  for (const sx of [-1,1]){
+    const g = new THREE.Group();
+    const d = new THREE.Vector3(sx*.43, .14, .89).normalize();
+    g.position.copy(d).multiplyScalar(R*.9);
+    g.lookAt(g.position.clone().add(d)); head.add(g);
+    if (st.eye === "button"){
+      E(g, "#120C0A", R*.19, R*.2, R*.11, 0,0,0, {kind:"gloss", ol:false});
+      E(g, "#FFFFFF", R*.055, R*.055, R*.03, R*.06, R*.07, R*.1, {kind:"flat", ol:false});
+      E(g, "#FFFFFF", R*.028, R*.028, R*.02, -R*.06, -R*.06, R*.1, {kind:"flat", ol:false});
+    } else if (st.eye === "toon"){
+      E(g, "#FFFFFF", R*.2, R*.24, R*.1, 0,0,0, {kind:"flat"});
+      E(g, "#5C3A1E", R*.15, R*.17, R*.06, 0, -R*.02, R*.07, {kind:"flat", ol:false});
+      E(g, "#120C0A", R*.09, R*.1, R*.04, 0, -R*.02, R*.11, {kind:"flat", ol:false});
+      E(g, "#FFFFFF", R*.05, R*.05, R*.02, R*.05, R*.06, R*.14, {kind:"flat", ol:false});
+      const brow = E(g, shade(main,-.45), R*.13, R*.035, R*.04, 0, R*.33, R*.05, {kind:"flat", ol:false}); brow.rotation.z = sx*.18;
+    } else {
+      E(g, "#1A0F0A", R*.12, R*.105, R*.06, 0,0,-R*.01, {ol:false});
+      E(g, "#3B2414", R*.095, R*.085, R*.06, 0,0,R*.02, {kind:"gloss", ol:false});
+      E(g, "#FFFFFF", R*.022, R*.022, R*.012, R*.03, R*.035, R*.07, {kind:"flat", ol:false});
+    }
+    anim.eyes.push(g);
+    if (st.blush) E(head, "#FF9AA8", R*.16, R*.09, R*.04, sx*R*.62, -R*.22, R*.6, {kind:"flat", ol:false, rot:[0, sx*.75, 0]});
+  }
+
+  // tai
+  for (const sx of [-1,1]){
+    const p = new THREE.Group(); head.add(p); anim.ears.push(p);
+    if (s.ear === "prick"){
+      p.position.set(sx*R*.5, R*.66, -R*.08); p.rotation.set(-.12, 0, -sx*.32);
+      const h = R*s.earH, w = R*s.earW;
+      if (st.roundEars){
+        E(p, main, w*.55, h*.55, w*.28, 0, h*.45, 0);
+        E(p, "#F2B1A8", w*.32, h*.36, w*.12, 0, h*.42, w*.2, {ol:false});
+      } else {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(w*.5, h, st.mat==="real" ? 10 : 24), M(main)); cone.scale.z = .42; cone.position.y = h*.42; cone.userData.ol = true; p.add(cone);
+        const inn = new THREE.Mesh(new THREE.ConeGeometry(w*.3, h*.7, 16), M(st.mat==="real" ? shade(second,-.05) : "#F2B1A8")); inn.scale.z = .3; inn.position.set(0, h*.36, w*.1); p.add(inn);
+      }
+    } else if (s.ear === "drop"){
+      p.position.set(sx*R*.8, R*.28, -R*.12); p.rotation.set(.05, 0, sx*.18);
+      E(p, shade(main,-.12), R*.13, R*.68, R*.4, 0, -R*.5, 0);
+    } else if (s.ear === "curly"){
+      p.position.set(sx*R*.82, R*.22, -R*.06);
+      for (let i=0;i<5;i++) E(p, i%2?coatC:shade(coatC,-.07), R*(.34-i*.03), R*(.34-i*.03), R*(.3-i*.03), sx*R*.03, -i*R*.26, 0, {lo:true});
+    }
+  }
+
+  // đuôi
+  const tail = new THREE.Group(); tail.position.set(0, ty + bh*.35, -bl*.98); root.add(tail); anim.tail = tail;
+  const L = s.bodyL;
+  const T = {
+    curl:   {p:[[0,0],[-.05,.12],[-.02,.24],[.07,.29],[.16,.25],[.17,.15]], r0:.06, r1:.045, tip:second},
+    plume:  {p:[[0,0],[-.06,.14],[.0,.3],[.14,.36],[.26,.3]], r0:.08, r1:.1, tip:shade(main,.08), fluffy:true},
+    fox:    {p:[[0,0],[-.12,.05],[-.24,.08]], r0:.05, r1:.075, tip:second},
+    pompom: {p:[[0,0],[-.04,.14],[-.07,.28]], r0:.018, r1:.016, ball:.085},
+    long:   {p:[[0,0],[-.14,.01],[-.27,.07],[-.36,.17]], r0:.032, r1:.012}
+  }[s.tail];
+  const curve = new THREE.CatmullRomCurve3(T.p.map(([z,y])=>new THREE.Vector3(0, y*L, z*L)));
+  const N = 22;
+  for (let i=0;i<=N;i++){
+    const t = i/N, pt = curve.getPoint(t), r = (T.r0 + (T.r1-T.r0)*t) * L * (st.mat==="plush" ? 1.2 : 1);
+    const col = (T.tip && t > .78) ? T.tip : main;
+    E(tail, curly ? coatC : col, r, r, r, pt.x, pt.y, pt.z, {lo:true, ol: i%3===0});
+    if (T.fluffy && i%3===0) E(tail, shade(main,.05), r*1.25, r*1.25, r*1.25, pt.x + (i%2?.01:-.01), pt.y, pt.z, {lo:true, ol:false});
+  }
+  if (T.ball){ const pt = curve.getPoint(1); E(tail, coatC, T.ball*L, T.ball*L, T.ball*L, pt.x, pt.y, pt.z, {lo:true}); }
+
+  // bóng mờ dưới chân
+  const blob = new THREE.Mesh(new THREE.PlaneGeometry(1,1), new THREE.MeshBasicMaterial({map:blobTex, transparent:true, depthWrite:false}));
+  blob.userData.noBox = true; blob.rotation.x = -Math.PI/2; blob.position.y = .002; blob.scale.set(bw*3.6, s.bodyL*1.7 + R, 1); root.add(blob);
+
+  // viền hoạt hình
+  if (st.outline){
+    const list = []; root.traverse(o=>{ if (o.isMesh && o.userData.ol && o !== blob) list.push(o); });
+    for (const m of list){ const o = new THREE.Mesh(m.geometry, OUTLINE); o.scale.setScalar(1.09); m.add(o); }
+  }
+  root.traverse(o=>{ if (o.isMesh) o.frustumCulled = false; });
+  return {root, anim};
+}
+
+/* ================= Khung xem lớn ================= */
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, .05, 50);
+function lights(sc){
+  sc.add(new THREE.HemisphereLight("#FFF6E8", "#B9A68A", 1.6));
+  const sun = new THREE.DirectionalLight("#FFF1D6", 2.2); sun.position.set(-1.5, 3, 2.6); sc.add(sun);
+  const rim = new THREE.DirectionalLight("#DCEBFF", .9); rim.position.set(2, 1.5, -2); sc.add(rim);
+}
+lights(scene);
+
+const QS0 = new URLSearchParams(location.search);
+const state = {style: STYLES[QS0.get("s")] ? QS0.get("s") : "A", breed: BREEDS[QS0.get("b")] ? QS0.get("b") : "pom", coat:0};
+let cur = null, spin = -.6, dragging = false, lastX = 0, idleT = 0;
+
+function frame(cam, root, w, h){
+  const box = new THREE.Box3(); root.updateMatrixWorld(true); root.children.forEach(ch=>{ if (!ch.userData.noBox) box.expandByObject(ch); });
+  const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+  const rad = Math.max(size.x, size.y, size.z) * .62;
+  const dist = rad / Math.sin(THREE.MathUtils.degToRad(cam.fov/2)) * (w < h ? 1.25 : 1.0);
+  cam.aspect = w/h; cam.updateProjectionMatrix();
+  cam.position.set(ctr.x, ctr.y + dist*.32, ctr.z + dist*.95);
+  cam.lookAt(ctr.x, ctr.y*.85, ctr.z);
+}
+function show(){
+  if (cur){ scene.remove(cur.root); }
+  cur = buildDog(state.breed, state.coat, state.style);
+  const r0 = cur.root.rotation.y; cur.root.rotation.y = 0;
+  scene.add(cur.root);
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  frame(camera, cur.root, w, h);
+  cur.root.rotation.y = spin;
+  document.getElementById("tag").textContent = "Mẫu " + state.style;
+  ui();
+}
+function ui(){
+  const st = STYLES[state.style], B = BREEDS[state.breed];
+  document.getElementById("styleChips").innerHTML = Object.keys(STYLES).map(k=>`<button class="chip ${k===state.style?"on":""}" data-s="${k}">${STYLES[k].name}</button>`).join("");
+  document.getElementById("breedChips").innerHTML = ORDER.map(k=>`<button class="chip ${k===state.breed?"on":""}" data-b="${k}">${BREEDS[k].name}</button>`).join("");
+  document.getElementById("coatChips").innerHTML = B.coats.map((c,i)=>`<button class="sw ${i===state.coat?"on":""}" data-c="${i}" title="${c.n}" aria-label="${c.n}" style="background:${c.main}"><i style="background:${c.points||c.second}"></i></button>`).join("");
+  document.getElementById("desc").innerHTML = `<b>${st.name}</b><br>${st.long}`;
+  document.querySelectorAll(".th").forEach(t=>t.classList.toggle("on", t.dataset.s===state.style && t.dataset.b===state.breed));
+}
+document.querySelector(".panel").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.s){ state.style = b.dataset.s; }
+  if (b.dataset.b){ state.breed = b.dataset.b; state.coat = 0; }
+  if (b.dataset.c){ state.coat = +b.dataset.c; }
+  show();
+});
+stage.addEventListener("pointerdown", e=>{ dragging = true; lastX = e.clientX; stage.setPointerCapture(e.pointerId); stage.style.cursor = "grabbing"; });
+stage.addEventListener("pointermove", e=>{ if (!dragging) return; spin += (e.clientX - lastX) * .012; lastX = e.clientX; idleT = 0; });
+const endDrag = ()=>{ dragging = false; stage.style.cursor = ""; };
+stage.addEventListener("pointerup", endDrag); stage.addEventListener("pointercancel", endDrag);
+window.addEventListener("resize", ()=>{ if (cur){ const r = cur.root.rotation.y; cur.root.rotation.y = 0; const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); frame(camera, cur.root, w, h); cur.root.rotation.y = r; } });
+
+function animate(a, t){
+  a.tail.rotation.y = Math.sin(t*7) * .45;
+  a.head.rotation.z = Math.sin(t*.8) * .08;
+  a.head.rotation.x = Math.sin(t*.55) * .04;
+  a.torso.scale.y = 1 + Math.sin(t*2.4)*.008;
+  const blink = (t % 3.4) < .12 ? .12 : 1;
+  for (const e of a.eyes) e.scale.y = blink;
+  a.ears.forEach((p,i)=>{ p.rotation.y = Math.sin(t*1.3 + i)*.05; });
+}
+const clock = new THREE.Clock();
+const SIM = new URLSearchParams(location.search).has("sim");
+function loop(){
+  const dt = Math.min(.05, clock.getDelta()), t = clock.elapsedTime;
+  if (!dragging){ idleT += dt; if (idleT > 2.5) spin += dt*.35; }
+  if (cur){ cur.root.rotation.y = spin; animate(cur.anim, t); }
+  renderer.render(scene, camera);
+  if (DBG) document.querySelector(".hint").textContent = `w=${stage.clientWidth} h=${stage.clientHeight} calls=${renderer.info.render.calls} lost=${renderer.getContext().isContextLost()} cam=${camera.position.toArray().map(v=>v.toFixed(2))} asp=${camera.aspect.toFixed(2)}`;
+}
+const DBG = new URLSearchParams(location.search).has("dbg");
+if (SIM) setInterval(loop, 33); else renderer.setAnimationLoop(loop);
+
+/* ================= Ảnh nhỏ 15 mẫu ================= */
+document.getElementById("rows").innerHTML = Object.keys(STYLES).map(sk=>`
+  <div class="row"><div class="head"><b>${STYLES[sk].name}</b><span>${STYLES[sk].short}</span></div>
+  <div class="thumbs">${ORDER.map(bk=>`<button class="th" data-s="${sk}" data-b="${bk}"><div class="ph" id="ph-${sk}-${bk}"></div>${BREEDS[bk].name}</button>`).join("")}</div></div>`).join("");
+document.getElementById("rows").addEventListener("click", e=>{
+  const t = e.target.closest(".th"); if (!t) return;
+  state.style = t.dataset.s; state.breed = t.dataset.b; state.coat = 0; show();
+  document.querySelector(".viewer").scrollIntoView({behavior:"smooth", block:"start"});
+});
+function makeThumbs(){
+  const TW = 260, TH = 220;
+  const tr = new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+  tr.setPixelRatio(1.5); tr.setSize(TW, TH, false); tr.outputColorSpace = THREE.SRGBColorSpace;
+  const ts = new THREE.Scene(); lights(ts);
+  const tc = new THREE.PerspectiveCamera(30, TW/TH, .05, 50);
+  const jobs = []; for (const sk of Object.keys(STYLES)) for (const bk of ORDER) jobs.push([sk,bk]);
+  (function next(){
+    const job = jobs.shift(); if (!job){ tr.dispose(); return; }
+    const [sk, bk] = job, d = buildDog(bk, 0, sk);
+    ts.add(d.root); d.root.rotation.y = -.62; frame(tc, d.root, TW, TH);
+    tr.render(ts, tc);
+    const img = new Image(); img.alt = STYLES[sk].name + " " + BREEDS[bk].name; img.src = tr.domElement.toDataURL("image/png");
+    const ph = document.getElementById(`ph-${sk}-${bk}`); if (ph) ph.replaceWith(img);
+    ts.remove(d.root);
+    setTimeout(next, 0);
+  })();
+}
+
+// ?w=390 : ép trang về khổ điện thoại để chụp thử trên máy tính
+if (new URLSearchParams(location.search).get("w")){
+  const w = +new URLSearchParams(location.search).get("w");
+  const css = document.createElement("style");
+  css.textContent = `.wrap{max-width:${w}px;margin:0} .viewer{grid-template-columns:1fr} .thumbs{grid-template-columns:repeat(3,1fr)}`;
+  document.head.appendChild(css);
+}
+show();
+setTimeout(makeThumbs, 50);
+</script>
+</body>
+</html>
