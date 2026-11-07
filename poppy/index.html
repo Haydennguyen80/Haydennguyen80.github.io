@@ -280,6 +280,9 @@ const STYLE_A = {headK: 1.6, legLenK: 0.72, legThickK: 1.55, snoutK: 0.55, eyeK:
 // Bảng màu định sẵn: Sếp chốt 07/11 "chọn trong màu định sẵn"
 const PALETTE = [["Trắng","#F6F2EA"],["Kem","#EED5A8"],["Vàng nhạt","#E2B373"],["Mơ","#E8B07A"],["Cam","#E8913A"],["Đỏ","#D2772F"],
   ["Nâu đỏ","#B5541F"],["Nâu","#6B4226"],["Sô-cô-la","#4A2E1E"],["Xám","#9A9590"],["Đen","#2B2522"],["Hồng","#F2B1A8"]];
+const OWNER_HAIR = [["ngan","Tóc ngắn"],["dai","Tóc dài"],["duoi","Đuôi ngựa"],["xoan","Tóc xoăn"],["bui","Hai búi"]];
+const OWNER_SHIRT = [["Đỏ","#E0524A"],["Cam","#EE9440"],["Vàng","#F2C94C"],["Xanh lá","#5DB36A"],["Xanh dương","#4C8FE0"],["Tím","#9A6AD6"],["Hồng","#EE8FB5"],["Trắng","#F4F1EA"],["Đen","#3A3A40"]];
+const OWNER_DEFAULT = {hair: "ngan", shirt: "#4C8FE0"};
 const REGION_NAMES = {body:"Thân", head:"Đầu", back:"Lưng", chest:"Ngực và bụng", legs:"Chân", muzzle:"Mõm", earOut:"Tai ngoài", earIn:"Tai trong", tail:"Đuôi", blaze:"Vệt trán"};
 const UPRIGHT_EARS = ["prick","bigPrick","fold"];
 function breedRegions(look){   // chỉ các vùng hình chó thật sự có (thêm Đầu, Lưng theo ý Sếp)
@@ -682,11 +685,11 @@ function persist(){
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
   catch(e){ toast("Không lưu được trên trình duyệt này. Hãy dùng nút Lưu bản sao."); }
 }
-function newProfile(owner, look, name){
+function newProfile(owner, look, name, ownerLook){
   const B = BREEDS[look.breed];
   const now = Date.now();
   return {
-    id: uid(), owner, created: now,
+    id: uid(), owner, created: now, ownerLook: Object.assign({}, OWNER_DEFAULT, ownerLook||{}),
     dog: {name, breed: look.breed, coat: look.coat, ear: look.ear, tail: look.tail, eye: look.eye, colors: Object.assign({}, look.colors||{})},
     stats: {xp: 0, hunger: 20, happy: 75, bond: 10, weight: 50, thirst: 0, fit: 50, sick: 0, energy: 85, clean: 95},
     skills: {come: 0, sit: 0, stand: 0, lie: 0, potty: 0, no: 0},
@@ -2459,11 +2462,49 @@ canvas.addEventListener("pointerdown", e=>{
 buildRoom();
 
 /* =========================================================
+   NGƯỜI CHỦ (kiểu tóc, màu áo) — dùng ở màn tạo nhân vật, sau này dùng khi đi dạo
+   ========================================================= */
+function buildOwner3D(o){
+  o = Object.assign({}, OWNER_DEFAULT, o||{});
+  const root = new THREE.Group();
+  const skin = "#F1C9A5", hairC = "#3B2A20", pants = "#3E5679", shoe = "#5A4636";
+  for (const s of [-1, 1]){
+    const leg = cyl(0.055, 0.06, 0.3, pants); leg.position.set(s*0.075, 0.18, 0); root.add(leg);
+    const sh = rbox(0.1, 0.06, 0.15, 0.025, shoe); sh.position.set(s*0.075, 0.03, 0.02); root.add(sh);
+    const arm = cyl(0.045, 0.04, 0.27, o.shirt); arm.position.set(s*0.19, 0.48, 0); arm.rotation.z = s*0.15; root.add(arm);
+    const hand = sph(0.045, skin); hand.position.set(s*0.21, 0.33, 0); root.add(hand);
+    const eye = sph(1, "#1E1816", {r: 0.25}); eye.scale.set(0.024, 0.03, 0.014); eye.position.set(s*0.062, 0.815, 0.152); root.add(eye);
+    const ck = sph(0.026, "#F2A0A0"); ck.scale.set(0.03, 0.018, 0.012); ck.position.set(s*0.1, 0.77, 0.135); root.add(ck);
+  }
+  const body = rbox(0.3, 0.32, 0.2, 0.08, o.shirt); body.position.y = 0.49; root.add(body);
+  const head = sph(1, skin); head.scale.set(0.17, 0.165, 0.16); head.position.y = 0.8; root.add(head);
+  const capG = new THREE.SphereGeometry(1, 22, 14, 0, Math.PI*2, 0, Math.PI*0.52);
+  const cap = mesh(capG, mat(hairC)); cap.scale.set(0.182, 0.18, 0.175); cap.position.set(0, 0.805, -0.008); cap.rotation.x = -0.38; root.add(cap);
+  const add = (m, x, y, z)=>{ m.position.set(x, y, z); root.add(m); return m; };
+  if (o.hair === "dai"){
+    add(rbox(0.33, 0.3, 0.07, 0.035, hairC), 0, 0.7, -0.12);
+    for (const s of [-1, 1]){ const st = sph(1, hairC); st.scale.set(0.045, 0.13, 0.06); add(st, s*0.155, 0.72, -0.03); }
+  } else if (o.hair === "duoi"){
+    const tie = sph(0.03, o.shirt); add(tie, 0, 0.86, -0.18);
+    const pt = sph(1, hairC); pt.scale.set(0.06, 0.13, 0.06); pt.rotation.x = 0.35; add(pt, 0, 0.75, -0.22);
+  } else if (o.hair === "xoan"){
+    for (let i = 0; i < 16; i++){ const a = i/16*Math.PI*2, ring = i%2 ? 0.6 : 0.85;
+      add(sph(0.055, hairC), Math.cos(a)*0.16*ring, 0.86 + (1-ring)*0.12, Math.sin(a)*0.15*ring - 0.03); }
+    add(sph(0.07, hairC), 0, 0.97, -0.02);
+  } else if (o.hair === "bui"){
+    for (const s of [-1, 1]) add(sph(0.07, hairC), s*0.13, 0.95, -0.03);
+  } else {   // tóc ngắn: thêm mái lệch
+    const fr = sph(1, hairC); fr.scale.set(0.11, 0.04, 0.05); fr.rotation.z = 0.25; add(fr, 0.03, 0.93, 0.11);
+  }
+  return {root};
+}
+
+/* =========================================================
    MÀN HÌNH TẠO CHÓ
    ========================================================= */
 let draft = null, previewRAF = null;
 function openCreate(firstTime){
-  draft = {step: 0, owner: "", look: {breed:"pom", coat:0, ear:"prick", tail:"curl", eye:0, colors:{}}, name:"", region:"body", firstTime};
+  draft = {step: 0, owner: "", ownerLook: Object.assign({}, OWNER_DEFAULT), look: {breed:"pom", coat:0, ear:"prick", tail:"curl", eye:0, colors:{}}, name:"", region:"body", firstTime};
   renderCreate();
   $("ovCreate").classList.add("show");
 }
@@ -2472,14 +2513,26 @@ function renderCreate(){
   const d = draft;
   cancelAnimationFrame(previewRAF);
   if (d.step===0){
-    el.innerHTML = `<h2>Chào bé!</h2><div class="sub">Bé tên gì? (gõ biệt danh, không cần tên thật)</div>
+    el.innerHTML = `<h2>Chào bạn!</h2><div class="sub">Bạn tên gì? (gõ biệt danh, không cần tên thật)</div>
       <input type="text" id="cOwner" maxlength="20" placeholder="Ví dụ: Aiden" value="${esc(d.owner)}">
       <div class="row" style="margin-top:14px;justify-content:space-between">
         ${d.firstTime?"<span></span>":`<button class="btn ghost" id="cCancel">Hủy</button>`}
         <button class="btn gold" id="cNext">Tiếp</button></div>`;
     const inp = $("cOwner"); setTimeout(()=>inp.focus(), 50);
-    $("cNext").onclick = ()=>{ const v = inp.value.trim(); if(!v){ inp.focus(); toast("Bé gõ biệt danh trước nha"); return; } d.owner=v; d.step=1; renderCreate(); };
+    $("cNext").onclick = ()=>{ const v = inp.value.trim(); if(!v){ inp.focus(); toast("Bạn gõ tên trước nha"); return; } d.owner=v; d.step=5; renderCreate(); };
     inp.onkeydown = e=>{ if(e.key==="Enter") $("cNext").click(); };
+  } else if (d.step===5){   // người chủ: kiểu tóc, màu áo
+    const o = d.ownerLook;
+    el.innerHTML = `<h2>Chào ${esc(d.owner)} nha!</h2><div class="sub">Chọn kiểu tóc và màu áo cho bạn. Bạn sẽ mặc áo này khi dắt chó đi dạo.</div>
+      <div id="prev3d"></div>
+      <div class="opt-label">Kiểu tóc</div><div class="row">${OWNER_HAIR.map(([k,n])=>`<button class="chip ${o.hair===k?"sel":""}" data-hair="${k}">${n}</button>`).join("")}</div>
+      <div class="opt-label">Màu áo</div><div class="swatches">${OWNER_SHIRT.map(([n,hex])=>`<button class="sw small ${o.shirt===hex?"sel":""}" data-shirt="${hex}"><i style="background:${hex}"></i>${n}</button>`).join("")}</div>
+      <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn ghost" id="cBack">Quay lại</button><button class="btn gold" id="cNext">Tiếp</button></div>`;
+    el.querySelectorAll("[data-hair]").forEach(b=>b.onclick=()=>{o.hair=b.dataset.hair; renderCreate();});
+    el.querySelectorAll("[data-shirt]").forEach(b=>b.onclick=()=>{o.shirt=b.dataset.shirt; renderCreate();});
+    $("cBack").onclick=()=>{d.step=0;renderCreate();};
+    $("cNext").onclick=()=>{d.step=1;renderCreate();};
+    runPreview3D();
   } else if (d.step===1){
     el.innerHTML = `<h2>Chọn giống chó</h2><div class="sub">Mỗi giống có dáng và tính cách khác nhau</div>
       <div class="grid">${BREED_ORDER.map(k=>{
@@ -2491,7 +2544,7 @@ function renderCreate(){
       d.look = {breed:k, coat:0, ear:B.ears[0][0], tail:B.tails[0][0], eye:0, colors:{}}; d.region = "body";
       el.querySelectorAll(".card").forEach(x=>x.classList.toggle("sel", x===c));
     });
-    $("cBack").onclick=()=>{d.step=0;renderCreate();};
+    $("cBack").onclick=()=>{d.step=5;renderCreate();};
     $("cNext").onclick=()=>{d.step=2;renderCreate();};
   } else if (d.step===2){
     const B = BREEDS[d.look.breed], C = lookColors(d.look), regs = breedRegions(d.look);
@@ -2515,7 +2568,7 @@ function renderCreate(){
     $("cNext").onclick=()=>{d.step=3;renderCreate();};
     runPreview3D();
   } else if (d.step===3){
-    el.innerHTML = `<h2>Đặt tên cho chó</h2><div class="sub">Bé muốn gọi chó là gì?</div>
+    el.innerHTML = `<h2>Đặt tên cho chó</h2><div class="sub">Bạn muốn gọi chó là gì?</div>
       <div id="prev3d"></div>
       <div class="lock">🔒 Tạo xong thì <b>không đổi được giống và màu</b> nữa. Muốn chó khác thì tạo tài khoản mới nha.</div>
       <input type="text" id="cName" maxlength="16" placeholder="Tên chó" value="${esc(d.name)}" style="margin-top:12px">
@@ -2523,8 +2576,8 @@ function renderCreate(){
     const inp=$("cName"); setTimeout(()=>inp.focus(),50);
     $("cBack").onclick=()=>{d.name=inp.value; d.step=2;renderCreate();};
     $("cDone").onclick=()=>{
-      const v=inp.value.trim(); if(!v){ inp.focus(); toast("Bé đặt tên cho chó trước nha"); return; }
-      const p = newProfile(d.owner, d.look, v);
+      const v=inp.value.trim(); if(!v){ inp.focus(); toast("Bạn đặt tên cho chó trước nha"); return; }
+      const p = newProfile(d.owner, d.look, v, d.ownerLook);
       save.profiles.push(p); save.current = p.id; persist();
       cancelAnimationFrame(previewRAF);
       $("ovCreate").classList.remove("show");
@@ -2554,10 +2607,11 @@ function runPreview3D(){
     window.addEventListener("pointerup", ()=>{ PV.drag = null; });
   }
   box.appendChild(PV.r.domElement);
-  const key = JSON.stringify(draft.look);
+  const isOwner = draft.step === 5;
+  const key = isOwner ? "o" + JSON.stringify(draft.ownerLook) : JSON.stringify(draft.look);
   if (key !== PV.key){
     if (PV.d) PV.sc.remove(PV.d.root);
-    PV.d = buildDog3D(draft.look, {preview: true}); PV.sc.add(PV.d.root); PV.key = key;
+    PV.d = isOwner ? buildOwner3D(draft.ownerLook) : buildDog3D(draft.look, {preview: true}); PV.sc.add(PV.d.root); PV.key = key;
   }
   const B = BREEDS[draft.look.breed], t0 = performance.now();
   cancelAnimationFrame(previewRAF);
@@ -2568,6 +2622,12 @@ function runPreview3D(){
     const t = (now - t0)/1000;
     if (PV.drag == null) PV.yaw += 0.006;
     PV.d.root.rotation.y = PV.yaw;
+    if (isOwner){
+      PV.d.root.position.y = Math.abs(Math.sin(t*2.2))*0.015;
+      PV.cam.position.set(0, 0.62, 2.15); PV.cam.lookAt(0, 0.5, 0);
+      PV.r.render(PV.sc, PV.cam); previewRAF = requestAnimationFrame(loop); return;
+    }
+    PV.d.root.position.y = 0;
     updateDog3D(poseFor(Math.floor(t/4)%2 ? "sit" : "happy", B), t, PV.d);
     const size = (B.bodyL + B.headR*2)*K;
     PV.cam.position.set(0, size*0.5, size*1.75); PV.cam.lookAt(0, size*0.24, 0);
@@ -2601,7 +2661,7 @@ function runPreview(){
 function showProfiles(){
   closeRing();
   const el = $("profilesSheet");
-  el.innerHTML = `<h2>Hồ sơ</h2><div class="sub">Mỗi bé một hồ sơ, một chú chó riêng</div>
+  el.innerHTML = `<h2>Hồ sơ</h2><div class="sub">Mỗi người một hồ sơ, một chú chó riêng</div>
     <div class="grid profiles" style="grid-template-columns:1fr">${save.profiles.map(p=>`
       <div class="card ${prof&&prof.id===p.id?"sel":""}" data-id="${p.id}">${staticDog(p.dog,120,80)}
         <div><b>${esc(p.dog.name)}</b><span>${esc(p.owner)} · ${BREEDS[p.dog.breed].name} · Cấp ${levelOf(p)}</span></div></div>`).join("") || `<div class="small">Chưa có hồ sơ nào.</div>`}
@@ -2637,7 +2697,7 @@ function startProfile(id){
   setTimeout(()=>{
     if (sickLevel(S.sick)>=2) bubble("Ốm rồi... 🤒", 2600);
     else if (S.hunger>70) bubble("Đói quá à...", 2600);
-    else bubble(`Chào ${prof.owner}!`, 2200);
+    else bubble(`Chào ${prof.owner} nha!`, 2200);
   }, 400);
 }
 function refreshTop(){
@@ -2882,7 +2942,7 @@ function showInfo(){
     ${Object.keys(COMMANDS).map(k=>statRow(COMMANDS[k].n, p.skills[k], true)).join("")}
     ${Object.keys(LEARN_EXTRA).map(k=>statRow(LEARN_EXTRA[k], p.skills[k]||0, true)).join("")}
     ${statRow("Năng lượng", S.energy ?? 80, false, (S.energy ?? 80) < 25 ? "Mệt, cần ngủ" : "Khỏe")}
-    <div class="small" style="margin-top:6px">Không có giờ cố định: các thanh tự giảm dần, bé tự nhớ cho ăn, cho uống, cho chơi, cho tập và cho nghỉ. Thanh dưới 25% màu cam, dưới 15% màu đỏ, dưới 10% thì chó bị bệnh (không chết), chăm lại thì khỏi dần. Chơi càng nhiều, chó càng thông minh và thân thiết.<br>Bịch treat còn: <b>${p.treats.left}/${TREAT_BAG}</b> viên. Mức đã học chỉ tăng khi cho đồ ăn thưởng ngay sau lúc chó làm đúng.</div>
+    <div class="small" style="margin-top:6px">Không có giờ cố định: các thanh tự giảm dần, bạn tự nhớ cho ăn, cho uống, cho chơi, cho tập và cho nghỉ. Thanh dưới 25% màu cam, dưới 15% màu đỏ, dưới 10% thì chó bị bệnh (không chết), chăm lại thì khỏi dần. Chơi càng nhiều, chó càng thông minh và thân thiết.<br>Bịch treat còn: <b>${p.treats.left}/${TREAT_BAG}</b> viên. Mức đã học chỉ tăng khi cho đồ ăn thưởng ngay sau lúc chó làm đúng.</div>
     <div class="row" style="margin-top:14px">
       <button class="btn" id="iExport">Lưu bản sao</button>
       <button class="btn ghost" id="iImport">Mở bản sao</button>
@@ -2895,7 +2955,7 @@ function showInfo(){
   $("iImport").onclick = ()=>$("fileIn").click();
   $("iClose").onclick = ()=>$("ovInfo").classList.remove("show");
   $("iRename").onclick = ()=>{
-    const o = prompt("Tên của bé (biệt danh):", prof.owner); if (o === null) return;
+    const o = prompt("Tên của bạn (biệt danh):", prof.owner); if (o === null) return;
     const d = prompt("Tên của chó:", prof.dog.name); if (d === null) return;
     if (o.trim()) prof.owner = o.trim().slice(0,20);
     if (d.trim()) prof.dog.name = d.trim().slice(0,16);
@@ -2938,7 +2998,7 @@ $("fileIn").addEventListener("change", async e=>{
 
 /* ---------- thẻ chó + mã QR ---------- */
 function cardData(p){
-  return {v:1, n:p.dog.name, o:p.owner, b:p.dog.breed, c:p.dog.coat, e:p.dog.ear, t:p.dog.tail, y:p.dog.eye, k:p.dog.colors||{},
+  return {v:1, n:p.dog.name, o:p.owner, b:p.dog.breed, c:p.dog.coat, e:p.dog.ear, t:p.dog.tail, y:p.dog.eye, k:p.dog.colors||{}, u:p.ownerLook||OWNER_DEFAULT,
           l:levelOf(p), s:[Math.round(p.skills.sit),Math.round(p.skills.stand),Math.round(p.skills.come),Math.round(p.skills.lie||0)],
           h:Math.round(p.stats.happy), d:Math.round(p.stats.bond), w:Math.round(p.stats.weight)};
 }
@@ -3078,7 +3138,11 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   let p = newProfile("Test", {breed:"pom",coat:0,ear:"prick",tail:"curl",eye:0}, "Bông");
   save = {version:SAVE_VERSION, profiles:[p], current:p.id}; startProfile(p.id);
   ok("hồ sơ mới: bịch treat 100 viên", prof.treats.left===100);
-  ok("tên để bé tự đặt", prof.dog.name==="Bông");
+  ok("tên để người chơi tự đặt", prof.dog.name==="Bông");
+  ok("người chủ có kiểu tóc và màu áo mặc định", prof.ownerLook && prof.ownerLook.hair==="ngan" && /^#/.test(prof.ownerLook.shirt));
+  ok("dựng được người chủ đủ 5 kiểu tóc", OWNER_HAIR.every(([k])=>buildOwner3D({hair:k, shirt:"#E0524A"}).root.children.length > 10));
+  { const html = ["Chào bạn!","Bạn tên gì?"]; openCreate(false); const t0 = $("createSheet").innerText; $("ovCreate").classList.remove("show");
+    ok("lời chào dùng “bạn”, không có chữ “bé”", html.every(s=>t0.includes(s)) && !t0.toLowerCase().includes("bé")); }
   ok("tỉ lệ đúng ở mức 0 thấp", successChance(0) <= 0.15, successChance(0));
   ok("tỉ lệ đúng ở mức 85 = 100%", successChance(85) === 1);
   // huấn luyện: làm đúng rồi thưởng ngay thì tăng
@@ -3256,7 +3320,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
   if (QS.get("side")) setInterval(()=>{ if (!dog.path.length){ dog.faceCam = false; dog.lookAt = {x: dog.pos.x + 1, z: dog.pos.z + 0.25}; } }, 150);   // chạy thử: nhìn chó từ bên hông
   const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="sofa") goPerch("sofa", true); else if(st==="belly"){ petDog(); setTimeout(petDog, 300); setInterval(()=>{ if (dog.state==="belly") rubBelly(); }, 600); } else if(st==="stats") showStats(600000); else if(st==="potty"){ prof.skills.potty = +(QS.get("skill")||0); prof.bladder = 100; } else if(st==="mess"){ prof.messes = [{x:0.6,z:1.0,t:0},{x:-0.6,z:1.3,t:gameNow(prof)}]; buildMesses(); } else if(st==="gnaw") startGnaw(QS.get("spot")||"sofa"); else if(st==="marks"){ prof.marks = {sofa: 7, table: 4, cab: 2}; buildMarks(); } else if(st==="food") openFoodMenu(); else if(st==="closet") openCloset(); else if(st==="info") showInfo(); else if(st==="card") showCard(); else if(st.startsWith("g_")){ const gn = st.slice(2); const again = ()=>gesture(gn, ()=>setTimeout(again, 400), {dir: 1}); dog.faceCam = true; again(); } else if(st==="dream"){ toggleRest(); } else setState(st, 600000); }, 300);
-} else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); if (QS.get("coat")) draft.look.coat=+QS.get("coat"); if (QS.get("cols")) QS.get("cols").split(",").forEach(p=>{ const [k,v]=p.split(":"); draft.look.colors[k]="#"+v; }); if (QS.get("reg")) draft.region=QS.get("reg"); renderCreate();
+} else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); if (QS.get("coat")) draft.look.coat=+QS.get("coat"); if (QS.get("cols")) QS.get("cols").split(",").forEach(p=>{ const [k,v]=p.split(":"); draft.look.colors[k]="#"+v; }); if (QS.get("reg")) draft.region=QS.get("reg"); if (QS.get("hair")) draft.ownerLook.hair=QS.get("hair"); if (QS.get("shirt")) draft.ownerLook.shirt="#"+QS.get("shirt"); renderCreate();
 } else if (save.profiles.length === 0) openCreate(true);
 else {
   const id = save.current && save.profiles.some(p=>p.id===save.current) ? save.current : save.profiles[0].id;
