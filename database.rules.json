@@ -19,8 +19,15 @@
         },
         "$other": {
           ".validate": false
+        },
+        "created": {
+          ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+        },
+        "playSec": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
         }
-      }
+      },
+      ".read": "auth != null && auth.uid === 'gHUDp3jCTYUfy5RiPuCdpv5Dwz02'"
     },
     "park": {
       ".read": "auth != null",
@@ -74,6 +81,15 @@
         },
         "$other": {
           ".validate": false
+        }
+      }
+    },
+    "activity": {
+      ".read": "auth != null && auth.uid === 'gHUDp3jCTYUfy5RiPuCdpv5Dwz02'",
+      "$day": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 86400"
         }
       }
     }

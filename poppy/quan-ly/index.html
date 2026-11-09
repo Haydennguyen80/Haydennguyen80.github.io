@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Quản lý Poppy</title>
+<style>
+:root{
+  --bg:#F6F3EC; --card:#FFFFFF; --ink:#16323A; --ink2:#4A6168; --muted:#7B8C90; --line:#E3DDD0; --grid:#ECE7DC;
+  --bar:#1E6F78; --barHi:#145060; --accent:#F2A33A; --warn:#B4541A; --good:#2E7D4F;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#10191C; --card:#18252A; --ink:#E8F0F1; --ink2:#B5C5C8; --muted:#8299A0; --line:#2A3B40; --grid:#22333A;
+  --bar:#4FB3BD; --barHi:#7FD0D8; --accent:#F2B45A; --warn:#F09A62; --good:#6FCB94; } }
+:root[data-theme="dark"]{ --bg:#10191C; --card:#18252A; --ink:#E8F0F1; --ink2:#B5C5C8; --muted:#8299A0; --line:#2A3B40; --grid:#22333A;
+  --bar:#4FB3BD; --barHi:#7FD0D8; --accent:#F2B45A; --warn:#F09A62; --good:#6FCB94; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1040px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:24px;margin:0 0 4px} h2{font-size:17px;margin:0 0 10px}
+.sub{color:var(--ink2);margin:0 0 18px}
+.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:10px 16px;background:var(--accent);color:#2B1A05;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+@media (max-width:720px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile .num.dur{font-size:22px;padding:6px 0 3px}
+.tile .lbl{color:var(--ink2);font-size:13px;font-weight:600}
+.tile .num{font-size:32px;font-weight:800;line-height:1.1;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.tile .note{color:var(--muted);font-size:12.5px}
+.warn{color:var(--warn)} .good{color:var(--good)}
+.grid2{display:grid;grid-template-columns:1fr;gap:14px}
+.chart{position:relative} svg{display:block;width:100%;height:auto;overflow:visible}
+.ax{fill:var(--muted);font-size:11px} .gl{stroke:var(--grid);stroke-width:1}
+.bar{fill:var(--bar)} .bar.hi{fill:var(--barHi)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);padding:6px 9px;border-radius:8px;font-size:12.5px;white-space:nowrap;transform:translate(-50%,-110%);opacity:0;transition:opacity .1s}
+table{width:100%;border-collapse:collapse;font-size:13.5px} th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--ink2);font-weight:700} td.n{text-align:right;font-variant-numeric:tabular-nums} th.n{text-align:right}
+.tblwrap{overflow-x:auto}
+.info{background:color-mix(in srgb,var(--accent) 14%,var(--card));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:12px;padding:10px 12px;font-size:13.5px;color:var(--ink2);margin-bottom:14px}
+details summary{cursor:pointer;color:var(--ink2);font-weight:600;margin-top:8px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>📊 Quản lý Poppy</h1>
+  <p class="sub" id="who">Trang riêng của chủ game. Đăng nhập bằng tài khoản Google quản lý để xem số liệu.</p>
+  <div class="row" id="authRow"><button class="btn" id="btnIn">Đăng nhập bằng Google</button></div>
+
+  <section id="dash" class="hidden">
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <div class="sub" style="margin:0" id="stamp"></div>
+      <div class="row"><button class="btn ghost" id="btnReload">↻ Tải lại</button><button class="btn ghost" id="btnOut">Đăng xuất</button></div>
+    </div>
+    <div class="info" id="scope"></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid2">
+      <div class="card"><h2>Số người chơi mỗi ngày (30 ngày gần nhất)</h2>
+        <div class="chart" id="chartDau"></div>
+        <details><summary>Xem dạng bảng</summary><div class="tblwrap" id="tblDau"></div></details>
+      </div>
+      <div class="card"><h2>Tài khoản đăng ký mới mỗi ngày (30 ngày gần nhất)</h2>
+        <div class="chart" id="chartNew"></div>
+        <details><summary>Xem dạng bảng</summary><div class="tblwrap" id="tblNew"></div></details>
+      </div>
+      <div class="card"><h2>Danh sách tài khoản</h2><div class="tblwrap" id="tblUsers"></div></div>
+    </div>
+  </section>
+</main>
+<script>
+const FB_CONFIG = {apiKey: "AIzaSyBjkbtdqVoZQnoQe1vNv6X9DGMCvMwo9KM", authDomain: "poppy-830f5.firebaseapp.com",
+  databaseURL: "https://poppy-830f5-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "poppy-830f5",
+  storageBucket: "poppy-830f5.firebasestorage.app", messagingSenderId: "139697342936", appId: "1:139697342936:web:364866a67b6b03796b0aad"};
+const ADMIN_UID = "gHUDp3jCTYUfy5RiPuCdpv5Dwz02";
+const DAY = 86400000, CHURN_DAYS = 14, ONLINE_MS = 2*60000;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dayKey = t => { const d = new Date(t); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+const fmtDay = k => { const [y,m,d] = k.split("-"); return `${d}/${m}`; };
+const fmtDate = t => t ? new Date(t).toLocaleDateString("vi-VN") : "–";
+const fmtDur = sec => { sec = Math.round(sec || 0); const h = Math.floor(sec/3600), m = Math.round((sec % 3600)/60); return h ? `${h} giờ ${m} phút` : `${m} phút`; };
+const ago = t => { if (!t) return "–"; const d = Date.now() - t; if (d < ONLINE_MS) return "đang chơi"; if (d < 3600000) return Math.round(d/60000) + " phút trước"; if (d < DAY) return Math.round(d/3600000) + " giờ trước"; return Math.round(d/DAY) + " ngày trước"; };
+
+function loadScript(src){ return new Promise((ok, bad) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = bad; document.head.appendChild(s); }); }
+let fb = null;
+async function init(){
+  if (new URLSearchParams(location.search).get("demo")){ $("authRow").classList.add("hidden"); render(demoData()); return; }
+  for (const m of ["app","auth","database"]) await loadScript(`https://www.gstatic.com/firebasejs/10.12.2/firebase-${m}-compat.js`);
+  firebase.initializeApp(FB_CONFIG); fb = firebase;
+  $("btnIn").onclick = async () => { const p = new fb.auth.GoogleAuthProvider(); p.setCustomParameters({prompt: "select_account"});
+    try { await fb.auth().signInWithPopup(p); } catch(e){ if (e.code === "auth/popup-blocked") await fb.auth().signInWithRedirect(p); else alert("Chưa đăng nhập được: " + (e.code || e.message)); } };
+  $("btnOut").onclick = () => fb.auth().signOut();
+  $("btnReload").onclick = load;
+  fb.auth().getRedirectResult().catch(()=>{});
+  fb.auth().onAuthStateChanged(u => {
+    if (!u){ $("dash").classList.add("hidden"); $("authRow").classList.remove("hidden"); $("who").textContent = "Trang riêng của chủ game. Đăng nhập bằng tài khoản Google quản lý để xem số liệu."; return; }
+    if (u.uid !== ADMIN_UID){ $("who").textContent = "Tài khoản này không có quyền xem trang quản lý."; $("authRow").innerHTML = '<button class="btn ghost" id="btnOut2">Đăng xuất</button>'; $("btnOut2").onclick = () => fb.auth().signOut(); return; }
+    $("authRow").classList.add("hidden"); $("who").textContent = "Xin chào Sếp. Số liệu lấy trực tiếp từ máy chủ Firebase."; load();
+  });
+}
+async function load(){
+  const db = fb.database(), from = dayKey(Date.now() - 29*DAY);
+  const [u, a, pk] = await Promise.all([db.ref("users").get(), db.ref("activity").orderByKey().startAt(from).get(), db.ref("park").get().catch(() => null)]);
+  render({users: u.val() || {}, activity: a.val() || {}, park: (pk && pk.val()) || {}});
+}
+
+function compute(D){
+  const now = Date.now(), users = Object.entries(D.users).map(([id, v]) => ({id, ...v, created: v.created || v.lastSeen || now}));
+  const days = []; for (let i = 29; i >= 0; i--) days.push(dayKey(now - i*DAY));
+  const act = D.activity || {}, today = days[29];
+  const setFor = ks => { const s = new Set(); for (const k of ks) for (const id of Object.keys(act[k] || {})) s.add(id); return s; };
+  const dau = days.map(k => ({k, v: Object.keys(act[k] || {}).length, sec: Object.values(act[k] || {}).reduce((a, b) => a + b, 0)}));
+  const newPer = days.map(k => ({k, v: users.filter(x => dayKey(x.created) === k).length}));
+  const online = new Set([...users.filter(x => now - (x.lastSeen || 0) < ONLINE_MS).map(x => x.id), ...Object.entries(D.park || {}).filter(([, v]) => now - (v.t || 0) < ONLINE_MS).map(([id]) => id)]);
+  const old = users.filter(x => now - x.created >= CHURN_DAYS*DAY);
+  const churned = old.filter(x => now - (x.lastSeen || 0) >= CHURN_DAYS*DAY);
+  const totalSec = users.reduce((a, x) => a + (x.playSec || 0), 0);
+  const actDays = dau.reduce((a, d) => a + d.v, 0), actSec = dau.reduce((a, d) => a + d.sec, 0);
+  return {users, days, dau, newPer, online: online.size, dauToday: (dau[29] || {}).v || 0, wau: setFor(days.slice(23)).size, mau: setFor(days).size,
+    total: users.length, old: old.length, churned: churned.length, avgTotal: users.length ? totalSec/users.length : 0, avgDay: actDays ? actSec/actDays : 0};
+}
+
+function tile(lbl, num, note, cls = ""){ return `<div class="card tile"><div class="lbl">${lbl}</div><div class="num ${cls}">${num}</div><div class="note">${note}</div></div>`; }
+function render(D){
+  const S = compute(D);
+  $("dash").classList.remove("hidden");
+  $("stamp").textContent = "Cập nhật lúc " + new Date().toLocaleString("vi-VN");
+  $("scope").innerHTML = "ℹ️ Số liệu chỉ tính <b>người chơi đã đăng nhập Google</b> (mục Chơi cùng bạn bè). Người chơi không đăng nhập chưa được đếm. Giờ chơi chỉ tính lúc màn hình game đang mở.";
+  const pct = S.old ? Math.round(S.churned*100/S.old) : 0;
+  $("tiles").innerHTML =
+    tile("Tổng tài khoản đăng ký", S.total, "từ trước tới nay") +
+    tile("Đang chơi ngay lúc này", S.online, "vào game trong 2 phút qua", S.online ? "good" : "") +
+    tile("Chơi hôm nay", S.dauToday, "số tài khoản có vào game hôm nay") +
+    tile("Chơi trong 7 ngày", S.wau, "số tài khoản khác nhau") +
+    tile("Chơi trong 30 ngày", S.mau, "số tài khoản khác nhau") +
+    tile("Bỏ chơi", S.churned, S.old ? `${pct}% số tài khoản đã đăng ký từ ${CHURN_DAYS} ngày trước, nay ${CHURN_DAYS} ngày không vào` : `chưa có tài khoản nào đủ ${CHURN_DAYS} ngày`, S.churned ? "warn" : "") +
+    tile("Giờ chơi trung bình mỗi tài khoản", fmtDur(S.avgTotal), "tổng từ khi đăng ký", "dur") +
+    tile("Giờ chơi trung bình mỗi ngày", fmtDur(S.avgDay), "của người có vào chơi hôm đó (30 ngày)", "dur");
+  window.onresize = () => { clearTimeout(window._rz); window._rz = setTimeout(() => render(D), 200); };
+  barChart($("chartDau"), S.dau, v => `${v.v} người chơi · ${fmtDur(v.sec)} tổng`);
+  barChart($("chartNew"), S.newPer, v => `${v.v} tài khoản mới`);
+  $("tblDau").innerHTML = table(["Ngày", "Người chơi", "Tổng giờ chơi"], S.dau.slice().reverse().map(d => [fmtDay(d.k), d.v, fmtDur(d.sec)]), [1]);
+  $("tblNew").innerHTML = table(["Ngày", "Tài khoản mới"], S.newPer.slice().reverse().map(d => [fmtDay(d.k), d.v]), [1]);
+  const us = S.users.slice().sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+  $("tblUsers").innerHTML = us.length ? table(["Nhân vật", "Chó", "Ngày đăng ký", "Lần cuối vào", "Tổng giờ chơi"], us.map(x => [esc(x.name), esc(x.dog), fmtDate(x.created), ago(x.lastSeen), fmtDur(x.playSec)]), [4]) : '<div class="sub">Chưa có tài khoản nào.</div>';
+}
+function table(head, rows, numCols = []){
+  return `<table><thead><tr>${head.map((h, i) => `<th class="${numCols.includes(i) ? "n" : ""}">${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${numCols.includes(i) ? "n" : ""}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+// biểu đồ cột một màu: cột mảnh, đầu bo 4px, khe 2px, trục mờ, rê chuột hoặc chạm để xem số
+function barChart(el, data, tipText){
+  const W = Math.max(300, Math.round(el.clientWidth || 960)), H = W < 600 ? 200 : 240, L = 34, R = 8, T = 10, B = 26, iw = W - L - R, ih = H - T - B;
+  const max = Math.max(1, ...data.map(d => d.v)), step = Math.max(1, Math.ceil(max/4)), top = step*Math.ceil(max/step);
+  const bw = iw/data.length, gap = 2, rx = 4;
+  const y = v => T + ih - v/top*ih;
+  let g = "";
+  for (let v = 0; v <= top; v += step) g += `<line class="gl" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  data.forEach((d, i) => {
+    const x = L + i*bw + gap/2, w = Math.max(2, bw - gap), h = d.v/top*ih, y0 = T + ih;
+    if (h > 0){ const r = Math.min(rx, w/2, h);
+      g += `<path class="bar" data-i="${i}" d="M${x},${y0} V${y0 - h + r} Q${x},${y0 - h} ${x + r},${y0 - h} H${x + w - r} Q${x + w},${y0 - h} ${x + w},${y0 - h + r} V${y0} Z"/>`; }
+    g += `<rect data-i="${i}" x="${L + i*bw}" y="${T}" width="${bw}" height="${ih}" fill="transparent"/>`;
+    if (i % (W < 600 ? 7 : 5) === (W < 600 ? 1 : 4) || i === data.length - 1) g += `<text class="ax" x="${L + i*bw + bw/2}" y="${H - 8}" text-anchor="middle">${fmtDay(d.k)}</text>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="biểu đồ cột">${g}</svg><div class="tip"></div>`;
+  const tip = el.querySelector(".tip"), svg = el.querySelector("svg");
+  const show = e => { const t = e.target.closest("[data-i]"); svg.querySelectorAll(".bar").forEach(b => b.classList.remove("hi"));
+    if (!t){ tip.style.opacity = 0; return; } const i = +t.dataset.i, d = data[i]; const b = svg.querySelector(`.bar[data-i="${i}"]`); if (b) b.classList.add("hi");
+    const r = svg.getBoundingClientRect(), sx = r.width/W; tip.innerHTML = `<b>${fmtDay(d.k)}</b> · ${tipText(d)}`; tip.style.left = (L + i*bw + bw/2)*sx + "px"; tip.style.top = y(d.v)*sx + "px"; tip.style.opacity = 1; };
+  svg.addEventListener("pointermove", show); svg.addEventListener("pointerdown", show); svg.addEventListener("pointerleave", () => { tip.style.opacity = 0; svg.querySelectorAll(".bar").forEach(b => b.classList.remove("hi")); });
+}
+function demoData(){   // ?demo=1: số liệu giả để xem bố cục, không đọc máy chủ
+  const now = Date.now(), users = {}, activity = {}, names = ["Aiden","Ryan","Hayden","Bảo","Linh","Minh","Khôi","Khang","An","Vy","Nam","Thư"], dogs = ["Bo","Mochi","TIti","Mực","Lu","Na"];
+  names.forEach((n, i) => { const c = now - (35 - i*3)*DAY; users["u"+i] = {name: n, dog: dogs[i % dogs.length], breed: "pom", created: c, lastSeen: i % 4 === 3 ? c + DAY : now - i*3600000, playSec: 3600*(2 + i*1.5)}; });
+  for (let d = 0; d < 30; d++){ const k = dayKey(now - d*DAY); activity[k] = {}; names.forEach((n, i) => { if (i % 4 !== 3 && (d + i) % 3 !== 0 && now - d*DAY > users["u"+i].created) activity[k]["u"+i] = 600 + ((d*7 + i*13) % 40)*60; }); }
+  return {users, activity, park: {u0: {t: now}}};
+}
+init().catch(e => { $("who").textContent = "Không tải được: " + e.message; });
+</script>
+</body>
+</html>
