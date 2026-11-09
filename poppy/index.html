@@ -3197,6 +3197,7 @@ function buildPark(){
   for (const [x, z] of [[46, -2.5], [62, -2.5], [80, -33], [96, -33], [80, -64.5], [56, -64.5], [103, -18], [103, -48], [39, -16], [39, -48]]) lamp(x, z, 0);
   // 4 quầy: kem, cà phê, tạp hóa, đồ ăn nhanh (mặt quầy nhìn ra lối đi chính)
   townPick.vendors = [];
+  const keepVisible = g => { const i = OCCL.findIndex(o => o.obj === g); if (i >= 0) OCCL.splice(i, 1); g.userData.keep = true; };   // Sếp 09/11: quầy không bao giờ tự ẩn
   const tagAll = (g, kind, key, i) => g.traverse(m => { if (m.isMesh && !m.userData.kind){ m.userData.kind = kind; if (key) m.userData[key] = i; pickables.push(m); } });
   // quầy mở mặt trước: tường sau, hai vách, mái, mặt quầy gỗ, mái hiên sọc có viền lượn, bảng hiệu, người bán đứng sau quầy
   const stall = (w, d, c, sign, look, extra) => {
@@ -3236,7 +3237,7 @@ function buildPark(){
     for (const s2 of [-1, 1]){ const tb = new THREE.Group(); tb.position.set(s2*1.6, G, KD/2 + 3.2);
       const top = M(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 16), "#FFFFFF"); top.position.y = 0.72; tb.add(top); const leg = M(new THREE.CylinderGeometry(0.05, 0.05, 0.72, 6), "#666"); leg.position.y = 0.36; tb.add(leg);
       const um = M(new THREE.ConeGeometry(0.9, 0.4, 8), q.c); um.position.y = 2.1; tb.add(um); const st = M(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), "#777"); st.position.y = 1.05; tb.add(st); add(tb); } });
-    tagAll(g, "kiosk", "ki", i); return g; });
+    tagAll(g, "kiosk", "ki", i); keepVisible(g); return g; });
   // khu huấn luyện chó: rào trắng, rào nhảy, cọc zíc zắc, ống chui, cầu chữ A, quầy bán vé
   { const T = TRAIN, rail = (x0, z0, x1, z1) => { const len = Math.hypot(x1 - x0, z1 - z0), h = Math.abs(z1 - z0) < 0.01; if (len < 0.1) return;
       for (const y of [G + 0.3, G + 0.65]) box(h ? len : 0.06, 0.06, h ? 0.06 : len, "#FFFFFF", (x0 + x1)/2, y, (z0 + z1)/2);
@@ -3251,7 +3252,7 @@ function buildPark(){
     add(signPlane("KHU HUẤN LUYỆN CHÓ", 4.2, 0.6, "#2E8B57", "#FFFFFF", (T.gx0 + T.gx1)/2, G + 1.35, T.z1 + 0.05));
     for (const s of [-1, 1]) box(0.1, 1.4, 0.1, "#7A5233", (T.gx0 + T.gx1)/2 + s*2, G + 0.7, T.z1);
     { const g = group(g => { g.position.set(T.booth.x, 0, T.booth.z); stall(2, 1.4, "#FFD15C", "VÉ HUẤN LUYỆN", {hair: "ngan", shirt: "#1E6F78", hat: "#1E3A5F", apron: "#1E6F78"},
-        () => { for (let k = 0; k < 3; k++) box(0.22, 0.02, 0.14, ["#F25C78","#4C8FE0","#7DBB6E"][k], -0.5 + k*0.3, G + 1.03, 0.45); }); }); tagAll(g, "booth"); }
+        () => { for (let k = 0; k < 3; k++) box(0.22, 0.02, 0.14, ["#F25C78","#4C8FE0","#7DBB6E"][k], -0.5 + k*0.3, G + 1.03, 0.45); }); }); tagAll(g, "booth"); keepVisible(g); }
     // huấn luyện viên mặc đồng phục: áo cam, sọc trắng, mũ lưỡi trai xanh đậm, còi, bảng tên
     { const tr = buildOwner3D({hair: "ngan", shirt: "#E8742C"}); tr.root.scale.setScalar(1.3); add(tr.root);
       const hat = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 8, 0, Math.PI*2, 0, Math.PI/2), mat("#1E3A5F")); hat.position.set(0, 0.87, 0); tr.root.add(hat);
@@ -3579,15 +3580,40 @@ const STORES = {
   pet:    {ic: "🛒", n: "Siêu thị thú cưng", items: [TREATS_ITEM, ...SOON]},
   pharm:  {ic: "💊", n: "Nhà thuốc", items: [{k: "meds", ic: "💊", n: "Hộp thuốc (thêm 3 lần uống)", p: 30}, {k: "vita", ic: "🧴", n: "Vitamin cho chó: bớt mệt, bớt ốm", p: 15, dog: S => { S.sick = Math.max(0, (S.sick || 0) - 8); S.energy = Math.min(100, (S.energy ?? 80) + 6); }}]},
   resto:  {ic: "🍽️", n: "Nhà hàng", items: [{k: "dogmeal", ic: "🍖", n: "Phần cơm cho chó", p: 15, dog: S => { S.hunger = Math.max(0, S.hunger - 60); S.happy = Math.min(happyCap(S.sick), S.happy + 5); }}, {k: "pho", ic: "🍜", n: "Tô phở cho bạn", p: 20, me: 1}]},
-  kem:    {ic: "🍦", n: "Tiệm kem", items: [{k: "dogice", ic: "🍨", n: "Kem sữa chua cho chó", p: 8, dog: S => { S.happy = Math.min(happyCap(S.sick), S.happy + 8); S.thirst = Math.max(0, (S.thirst || 0) - 10); }}, {k: "cone", ic: "🍦", n: "Kem ốc quế cho bạn", p: 5, me: 1}]},
-  cafe:   {ic: "☕", n: "Tiệm cà phê", items: [{k: "water", ic: "💧", n: "Bát nước mát cho chó", p: 2, dog: S => { S.thirst = 0; }}, {k: "coffee", ic: "☕", n: "Cà phê sữa đá cho bạn", p: 6, me: 1}]},
-  taphoa: {ic: "🧺", n: "Tạp hóa", items: [TREATS_ITEM, {k: "pate", ic: "🥫", n: "Hộp pate cho chó", p: 12, dog: S => { S.hunger = Math.max(0, S.hunger - 40); }}]},
-  fast:   {ic: "🍩", n: "Bánh rán & đồ ăn nhanh", items: [{k: "donut", ic: "🍩", n: "Bánh rán cho bạn", p: 6, me: 1}, {k: "sausage", ic: "🌭", n: "Xúc xích cho chó", p: 10, dog: S => { S.hunger = Math.max(0, S.hunger - 25); S.happy = Math.min(happyCap(S.sick), S.happy + 5); }}, {k: "banhmi", ic: "🥖", n: "Bánh mì cho bạn", p: 8, me: 1}]}};
+  kem:    {ic: "🍦", n: "Tiệm kem", items: [
+    {k: "dogice", ic: "🍨", n: "Kem sữa chua cho chó", p: 8, dog: S => { S.happy = Math.min(happyCap(S.sick), S.happy + 8); S.thirst = Math.max(0, (S.thirst || 0) - 10); }},
+    {k: "dogpop", ic: "🧊", n: "Kem que vị gà cho chó", p: 9, dog: S => { S.happy = Math.min(happyCap(S.sick), S.happy + 9); S.thirst = Math.max(0, (S.thirst || 0) - 12); S.hunger = Math.max(0, S.hunger - 5); }},
+    {k: "dogpb", ic: "🥜", n: "Kem bơ đậu phộng cho chó", p: 10, dog: S => { S.happy = Math.min(happyCap(S.sick), S.happy + 10); S.hunger = Math.max(0, S.hunger - 8); }},
+    {k: "cone", ic: "🍦", n: "Kem ốc quế vani", p: 5, me: 1}, {k: "straw", ic: "🍓", n: "Kem dâu", p: 6, me: 1}, {k: "choco", ic: "🍫", n: "Kem sô-cô-la", p: 6, me: 1},
+    {k: "matcha", ic: "🍵", n: "Kem trà xanh", p: 7, me: 1}, {k: "coco", ic: "🥥", n: "Kem dừa", p: 7, me: 1}, {k: "mango", ic: "🥭", n: "Kem xoài", p: 7, me: 1},
+    {k: "cup3", ic: "🍧", n: "Kem ly 3 viên", p: 12, me: 1}, {k: "sundae", ic: "🍨", n: "Kem sundae", p: 14, me: 1}, {k: "avo", ic: "🥑", n: "Kem bơ", p: 9, me: 1}]},
+  cafe:   {ic: "☕", n: "Tiệm cà phê", items: [
+    {k: "water", ic: "💧", n: "Bát nước mát cho chó", p: 2, dog: S => { S.thirst = 0; }},
+    {k: "goatmilk", ic: "🥛", n: "Sữa dê cho chó", p: 6, dog: S => { S.thirst = Math.max(0, (S.thirst || 0) - 30); S.happy = Math.min(happyCap(S.sick), S.happy + 4); }},
+    {k: "dogtea", ic: "🫖", n: "Trà bí đao mát cho chó", p: 5, dog: S => { S.thirst = Math.max(0, (S.thirst || 0) - 40); }},
+    {k: "black", ic: "☕", n: "Cà phê đen đá", p: 5, me: 1}, {k: "coffee", ic: "☕", n: "Cà phê sữa đá", p: 6, me: 1}, {k: "bacxiu", ic: "🥛", n: "Bạc xỉu", p: 6, me: 1},
+    {k: "eggcf", ic: "🍮", n: "Cà phê trứng", p: 8, me: 1}, {k: "coconutcf", ic: "🥥", n: "Cà phê cốt dừa", p: 8, me: 1}, {k: "peach", ic: "🍑", n: "Trà đào cam sả", p: 7, me: 1},
+    {k: "milktea", ic: "🧋", n: "Trà sữa trân châu", p: 8, me: 1}, {k: "oj", ic: "🍊", n: "Nước cam ép", p: 6, me: 1}, {k: "lemon", ic: "🍋", n: "Nước chanh", p: 4, me: 1},
+    {k: "coconut", ic: "🥥", n: "Nước dừa tươi", p: 5, me: 1}, {k: "cacao", ic: "🍫", n: "Ca cao đá", p: 6, me: 1}, {k: "smoothie", ic: "🥤", n: "Sinh tố bơ", p: 9, me: 1}]},
+  taphoa: {ic: "🧺", n: "Tạp hóa", items: [TREATS_ITEM, {k: "pate", ic: "🥫", n: "Hộp pate cho chó", p: 12, dog: S => { S.hunger = Math.max(0, S.hunger - 40); }},
+    {k: "dogbisc", ic: "🦴", n: "Bánh quy hình xương cho chó", p: 6, dog: S => { S.hunger = Math.max(0, S.hunger - 10); S.happy = Math.min(happyCap(S.sick), S.happy + 3); }},
+    {k: "jerky", ic: "🥓", n: "Thịt sấy cho chó", p: 9, dog: S => { S.hunger = Math.max(0, S.hunger - 15); S.happy = Math.min(happyCap(S.sick), S.happy + 5); }},
+    {k: "wipes", ic: "🧻", n: "Khăn ướt lau chân cho chó", p: 5, dog: S => { S.clean = Math.min(100, (S.clean ?? 95) + 15); }},
+    {k: "bottle", ic: "💧", n: "Nước suối", p: 2, me: 1}, {k: "soda", ic: "🥤", n: "Nước ngọt", p: 5, me: 1}, {k: "milk", ic: "🥛", n: "Sữa tươi hộp", p: 4, me: 1},
+    {k: "yogurt", ic: "🍶", n: "Sữa chua", p: 4, me: 1}, {k: "cookie", ic: "🍪", n: "Bánh quy", p: 4, me: 1}, {k: "chips", ic: "🥔", n: "Snack khoai tây", p: 5, me: 1},
+    {k: "candy", ic: "🍬", n: "Kẹo dẻo", p: 3, me: 1}, {k: "noodle", ic: "🍜", n: "Mì ly", p: 7, me: 1}, {k: "banana", ic: "🍌", n: "Nải chuối", p: 6, me: 1}]},
+  fast:   {ic: "🍩", n: "Bánh rán & đồ ăn nhanh", items: [{k: "donut", ic: "🍩", n: "Bánh rán đường", p: 6, me: 1}, {k: "donutc", ic: "🍩", n: "Bánh rán sô-cô-la", p: 7, me: 1},
+    {k: "donutb", ic: "🫘", n: "Bánh rán nhân đậu xanh", p: 6, me: 1}, {k: "fries", ic: "🍟", n: "Khoai tây chiên", p: 8, me: 1}, {k: "chicken", ic: "🍗", n: "Gà rán", p: 12, me: 1},
+    {k: "dogchick", ic: "🍗", n: "Gà luộc xé cho chó", p: 12, dog: S => { S.hunger = Math.max(0, S.hunger - 35); S.happy = Math.min(happyCap(S.sick), S.happy + 4); }}, {k: "sausage", ic: "🌭", n: "Xúc xích cho chó", p: 10, dog: S => { S.hunger = Math.max(0, S.hunger - 25); S.happy = Math.min(happyCap(S.sick), S.happy + 5); }}, {k: "banhmi", ic: "🥖", n: "Bánh mì cho bạn", p: 8, me: 1}]}};
 let curStore = "pet";
 function openStore(k){
   curStore = STORES[k] ? k : "pet"; const st = STORES[curStore], el = $("shopSheet");
   el.innerHTML = `<h2>${st.ic} ${st.n}</h2><div class="sub">Bạn đang có <b>🪙 ${coins()} xu</b>. Đi dạo, cho chó đi vệ sinh đúng chỗ là có thêm xu.</div>
-    <div class="closet"><div class="items">${st.items.map(it => `<button class="item" data-k="${it.k}" ${it.soon ? "disabled" : ""}><span class="ic">${it.ic}</span>${it.n}<br><small>${it.soon ? "Sắp có" : `🪙 ${it.p} xu`}</small></button>`).join("")}</div></div>
+    ${(() => { const btn = it => `<button class="item" data-k="${it.k}" ${it.soon ? "disabled" : ""}><span class="ic">${it.ic}</span>${it.n}<br><small>${it.soon ? "Sắp có" : `🪙 ${it.p} xu`}</small></button>`;
+      const me = st.items.filter(it => it.me), pet = st.items.filter(it => !it.me);
+      return me.length ? `<div class="small" style="margin:6px 0 2px;font-weight:800">🐶 Cho chó</div><div class="closet"><div class="items">${pet.map(btn).join("")}</div></div>
+        <div class="small" style="margin:10px 0 2px;font-weight:800">🙋 Cho bạn</div><div class="closet"><div class="items">${me.map(btn).join("")}</div></div>`
+        : `<div class="closet"><div class="items">${st.items.map(btn).join("")}</div></div>`; })()}
     <div class="row" style="margin-top:12px"><button class="btn gold" id="shClose">Ra khỏi ${curStore === "pet" ? "siêu thị" : "tiệm"}</button></div>`;
   el.querySelectorAll("[data-k]").forEach(b => b.onclick = ()=>buyItem(b.dataset.k));
   $("shClose").onclick = leaveStore;
@@ -5137,6 +5163,9 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     ok("tên đường và công viên Sếp duyệt", STREETS.st1 === "Đường Hoa Sữa" && STREETS.st2 === "Đường Bờ Kênh" && STREETS.park === "Công viên Bờ Kênh");
     openJobs(); { const t = $("mapSheet").innerText; ok("bảng nghề: đủ 5 nghề, giờ ca, lương", JOBS.length === 5 && JOBS.every(j => t.includes(j.n) && t.includes(j.pay + " xu")) && t.includes("08h – 17h") && t.includes("16h – 22h")); }
     ok("ca văn phòng 8h–17h dài 22,5 phút thật, ca 6 tiếng dài 15 phút", jobRealMin(JOBS[0]) === 22.5 && jobRealMin(JOBS[1]) === 15); $("ovMap").classList.remove("show");
+    ok("quầy và quầy vé không tự ẩn khi che tầm nhìn", townPick.kiosks.every(g => g.userData.keep && !OCCL.some(o => o.obj === g)));
+    ok("thực đơn nhiều món: kem, cà phê, tạp hóa từ 12 món, bánh rán từ 8 món", STORES.kem.items.length >= 12 && STORES.cafe.items.length >= 12 && STORES.taphoa.items.length >= 12 && STORES.fast.items.length >= 8);
+    openStore("cafe"); ok("quầy chia mục Cho chó và Cho bạn", $("shopSheet").innerText.includes("Cho chó") && $("shopSheet").innerText.includes("Cho bạn")); leaveStore();
     ok("có người đứng bán trong 4 quầy và quầy vé", (townPick.vendors || []).length === 5);
     ok("quầy bánh rán có món bánh rán", STORES.fast.items.some(it => it.k === "donut"));
     camPitch = PITCH_OUT[0]; updateCamera(1); ok("ngoài trời nghiêng được khoảng 120 độ, nhìn lên trời không chui xuống đất", PITCH_OUT[1] - PITCH_OUT[0] > 115*Math.PI/180 && camera.position.y >= 0.59); camPitch = 0.8;
