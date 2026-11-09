@@ -2946,7 +2946,9 @@ function lightWalk(){   // chó ốm vẫn đi bộ nhẹ được, để thanh 
    THẾ GIỚI NGOÀI PHÒNG (Sếp duyệt 09/11): đi dạo, công viên lớn ở góc ngã ba,
    cửa hàng quanh công viên, CTY KHÔI & KHANG, xu trong game (xu ảo, giai đoạn 1)
    ========================================================= */
-const COMPANY = "CTY KHÔI & KHANG";
+const COMPANY = "Cty TNHH - DV - KHÔI & KHANG", COMPANY_SHORT = "K&K";   // Sếp chốt 09/11: tên đầy đủ; bảng hiệu và chỗ chật dùng K&K
+// tên đường: một chỗ duy nhất, Sếp gửi tên thật thì chỉ đổi ở đây (tạm: Đường 1, Đường 2)
+const STREETS = {st1: "Đường 1", st2: "Đường 2"};
 // Khu phố (Sếp chốt 09/11): đường 1 trước nhà chạy dọc trục x, đường 2 cạnh công viên chạy dọc trục z, vỉa hè rộng 2,4 m (gấp đôi).
 // Người chủ chỉ đi trên vỉa hè, vạch qua đường, sân nhà và trong công viên: không xuống lòng đường, không xuyên rào, tường.
 const ST1 = {sw0: 5.35, road0: 7.75, road1: 12.15, sw1: 14.55};
@@ -3058,7 +3060,7 @@ function townKit(root){
     }
     if (opt.roof){ const r = M(new THREE.CylinderGeometry(0.01, w*0.62, 1.2, 4), "#C8553D"); r.rotation.y = Math.PI/4; r.scale.z = d/w*0.9; r.position.set(0, G + H + 0.6, -d/2); add(r); }
     else box(w, 0.35, 0.12, shade(col, -0.15), 0, G + H + 0.17, 0.02);
-    if (opt.sign){ const sg = new THREE.Mesh(new THREE.PlaneGeometry(w*0.9, 0.8), new THREE.MeshBasicMaterial({map: signTex(opt.sign, opt.signBg || "#1E6F78", opt.signFg || "#FFFFFF", 768, 116)})); sg.position.set(0, G + 2.75, 0.07); if (opt.kind){ sg.userData.kind = opt.kind; pickables.push(sg); } add(sg); }
+    if (opt.sign){ const sg = new THREE.Mesh(new THREE.PlaneGeometry(w*0.9, 0.8), new THREE.MeshBasicMaterial({map: signTex(opt.sign, opt.signBg || "#1E6F78", opt.signFg || "#FFFFFF", 768, 116)})); sg.position.set(0, G + 2.46, 0.07); /* thấp hơn ban công tầng 2 để dấu tiếng Việt không bị che */ if (opt.kind){ sg.userData.kind = opt.kind; pickables.push(sg); } add(sg); }
     if (opt.kind) for (const m of g.children) if (m.isMesh && !m.userData.kind){ m.userData.kind = opt.kind; pickables.push(m); }
   });
   return {G, M, box, add, group, ground, tree, lamp, shophouse, setPar: p => { par = p; }};
@@ -3098,9 +3100,16 @@ function buildTown(){
   // dãy nhà phố bên kia đường 1 (mặt tiền nhìn về phía nhà và công viên)
   const row = (x0, n, seed) => { for (let i = 0; i < n; i++){ const k = i + seed, w = 3.6 + (k*7 % 3)*0.4, floors = 2 + (k*5 % 3 === 0 ? 1 : 0) + (k % 4 === 1 ? 1 : 0); shophouse(x0 + i*4.2, ST1.sw1 + 0.25, Math.PI, w, floors, FACADE[(k*3) % FACADE.length], {roof: k % 3 === 2}); } };
   row(-16.8, 9, 0); row(21.2, 3, 9); shophouse(34.2, ST1.sw1 + 0.25, Math.PI, 3.6, 2, FACADE[5]); row(62.4, 11, 12);
+  // biển tên đường (Sếp 09/11: đường cần có tên), hai mặt, trên cột ở góc vỉa hè
+  const streetSign = (x, z, items) => K.group(() => { box(0.07, 3.0, 0.07, "#6C7278", x, G + 1.5, z);
+    for (const [txt, y, along] of items){ const r = along === "x" ? 0 : Math.PI/2; for (const f of [0, Math.PI]) K.add(signPlane(txt, 1.5, 0.34, "#1F5FA8", "#FFFFFF", x, G + y, z, r + f, null, [520, 120])); } });
+  streetSign(ST2.sw0 + 0.3, ST1.sw0 + 0.3, [[STREETS.st1, 2.75, "x"], [STREETS.st2, 2.35, "z"]]);
+  streetSign(ST2.sw1 - 0.3, ST1.sw0 + 0.3, [[STREETS.st1, 2.75, "x"], [STREETS.st2, 2.35, "z"]]);
+  for (const x of [-6, 60, 96]) streetSign(x, ST1.sw0 + 0.3, [[STREETS.st1, 2.6, "x"]]);
+  for (const z of [-24, -50]) streetSign(ST2.sw0 + 0.3, z, [[STREETS.st2, 2.6, "z"]]);
   // CTY KHÔI & KHANG và siêu thị thú cưng: bên kia đường, đối diện công viên
   const store = (S, rot, front, opt) => shophouse(front.x, front.z, rot, rot === Math.PI ? S.w : S.d, opt.floors || 2, opt.col, Object.assign({d: rot === Math.PI ? S.d : S.w, ground: "#BFE3F7"}, opt));
-  store(OFFICE, Math.PI, {x: OFFICE.x, z: OFFICE.z - OFFICE.d/2}, {col: "#F7F1E3", sign: COMPANY, signBg: "#1E6F78", signFg: "#FFF1D0", kind: "office", floors: 2});
+  store(OFFICE, Math.PI, {x: OFFICE.x, z: OFFICE.z - OFFICE.d/2}, {col: "#F7F1E3", sign: COMPANY_SHORT + " · KHÔI & KHANG", signBg: "#1E6F78", signFg: "#FFF1D0", kind: "office", floors: 2});
   store(SHOP, Math.PI, {x: SHOP.x, z: SHOP.z - SHOP.d/2}, {col: "#FFE3EC", sign: "SIÊU THỊ THÚ CƯNG", signBg: "#B05C8C", kind: "shop", floors: 2});
   // nhà thuốc, nhà hàng: bên kia đường 2 (mặt tiền nhìn về công viên)
   store(PHARM, Math.PI/2, {x: PHARM.x + PHARM.w/2, z: PHARM.z}, {col: "#E8F6EE", sign: "NHÀ THUỐC", signBg: "#2E8B57", kind: "pharm", floors: 2});
@@ -3792,9 +3801,9 @@ function mapSVG(){
     ${r(POOL.x0, POOL.x1, POOL.z0, POOL.z1, "#5AB8E8", 4)}
     ${r(TRAIN.x0, TRAIN.x1, TRAIN.z0, TRAIN.z1, "#C9E3A5", 3)}${r(PLAY.x0, PLAY.x1, PLAY.z0, PLAY.z1, "#F1D9A7", 3)}
     ${KIOSKS.map(q => r(q.x - KW/2, q.x + KW/2, q.z - KD/2, q.z + KD/2, q.c, 1)).join("")}
-    <text x="${X(-7)}" y="${Z(10.6)}" font-size="11" fill="#fff" font-weight="700">ĐƯỜNG 1</text>
-    <text x="${X(26.4)}" y="${Z(-60)}" font-size="11" fill="#fff" font-weight="700" transform="rotate(-90 ${X(26.4)} ${Z(-60)})">ĐƯỜNG 2</text>
-    ${PLACES.map(pl => pin(pl.pin || pl.at(), pl.ic, pl.n.replace("CTY ", "").replace("Quầy kem, cà phê, bánh rán", "4 quầy ăn uống"), pl.k)).join("")}
+    <text x="${X(-7)}" y="${Z(10.6)}" font-size="11" fill="#fff" font-weight="700">${STREETS.st1.toUpperCase()}</text>
+    <text x="${X(26.4)}" y="${Z(-60)}" font-size="11" fill="#fff" font-weight="700" transform="rotate(-90 ${X(26.4)} ${Z(-60)})">${STREETS.st2.toUpperCase()}</text>
+    ${PLACES.map(pl => pin(pl.pin || pl.at(), pl.ic, pl.n.replace(COMPANY, COMPANY_SHORT).replace("Quầy kem, cà phê, bánh rán", "4 quầy ăn uống"), pl.k)).join("")}
     <circle cx="${X(here.x)}" cy="${Z(here.z)}" r="7" fill="#E5533D" stroke="#fff" stroke-width="3"><animate attributeName="r" values="6;9;6" dur="1.2s" repeatCount="indefinite"/></circle>
   </svg>`;
 }
@@ -3902,8 +3911,8 @@ function refreshQuest(){
     const pc = L.posters.filter(Boolean).length, ac2 = L.asked.filter(Boolean).length;
     box.innerHTML = `<b>🔎 Tìm ${esc(P.dog.name)}</b><br>${pc === 3 ? "✅" : "⬜"} Dán tờ rơi ở cột điện ${pc}/3<br>${ac2 === 2 ? "✅" : "⬜"} Hỏi cô chú trong công viên ${ac2}/2<br>${L.stage === "bark" ? "👂 Tìm bụi cây đang lấp lánh!" : "⬜ Nghe tiếng sủa"}`;
     box.classList.add("show");
-  } else if (L){ box.innerHTML = `<b>😢 ${esc(P.dog.name)} đi lạc!</b><br>Đến CTY KHÔI & KHANG (bên kia đường, đối diện công viên) để báo`; box.classList.add("show"); }
-  else if (P && P.boarding && dogAway()){ box.innerHTML = `<b>🧳 ${esc(P.dog.name)} đang được gửi</b><br>ở CTY KHÔI & KHANG`; box.classList.add("show"); }
+  } else if (L){ box.innerHTML = `<b>😢 ${esc(P.dog.name)} đi lạc!</b><br>Đến ${COMPANY} (bên kia đường, đối diện công viên) để báo`; box.classList.add("show"); }
+  else if (P && P.boarding && dogAway()){ box.innerHTML = `<b>🧳 ${esc(P.dog.name)} đang được gửi</b><br>ở ${COMPANY}`; box.classList.add("show"); }
   else box.classList.remove("show");
   const showMarks = !!(L && L.stage === "search");
   (townPick.marks || []).forEach((m, i) => m.visible = showMarks && (i < 3 ? !L.posters[i] : !L.asked[i - 3]));
@@ -3911,15 +3920,15 @@ function refreshQuest(){
 }
 function awayHint(){
   const P = prof;
-  if (outdoor && P.lost){ hint(P.lost.stage === "report" ? "Đến CTY KHÔI & KHANG (bên kia đường, đối diện công viên) để báo chó lạc" : "Làm theo bảng nhiệm vụ để tìm chó nha", 3200); return; }
-  if (outdoor){ hint("Chó đang ở CTY KHÔI & KHANG, vào công ty để đón", 3000); return; }
+  if (outdoor && P.lost){ hint(P.lost.stage === "report" ? `Đến ${COMPANY} (bên kia đường, đối diện công viên) để báo chó lạc` : "Làm theo bảng nhiệm vụ để tìm chó nha", 3200); return; }
+  if (outdoor){ hint(`Chó đang ở ${COMPANY}, vào công ty để đón`, 3000); return; }
   if (P.lost) hint(`${P.dog.name} đi lạc rồi! Bấm cửa chính để ra ngoài đi tìm`, 3200);
-  else hint(`${P.dog.name} đang ở CTY KHÔI & KHANG. Bấm cửa chính, ra công ty đón về nha`, 3200);
+  else hint(`${P.dog.name} đang ở ${COMPANY}. Bấm cửa chính, ra công ty đón về nha`, 3200);
 }
 function tickAway(){
   if (!prof) return;
   if (prof.boarding && !dogAway()){ prof.boarding = null; if (!outdoor) dog.pos = nearestFree(room.door.inside); reunite("Công ty đưa em về rồi nè!"); toast(`Hết hạn gửi, công ty đã đưa ${prof.dog.name} về nhà 🏠`, 4000); }
-  if (prof.lost && gameNow(prof) - prof.lost.t > 86400000){ prof.lost = null; reunite("Em về rồi!"); toast(`CTY KHÔI & KHANG đã tìm thấy ${prof.dog.name} và đưa về nhà 🏠`, 5000); }
+  if (prof.lost && gameNow(prof) - prof.lost.t > 86400000){ prof.lost = null; reunite("Em về rồi!"); toast(`${COMPANY} đã tìm thấy ${prof.dog.name} và đưa về nhà 🏠`, 5000); }
   if (!outdoor && dog3) dog3.root.visible = !dogAway();
 }
 
@@ -5085,6 +5094,8 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
       ok("vé huấn luyện: trừ 20 xu, học xong lệnh Ngồi +2 (tạm, chờ họp)", coins() === c0 - 20 && prof.skills.sit === 12 && !outdoor.train);
       ok("huấn luyện: chủ đứng ngoài khu, huấn luyện viên dắt chó vào rồi trả về", ownerStill && tLeash && !!outdoor.lastTrain && outdoor.lastTrain.led && outdoor.z > TRAIN.z1);
       ok("huấn luyện lâu gấp 5: tập đủ 5 vòng", !!outdoor.lastTrain && outdoor.lastTrain.laps === TRAIN_LAPS && TRAIN_LAPS === 5); }
+    ok("tên công ty đầy đủ Cty TNHH - DV - KHÔI & KHANG, bảng hiệu dùng K&K", COMPANY === "Cty TNHH - DV - KHÔI & KHANG" && COMPANY_SHORT === "K&K" && (()=>{ const sv = prof.lost; prof.lost = {stage: "report", posters: [false, false, false], asked: [false, false], bush: 0, t: gameNow(prof)}; refreshQuest(); const t = $("questBox").innerText; prof.lost = sv; refreshQuest(); return t.includes(COMPANY) && !t.includes("CTY KHÔI"); })());
+    openMap(); ok("bản đồ có tên đường lấy từ một chỗ dữ liệu", $("ovMap").innerHTML.includes(STREETS.st1.toUpperCase()) && $("ovMap").innerHTML.includes(STREETS.st2.toUpperCase())); $("ovMap").classList.remove("show");
     ok("có người đứng bán trong 4 quầy và quầy vé", (townPick.vendors || []).length === 5);
     ok("quầy bánh rán có món bánh rán", STORES.fast.items.some(it => it.k === "donut"));
     camPitch = PITCH_OUT[0]; updateCamera(1); ok("ngoài trời nghiêng được khoảng 120 độ, nhìn lên trời không chui xuống đất", PITCH_OUT[1] - PITCH_OUT[0] > 115*Math.PI/180 && camera.position.y >= 0.59); camPitch = 0.8;
