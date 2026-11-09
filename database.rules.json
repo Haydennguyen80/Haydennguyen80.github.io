@@ -25,6 +25,18 @@
         },
         "playSec": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "terms": {
+          ".validate": "newData.hasChildren(['v','at'])",
+          "v": {
+            ".validate": "newData.isNumber()"
+          },
+          "at": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       },
       ".read": "auth != null && auth.uid === 'gHUDp3jCTYUfy5RiPuCdpv5Dwz02'"
@@ -81,6 +93,9 @@
         },
         "$other": {
           ".validate": false
+        },
+        "pants": {
+          ".validate": "newData.isString() && newData.val().length <= 10"
         }
       }
     },
@@ -90,6 +105,22 @@
         "$uid": {
           ".write": "auth != null && auth.uid === $uid",
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 86400"
+        }
+      }
+    },
+    "saves": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['data','at'])",
+        "data": {
+          ".validate": "newData.isString() && newData.val().length <= 500000"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
         }
       }
     }

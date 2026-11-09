@@ -153,6 +153,9 @@ textarea{width:100%;min-height:70px;font-size:12px;border-radius:10px;border:2px
 #ovRoom{background:rgba(20,80,90,.12)}
 #outBar{display:none;background:var(--c1d);grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
 #outBar.show{display:grid}
+label.chk{display:flex;gap:10px;align-items:flex-start;margin-top:10px;font-size:15px;line-height:1.35;cursor:pointer}
+label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E6F78}
+#ovGate{z-index:60}
 #outBar button{min-width:0;background:#2E8B57;border:1px solid #5DB36A;color:#fff;border-radius:14px;padding:8px 2px;font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:54px}
 #outBar button .ic{font-size:22px;line-height:1}
 #questBox{position:absolute;left:10px;top:10px;max-width:250px;background:rgba(255,250,241,.96);border:2px solid #E5533D;border-radius:14px;padding:8px 10px;font-size:13px;line-height:1.5;display:none;z-index:5;pointer-events:none}
@@ -230,6 +233,7 @@ textarea{width:100%;min-height:70px;font-size:12px;border-radius:10px;border:2px
 
 <!-- Tạo chó / hồ sơ -->
 <div class="overlay" id="ovCreate"><div class="sheet" id="createSheet"></div></div>
+<div class="overlay" id="ovGate"><div class="sheet" id="gateSheet"></div></div>
 <div class="overlay" id="ovProfiles"><div class="sheet" id="profilesSheet"></div></div>
 <div class="overlay" id="ovInfo"><div class="sheet" id="infoSheet"></div></div>
 <div class="overlay" id="ovCloset"><div class="sheet" id="closetSheet"></div></div>
@@ -351,6 +355,7 @@ const STYLE_A = {headK: 1.6, legLenK: 0.72, legThickK: 1.55, snoutK: 0.55, eyeK:
 const PALETTE = [["Trắng","#F6F2EA"],["Kem","#EED5A8"],["Vàng nhạt","#E2B373"],["Mơ","#E8B07A"],["Cam","#E8913A"],["Đỏ","#D2772F"],
   ["Nâu đỏ","#B5541F"],["Nâu","#6B4226"],["Sô-cô-la","#4A2E1E"],["Xám","#9A9590"],["Đen","#2B2522"],["Hồng","#F2B1A8"]];
 const OWNER_HAIR = [["ngan","Tóc ngắn"],["dai","Tóc dài"],["duoi","Đuôi ngựa"],["xoan","Tóc xoăn"],["bui","Hai búi"]];
+const OWNER_PANTS = [["Xanh jean","#3E5679"],["Đen","#2E2E33"],["Xám","#8A8F96"],["Be","#CDB892"],["Nâu","#7A5233"],["Xanh lá","#4E7D4F"],["Đỏ","#A8423A"],["Hồng","#D98CA8"]];
 const OWNER_SHIRT = [["Đỏ","#E0524A"],["Cam","#EE9440"],["Vàng","#F2C94C"],["Xanh lá","#5DB36A"],["Xanh dương","#4C8FE0"],["Tím","#9A6AD6"],["Hồng","#EE8FB5"],["Trắng","#F4F1EA"],["Đen","#3A3A40"]];
 const OWNER_DEFAULT = {hair: "ngan", shirt: "#4C8FE0"};
 const REGION_NAMES = {body:"Thân", head:"Đầu", back:"Lưng", chest:"Ngực và bụng", legs:"Chân", muzzle:"Mõm", earOut:"Tai ngoài", earIn:"Tai trong", tail:"Đuôi", blaze:"Vệt trán"};
@@ -3004,6 +3009,9 @@ const PARK_TREES = [];
   for (let x = 34; x <= 106; x += 8){ if (!gate(x, 2.6)) PARK_TREES.push([x, 2.6, 1]); PARK_TREES.push([x + 3, -67.4, 1.1]); }
   for (let z = -62; z <= -6; z += 8){ if (!gate(33, z)) PARK_TREES.push([33, z, 1]); PARK_TREES.push([107.6, z + 3, 1.1]); }
   PARK_TREES.push([78, -8, 1.2], [84, -52, 1.1], [94, -30, 1.3], [100, -50, 1.1], [62, -46, 1], [66, -60, 1.2], [90, -62, 1], [38.5, -20, 1.1], [70, -50, 1], [60, -38, 0.9], [102, -24, 1]); }
+const BIG_TREES = [[51.5, -11.6, 2.3], [58.5, -11.6, 2.2], [41.5, -13.2, 2.1], [65.2, -12.6, 2.4], [72.6, -10.2, 2.2], [48.4, -26.5, 2.4], [62.2, -27.2, 2.3],
+  [75.5, -20, 2.5], [85.5, -17.5, 2.2], [89.5, -44.5, 2.4], [70, -57, 2.3], [96.5, -57.5, 2.2], [60.5, -50.5, 2.1]];
+const KIOSK_CHAIRS = 3;   // số ghế quanh mỗi bàn dù trước quầy
 const COIN_START = 100, WALK_COIN_M = 10;
 const BOARD_PER_DAY = 20, HIRE_PRICE = 30;
 const SWIM_STEP = 15, SWIM_MAX_MIN = 30;   // bơi: cứ 15 giây thêm Thể dục; quá 30 phút chưa bấm dừng thì chó tự lên bờ
@@ -3193,6 +3201,13 @@ function buildPark(){
     const seat = M(new THREE.BoxGeometry(1.4, 0.08, 0.45), "#B5784A"); seat.position.y = 0.45; b.add(seat); const back = M(new THREE.BoxGeometry(1.4, 0.4, 0.06), "#B5784A"); back.position.set(0, 0.7, -0.2); b.add(back);
     for (const s of [-1, 1]){ const l = M(new THREE.BoxGeometry(0.08, 0.45, 0.4), "#555"); l.position.set(s*0.6, 0.22, 0); b.add(l); } park.add(b); }
   for (const [x, z, s] of PARK_TREES) tree(x, z, s);
+  // cây cổ thụ: thân to có rễ loe, tán nhiều tầng, đổ bóng mát
+  for (const [x, z, s] of BIG_TREES) group(g => {
+    const shade = m => { m.castShadow = true; return m; };
+    const trunk = shade(M(new THREE.CylinderGeometry(0.16*s, 0.26*s, 2.6*s, 10), "#7A5235")); trunk.position.set(x, G + 1.3*s, z); add(trunk);
+    for (let k = 0; k < 4; k++){ const a = k*Math.PI/2 + 0.4, r = M(new THREE.ConeGeometry(0.12*s, 0.5*s, 6), "#6E4A30"); r.position.set(x + Math.cos(a)*0.24*s, G + 0.15*s, z + Math.sin(a)*0.24*s); r.rotation.set(Math.sin(a)*0.9, 0, -Math.cos(a)*0.9); add(r); }
+    for (const [dx, dy, dz, r, c] of [[0, 3.1, 0, 1.25, "#3F8A47"], [0.95, 2.75, 0.35, 0.95, "#4F9A50"], [-0.9, 2.8, -0.3, 0.95, "#4A9249"], [0.3, 2.7, -0.95, 0.9, "#57A356"], [-0.35, 2.65, 0.95, 0.9, "#4F9A50"], [0.1, 3.75, 0.1, 0.85, "#5BAA59"]]){
+      const l = shade(M(SPHERE_LO, c)); l.scale.set(r*s, r*s*0.8, r*s); l.position.set(x + dx*s, G + dy*s, z + dz*s); add(l); } });
   for (const [x, z] of [[50, -14], [60, -14], [80, -2.5], [92, -38]]){ box(1.6, 0.25, 1.6, "#C9A27A", x, G + 0.12, z); for (let i = 0; i < 9; i++){ const f = add(M(SPHERE_LO, ["#F25C78","#FFD15C","#C38BEB"][i % 3])); f.scale.setScalar(0.16); f.position.set(x - 0.5 + (i % 3)*0.5, G + 0.33, z - 0.5 + Math.floor(i/3)*0.5); } }
   for (const [x, z] of [[46, -2.5], [62, -2.5], [80, -33], [96, -33], [80, -64.5], [56, -64.5], [103, -18], [103, -48], [39, -16], [39, -48]]) lamp(x, z, 0);
   // 4 quầy: kem, cà phê, tạp hóa, đồ ăn nhanh (mặt quầy nhìn ra lối đi chính)
@@ -3236,7 +3251,13 @@ function buildPark(){
       else { for (let k = 0; k < 4; k++) box(0.18, 0.24, 0.18, ["#E5533D","#4C8FE0","#FFD15C","#7DBB6E"][k], -1.2 + k*0.25, G + 1.14, fz); box(0.6, 0.25, 0.4, "#C9A27A", 0.9, G + 1.15, fz - 0.05); } });
     for (const s2 of [-1, 1]){ const tb = new THREE.Group(); tb.position.set(s2*1.6, G, KD/2 + 3.2);
       const top = M(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 16), "#FFFFFF"); top.position.y = 0.72; tb.add(top); const leg = M(new THREE.CylinderGeometry(0.05, 0.05, 0.72, 6), "#666"); leg.position.y = 0.36; tb.add(leg);
-      const um = M(new THREE.ConeGeometry(0.9, 0.4, 8), q.c); um.position.y = 2.1; tb.add(um); const st = M(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), "#777"); st.position.y = 1.05; tb.add(st); add(tb); } });
+      const um = M(new THREE.ConeGeometry(0.9, 0.4, 8), q.c); um.position.y = 2.1; tb.add(um); const st = M(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), "#777"); st.position.y = 1.05; tb.add(st);
+      for (let c = 0; c < KIOSK_CHAIRS; c++){ const a = (c/KIOSK_CHAIRS)*Math.PI*2 + Math.PI/2, ch = new THREE.Group(); ch.position.set(Math.cos(a)*0.85, 0, Math.sin(a)*0.85); ch.rotation.y = -a - Math.PI/2;
+        const seat = M(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 12), q.c); seat.position.y = 0.46; ch.add(seat);
+        const back = M(new THREE.BoxGeometry(0.36, 0.3, 0.04), q.c); back.position.set(0, 0.66, -0.18); ch.add(back);
+        for (const [lx, lz] of [[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]]){ const lg = M(new THREE.CylinderGeometry(0.018, 0.018, 0.46, 5), "#555"); lg.position.set(lx, 0.23, lz); ch.add(lg); }
+        tb.add(ch); }
+      add(tb); } });
     tagAll(g, "kiosk", "ki", i); keepVisible(g); return g; });
   // khu huấn luyện chó: rào trắng, rào nhảy, cọc zíc zắc, ống chui, cầu chữ A, quầy bán vé
   { const T = TRAIN, rail = (x0, z0, x1, z1) => { const len = Math.hypot(x1 - x0, z1 - z0), h = Math.abs(z1 - z0) < 0.01; if (len < 0.1) return;
@@ -3324,6 +3345,7 @@ function buildOutdoorGrid(){
   disc(POND.x, POND.z, POND.r + 0.4); rect(POND.x - 3.2, POND.x + 3.2, POND.z - POND.r - 2.1, POND.z - POND.r - 0.5, 1);
   rect(POOL.x0 - 0.2, POOL.x1 + 0.2, POOL.z0 - 0.2, POOL.z1 + 0.2, 1); for (const z of [POOL.z0 + 1.5, POOL.z1 - 1.5]) disc(POOL.x1 + 0.9, z, 0.3);
   for (const q of KIOSKS){ rect(q.x - KW/2 - 0.2, q.x + KW/2 + 0.2, q.z - KD/2 - 0.2, q.z + KD/2 + 0.4, 1); for (const s of [-1, 1]) disc(q.x + s*1.6, q.z + KD/2 + 3.2, 0.6); }
+  for (const [x, z, s] of BIG_TREES) disc(x, z, 0.3*s + 0.2);
   const T = TRAIN; rect(T.x0 - 0.35, T.gx0, T.z1 - 0.35, T.z1 + 0.35, 1); rect(T.gx1, T.x1 + 0.35, T.z1 - 0.35, T.z1 + 0.35, 1);
   rect(T.x0 - 0.35, T.x1 + 0.35, T.z0 - 0.35, T.z0 + 0.35, 1); rect(T.x0 - 0.35, T.x0 + 0.35, T.z0, T.z1, 1); rect(T.x1 - 0.35, T.x1 + 0.35, T.z0, T.z1, 1);
   rect(39, 41, -54.4, -50.6, 1); rect(43.6, 52.4, -59.4, -58.6, 1); rect(53.9, 55.1, -55.4, -48.6, 1); rect(47.3, 48.7, -52.4, -49.6, 1);
@@ -3417,6 +3439,7 @@ function setOutdoor(on){
     else hint("Bấm xuống đất để đi. Bấm 🗺️ Bản đồ để tới ngay công viên, hồ bơi, các cửa hàng", 4500);
   } else {
     outdoor = null;
+    { const SC = sun.shadow.camera; Object.assign(SC, {left: -4, right: 4, top: 4, bottom: -4, far: 15}); SC.updateProjectionMatrix(); sun.position.set(-2.2, 5.5, 3.2); sun.target.position.set(0, 0, 0); sun.target.updateMatrixWorld(); }
     if (ownerOut) ownerOut.root.visible = false;
     if (leash) leash.visible = false;
     dog.path = []; dog.then = null; dog.jump = null; dog.pos = nearestFree(room.door.inside); dog.y = 0; setState("happy", 1200);
@@ -3564,7 +3587,8 @@ function tickOutdoor(dt){
     dog.pottyOk = true; dog.pottyBusy = true; setState("potty", 2200, {pottyOk: true}); setTimeout(()=>{ if (outdoor){ addCoins(2); hint("Đi vệ sinh ngoài cỏ, giỏi lắm! 🪙 +2", 2600); } }, 2300);
   }
   // bóng đổ đi theo người chủ
-  sun.position.set(o.x - 2.2, 5.5, o.z + 3.2); sun.target.position.set(o.x, 0, o.z); sun.target.updateMatrixWorld();
+  const SC = sun.shadow.camera; if (SC.right !== 10){ Object.assign(SC, {left: -10, right: 10, top: 10, bottom: -10, far: 45}); SC.updateProjectionMatrix(); }
+  sun.position.set(o.x - 6.6, 16.5, o.z + 9.6); sun.target.position.set(o.x, 0, o.z); sun.target.updateMatrixWorld();
   if (townPick.fountain) townPick.fountain.scale.y = 1 + Math.sin(tSec*6)*0.15;
   if (townPick.fall) townPick.fall.material.opacity = 0.7 + Math.sin(tSec*9)*0.1;
   // đang tìm chó: bụi cây có chó thì lấp lánh, thỉnh thoảng có tiếng sủa
@@ -4102,7 +4126,7 @@ buildRoom(0, 0); buildTown(); buildPark(); finalizeOccl(); scene.add(sun.target)
 function buildOwner3D(o){
   o = Object.assign({}, OWNER_DEFAULT, o||{});
   const root = new THREE.Group();
-  const skin = "#F1C9A5", hairC = "#3B2A20", pants = "#3E5679", shoe = "#5A4636";
+  const skin = "#F1C9A5", hairC = "#3B2A20", pants = /^#[0-9A-Fa-f]{6}$/.test(o.pants || "") ? o.pants : "#3E5679", shoe = "#5A4636";
   const legs = [], arms = [];
   for (const s of [-1, 1]){
     const leg = cyl(0.055, 0.06, 0.3, pants); leg.position.set(s*0.075, 0.18, 0); root.add(leg);
@@ -4181,16 +4205,29 @@ function renderCreate(){
     inp.onkeydown = e=>{ if(e.key==="Enter") $("cNext").click(); };
   } else if (d.step===5){   // người chủ: kiểu tóc, màu áo
     const o = d.ownerLook;
-    el.innerHTML = `<h2>Chào ${esc(d.owner)} nha!</h2><div class="sub">Chọn kiểu tóc và màu áo cho bạn. Bạn sẽ mặc áo này khi dắt chó đi dạo.</div>
+    el.innerHTML = `<h2>Chào ${esc(d.owner)} nha!</h2><div class="sub">Chọn kiểu tóc, màu áo, màu quần cho bạn. Bạn sẽ mặc bộ này khi dắt chó đi dạo.</div>
       <div id="prev3d"></div>
       <div class="opt-label">Kiểu tóc</div><div class="row">${OWNER_HAIR.map(([k,n])=>`<button class="chip ${o.hair===k?"sel":""}" data-hair="${k}">${n}</button>`).join("")}</div>
       <div class="opt-label">Màu áo</div><div class="swatches">${OWNER_SHIRT.map(([n,hex])=>`<button class="sw small ${o.shirt===hex?"sel":""}" data-shirt="${hex}"><i style="background:${hex}"></i>${n}</button>`).join("")}</div>
+      <div class="opt-label">Màu quần</div><div class="swatches">${OWNER_PANTS.map(([n,hex])=>`<button class="sw small ${(o.pants||"#3E5679")===hex?"sel":""}" data-pants="${hex}"><i style="background:${hex}"></i>${n}</button>`).join("")}</div>
       <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn ghost" id="cBack">Quay lại</button><button class="btn gold" id="cNext">Tiếp</button></div>`;
     el.querySelectorAll("[data-hair]").forEach(b=>b.onclick=()=>{o.hair=b.dataset.hair; renderCreate();});
     el.querySelectorAll("[data-shirt]").forEach(b=>b.onclick=()=>{o.shirt=b.dataset.shirt; renderCreate();});
+    el.querySelectorAll("[data-pants]").forEach(b=>b.onclick=()=>{o.pants=b.dataset.pants; renderCreate();});
     $("cBack").onclick=()=>{d.step=0;renderCreate();};
-    $("cNext").onclick=()=>{d.step=1;renderCreate();};
+    $("cNext").onclick=()=>{ d.step = SKIP_GATE ? 1 : "acct"; renderCreate(); };   // Sếp chốt 09/11: tạo tài khoản rồi mới nhận chó
     runPreview3D();
+  } else if (d.step==="acct"){
+    const cl = d.cloud;
+    el.innerHTML = `<h2>Tạo tài khoản</h2><div class="sub">Mỗi người chơi cần một tài khoản để giữ chó của mình và chơi cùng bạn bè. Game không lưu email của bạn.</div>
+      ${acctFormHTML()}
+      ${cl && cl.profiles && cl.profiles.length ? `<div class="lock" style="margin-top:12px">☁️ Tài khoản này đã có <b>${cl.profiles.length} chó</b> lưu từ trước (${cl.profiles.map(x => esc(x.dog.name)).join(", ")}). <button class="btn gold" id="cRestore" style="margin-top:8px">Tải chó đã lưu về máy này</button></div>` : ""}
+      <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn ghost" id="cBack">Quay lại</button><button class="btn gold" id="cNext" ${acctReady() ? "" : "disabled"}>Tiếp: nhận chó</button></div>`;
+    wireAcct(() => renderCreate());
+    if (fbUser && d.cloud === undefined){ d.cloud = null; cloudLoad().then(c => { d.cloud = c; if (draft === d && d.step === "acct") renderCreate(); }); }
+    const rs = $("cRestore"); if (rs) rs.onclick = () => { save = cl; save.profiles.forEach(x => { if (!x.terms) x.terms = acctTerms(); }); persist(); cancelAnimationFrame(previewRAF); $("ovCreate").classList.remove("show"); startProfile(save.current && save.profiles.some(x => x.id === save.current) ? save.current : save.profiles[0].id); toast("Đã tải chó của bạn về ☁️", 3500); };
+    $("cBack").onclick = ()=>{ d.step = 5; renderCreate(); };
+    $("cNext").onclick = ()=>{ if (!acctReady()) return; d.terms = acctTerms(); d.step = 1; renderCreate(); };
   } else if (d.step===1){
     el.innerHTML = `<h2>Chọn giống chó</h2><div class="sub">Mỗi giống có dáng và tính cách khác nhau</div>
       <div class="grid">${BREED_ORDER.map(k=>{
@@ -4252,7 +4289,7 @@ function renderCreate(){
     $("cDone").onclick = ()=>{
       if (d.layout == null || d.palette == null){ toast("Chọn kiểu sắp xếp và bộ màu trước nha"); return; }
       const v = d.name;
-      const p = newProfile(d.owner, d.look, v, d.ownerLook); p.room = {layout: d.layout, palette: d.palette}; p.ageOk = !!d.ageOk;
+      const p = newProfile(d.owner, d.look, v, d.ownerLook); p.room = {layout: d.layout, palette: d.palette}; p.ageOk = !!d.ageOk; if (d.terms) p.terms = d.terms;
       save.profiles.push(p); save.current = p.id; persist();
       cancelAnimationFrame(previewRAF);
       $("ovCreate").classList.remove("show");
@@ -4340,6 +4377,59 @@ const FB_CONFIG = {apiKey: "AIzaSyBjkbtdqVoZQnoQe1vNv6X9DGMCvMwo9KM", authDomain
   databaseURL: "https://poppy-830f5-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "poppy-830f5",
   storageBucket: "poppy-830f5.firebasestorage.app", messagingSenderId: "139697342936", appId: "1:139697342936:web:364866a67b6b03796b0aad"};
 const FB_VER = "10.12.2", FB_FLAG = "poppy.online";
+// Sếp chốt 09/11: bắt buộc tài khoản (Google), tự khai, tự đồng ý điều khoản; không lưu email. Chạy thử (selftest, demo) thì bỏ qua cổng.
+const GATE_ON = false;   // BẬT (true) khi Sếp duyệt Điều khoản chơi và đưa trang dieu-khoan/ lên; tắt thì game chạy như trước (đăng nhập tùy chọn)
+const TESTING = (() => { const q = new URLSearchParams(location.search); return !!(q.get("selftest") || q.get("demo") || q.get("createStep") || q.get("nogate")); })();
+const TERMS_V = 1, SKIP_GATE = TESTING || !GATE_ON;
+const acctTick = {terms: false, age: false};
+let fbAuthKnown = false, fbFailed = false;
+const acctTerms = () => ({v: TERMS_V, at: Date.now()});
+const acctReady = () => !!(fbUser && acctTick.terms && acctTick.age);
+function acctFormHTML(){
+  return `<label class="chk"><input type="checkbox" id="aTerms" ${acctTick.terms ? "checked" : ""}> Tôi đã đọc và đồng ý <a href="dieu-khoan/" target="_blank" rel="noopener">Điều khoản chơi Poppy</a></label>
+    <label class="chk"><input type="checkbox" id="aAge" ${acctTick.age ? "checked" : ""}> Tôi từ 16 tuổi, hoặc cha mẹ đã cho phép tôi chơi</label>
+    <div style="margin-top:10px">${fbUser ? `<div class="small">✅ <b>Đã đăng nhập Google.</b> Bạn bè chỉ thấy tên nhân vật và tên chó.</div>`
+      : fbFailed ? `<div class="small">⚠️ Chưa kết nối được máy chủ. Kiểm tra mạng rồi bấm thử lại.</div><button class="btn gold" id="aRetry" style="margin-top:6px">Thử lại</button>`
+      : `<button class="btn gold" id="aLogin">Đăng nhập bằng Google</button><div class="small" style="margin-top:4px">Tích đủ 2 ô rồi bấm đăng nhập.</div>`}</div>`;
+}
+function wireAcct(rerender){
+  const t = $("aTerms"), a = $("aAge"), b = $("aLogin"), r = $("aRetry");
+  if (t) t.onchange = () => { acctTick.terms = t.checked; rerender(); };
+  if (a) a.onchange = () => { acctTick.age = a.checked; rerender(); };
+  if (b) b.onclick = () => { if (!acctTick.terms || !acctTick.age){ toast("Bạn tích đủ 2 ô trước nha"); return; } fbLogin(); };
+  if (r) r.onclick = () => { fbFailed = false; rerender(); fbInit().catch(() => { fbFailed = true; rerender(); }); };
+}
+function gateNeeded(){
+  if (SKIP_GATE || !prof) return false;
+  if (prof.terms && fbUser) return false;
+  let flag = false; try { flag = !!localStorage.getItem(FB_FLAG); } catch(e){}
+  if (prof.terms && flag && (!fbAuthKnown || fbFailed)) return false;   // đã có tài khoản: chờ khôi phục đăng nhập, hoặc đang mất mạng thì vẫn cho chơi
+  return true;
+}
+function refreshGate(){
+  const ov = $("ovGate"); if (!ov) return;
+  if (!gateNeeded()){ ov.classList.remove("show"); return; }
+  if (fbUser && prof && acctTick.terms && acctTick.age && !prof.terms){ prof.terms = acctTerms(); persist(); fbSaveMe(); ov.classList.remove("show"); toast(`Xong! Tài khoản đã giữ ${prof.dog.name} cho bạn ☁️`, 3500); cloudBackup(); return; }
+  $("gateSheet").innerHTML = `<h2>Tạo tài khoản Poppy</h2><div class="sub">Từ nay mỗi người chơi cần một tài khoản. <b>${esc(prof.dog.name)}</b> của ${esc(prof.owner)} vẫn giữ nguyên và được lưu lên tài khoản. Game không lưu email của bạn.</div>
+    ${acctFormHTML()}
+    <div class="row" style="margin-top:14px;justify-content:space-between">${save.profiles.length > 1 ? `<button class="btn ghost" id="gSwitch">Đổi hồ sơ</button>` : "<span></span>"}<button class="btn gold" id="gDone" ${acctReady() ? "" : "disabled"}>Vào chơi</button></div>`;
+  wireAcct(refreshGate);
+  const sw = $("gSwitch"); if (sw) sw.onclick = () => { ov.classList.remove("show"); showProfiles(); };
+  $("gDone").onclick = () => { if (!acctReady()) return; refreshGate(); };
+  ov.classList.add("show");
+}
+// sao lưu toàn bộ hồ sơ trên máy này lên tài khoản (2 phút một lần và lúc rời game); máy mới đăng nhập thì tải về được
+function cloudBackup(){
+  if (!fb || !fbUser || !save.profiles.length) return;
+  const data = JSON.stringify(save); if (data.length > 480000) return;
+  fb.database().ref("saves/" + fbUser.uid).set({data, at: Date.now()}).catch(e => console.warn("sao lưu:", e));
+}
+async function cloudLoad(){
+  try { const sn = await fb.database().ref("saves/" + fbUser.uid).get(); const v = sn.val(); if (!v || !v.data) return null; const d = JSON.parse(v.data); return d && Array.isArray(d.profiles) && d.profiles.every(x => x.dog && BREEDS[x.dog.breed]) ? d : null; }
+  catch(e){ return null; }
+}
+setInterval(cloudBackup, 120000);
+document.addEventListener("visibilitychange", () => { if (document.hidden) cloudBackup(); });
 let fb = null, fbUser = null, fbLoading = null;
 function loadScript(src){ return new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = src; sc.onload = ok; sc.onerror = () => bad(new Error("không tải được " + src)); document.head.appendChild(sc); }); }
 function fbInit(){
@@ -4347,11 +4437,12 @@ function fbInit(){
   fbLoading = (async () => {
     for (const m of ["app", "auth", "database"]) await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${m}-compat.js`);
     firebase.initializeApp(FB_CONFIG); fb = firebase;
-    fb.auth().getRedirectResult().catch(e => toast("Chưa đăng nhập được (" + (e.code || e.message) + ")"));
-    fb.auth().onAuthStateChanged(u => { fbUser = u; if (u) fbSaveMe(); renderAccount(); });
+    fb.auth().getRedirectResult().catch(e => { if (e.code !== "auth/operation-not-supported-in-this-environment") toast("Chưa đăng nhập được (" + (e.code || e.message) + ")"); });
+    fb.auth().onAuthStateChanged(u => { fbUser = u; fbAuthKnown = true; if (u){ fbSaveMe(); try { localStorage.setItem(FB_FLAG, "1"); } catch(e){} } renderAccount(); refreshGate();
+      if (draft && draft.step === "acct" && $("ovCreate").classList.contains("show")) renderCreate(); });
     return fb;
   })();
-  fbLoading.catch(() => { fbLoading = null; });
+  fbLoading.catch(() => { fbLoading = null; fbFailed = true; refreshGate(); if (draft && draft.step === "acct") renderCreate(); });
   return fbLoading;
 }
 async function fbLogin(){
@@ -4366,8 +4457,9 @@ async function fbLogin(){
 async function fbLogout(){ try { localStorage.removeItem(FB_FLAG); } catch(e){} if (NET.joined) netLeave(); if (fb) await fb.auth().signOut(); fbUser = null; renderAccount(); toast("Đã đăng xuất"); }
 function fbSaveMe(){
   if (!fb || !fbUser || !prof) return;
-  const ref = fb.database().ref("users/" + fbUser.uid);
-  ref.update({name: String(prof.owner || "Bạn").slice(0, 30), dog: String(prof.dog.name).slice(0, 30), breed: String(prof.dog.breed).slice(0, 20), lastSeen: Date.now()})
+  const ref = fb.database().ref("users/" + fbUser.uid), up = {name: String(prof.owner || "Bạn").slice(0, 30), dog: String(prof.dog.name).slice(0, 30), breed: String(prof.dog.breed).slice(0, 20), lastSeen: Date.now()};
+  if (prof.terms) up.terms = {v: +prof.terms.v || 1, at: +prof.terms.at || Date.now()};
+  ref.update(up)
     .then(() => ref.child("created").transaction(v => v || Date.now()))
     .catch(e => console.warn("lưu hồ sơ trực tuyến:", e));
 }
@@ -4393,7 +4485,7 @@ function renderAccount(){
        <div class="row" style="margin-top:8px"><button class="btn gold" id="acIn">Đăng nhập bằng Google</button></div>`;
   const a = $("acIn"), b = $("acOut"); if (a) a.onclick = fbLogin; if (b) b.onclick = fbLogout;
 }
-try { if (localStorage.getItem(FB_FLAG) && !new URLSearchParams(location.search).get("selftest")) fbInit().catch(() => {}); } catch(e){}
+{ let flag = false; try { flag = !!localStorage.getItem(FB_FLAG); } catch(e){} if (!TESTING && (GATE_ON || flag)) fbInit().catch(() => {}); }   // bắt buộc tài khoản: luôn nạp; chưa bắt buộc: chỉ khi đã đăng nhập trước đó
 
 /* ---------- BƯỚC 3: thấy nhau trong công viên ----------
    Đã đăng nhập và đang ở trong công viên: gửi vị trí của mình (chủ + chó) lên park/<uid>, nhận vị trí của người khác.
@@ -4404,7 +4496,7 @@ function myParkData(){
   const P = prof, o = outdoor, L = Object.assign({}, OWNER_DEFAULT, P.ownerLook || {}), r2 = v => Math.round(v*100)/100;
   return {name: String(P.owner || "Bạn").slice(0, 30), dog: String(P.dog.name).slice(0, 30), breed: String(P.dog.breed).slice(0, 20),
     coat: +P.dog.coat || 0, ear: String(P.dog.ear || "").slice(0, 20), tail: String(P.dog.tail || "").slice(0, 20), eye: +P.dog.eye || 0,
-    hair: String(L.hair || "ngan").slice(0, 20), shirt: String(L.shirt || "#4C8FE0").slice(0, 10),
+    hair: String(L.hair || "ngan").slice(0, 20), shirt: String(L.shirt || "#4C8FE0").slice(0, 10), pants: String(L.pants || "#3E5679").slice(0, 10),
     x: r2(o.x), z: r2(o.z), h: r2(o.h || 0), dx: r2(dog.pos.x), dz: r2(dog.pos.z), t: Date.now()};
 }
 function netWant(){ return !!(fb && fbUser && prof && outdoor && inParkArea(outdoor) && !dogAway()); }
@@ -4442,7 +4534,7 @@ function peerUpsert(id, v){
   if (!v || typeof v.x !== "number" || !BREEDS[v.breed]) return;
   let P = NET.peers[id];
   if (!P){
-    const own = buildOwner3D({hair: v.hair, shirt: /^#[0-9A-Fa-f]{3,8}$/.test(v.shirt || "") ? v.shirt : "#4C8FE0"}); own.root.scale.setScalar(1.3); scene.add(own.root);
+    const own = buildOwner3D({hair: v.hair, shirt: /^#[0-9A-Fa-f]{3,8}$/.test(v.shirt || "") ? v.shirt : "#4C8FE0", pants: v.pants}); own.root.scale.setScalar(1.3); scene.add(own.root);
     const d = buildDog3D({breed: v.breed, coat: v.coat|0, ear: v.ear, tail: v.tail, eye: v.eye|0, colors: {}}, {preview: true}); scene.add(d.root);
     const tag = nameTag(`${v.name} · 🐶 ${v.dog}`); scene.add(tag);
     const picks = []; for (const root of [own.root, d.root]) root.traverse(m => { if (m.isMesh){ m.userData.kind = "peer"; m.userData.uid = id; pickables.push(m); picks.push(m); } });
@@ -4528,6 +4620,7 @@ function startProfile(id){
   buildProfileRoom(true);
   buildDog3D(prof.dog);
   if (fbUser) fbSaveMe();   // đổi hồ sơ: bạn bè thấy đúng tên nhân vật và chó đang chơi
+  acctTick.terms = acctTick.age = false; setTimeout(refreshGate, 0);
   for (const m of prof.messes){ const f = nearestFree(m); m.x = f.x; m.z = f.z; }
   dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0; dog.onChair = false; dog.jump = null; dog.pendingPerch = null;
   dog.pose = poseFor("stand", BREEDS[prof.dog.breed]); setState("happy", 1500); dog.next = 0; excite(8000);
@@ -5000,7 +5093,7 @@ function renderRoomSheet(){
   $("rDone").onclick = () => $("ovRoom").classList.remove("show");
 }
 document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("pointerdown", e=>{
-  if (e.target===o && o.id!=="ovCreate"){ stopCam(); o.classList.remove("show"); if (o.id === "ovShop" && curStore !== "train") leaveStore(); }
+  if (e.target===o && o.id!=="ovCreate" && o.id!=="ovGate"){ stopCam(); o.classList.remove("show"); if (o.id === "ovShop" && curStore !== "train") leaveStore(); }
 }));
 document.addEventListener("visibilitychange", ()=>{ if (prof){ prof.last = Date.now(); persist(); } });
 
@@ -5329,6 +5422,12 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
       const d = myParkData(); ok("dữ liệu gửi đi chỉ có tên nhân vật, chó, vị trí (không email)", d.name && d.dog && typeof d.x === "number" && !JSON.stringify(d).includes("@"));
       ok("chưa đăng nhập thì không gửi vị trí", !netWant()); }
     ok("ngày ghi số liệu dạng năm-tháng-ngày", dayKey(new Date(2026, 10, 9, 23, 30).getTime()) === "2026-11-09");
+    ok("người chủ có 8 màu quần", OWNER_PANTS.length === 8 && (() => { const o = buildOwner3D({pants: "#A8423A"}); let f = false; o.root.traverse(m => { if (m.isMesh && m.material.color && m.material.color.getHexString() === "a8423a") f = true; }); return f; })());
+    ok("chạy thử thì bỏ qua cổng tài khoản", SKIP_GATE && !gateNeeded());
+    { const sv = fbUser; acctTick.terms = acctTick.age = true; ok("chưa đăng nhập Google thì chưa được tiếp", !acctReady()); fbUser = {uid: "x"}; ok("đăng nhập và tích đủ 2 ô thì được tiếp", acctReady()); acctTick.age = false; ok("thiếu ô tuổi thì chưa được tiếp", !acctReady()); fbUser = sv; acctTick.terms = acctTick.age = false; }
+    { const el = document.createElement("div"); el.innerHTML = acctFormHTML(); ok("bước tạo tài khoản có 2 ô tích và liên kết Điều khoản", el.querySelectorAll("input[type=checkbox]").length === 2 && el.querySelector('a[href="dieu-khoan/"]')); }
+    ok("công viên có 13 cây to tạo bóng mát, không chắn lối đi", BIG_TREES.length === 13 && BIG_TREES.every(([x, z]) => !oFree({x, z})) && [KIOSKS[0].stand, KIOSKS[3].stand, TRAIN.stand, POOL.stand].every(p => oFree(p)));
+    ok("mỗi bàn dù trước quầy có ghế ngồi", KIOSK_CHAIRS >= 2);
     ok("có người đứng bán trong 4 quầy và quầy vé", (townPick.vendors || []).length === 5);
     ok("quầy bánh rán có món bánh rán", STORES.fast.items.some(it => it.k === "donut"));
     camPitch = PITCH_OUT[0]; updateCamera(1); ok("ngoài trời nghiêng được khoảng 120 độ, nhìn lên trời không chui xuống đất", PITCH_OUT[1] - PITCH_OUT[0] > 115*Math.PI/180 && camera.position.y >= 0.59); camPitch = 0.8;
