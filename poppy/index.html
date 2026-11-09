@@ -4378,7 +4378,7 @@ const FB_CONFIG = {apiKey: "AIzaSyBjkbtdqVoZQnoQe1vNv6X9DGMCvMwo9KM", authDomain
   storageBucket: "poppy-830f5.firebasestorage.app", messagingSenderId: "139697342936", appId: "1:139697342936:web:364866a67b6b03796b0aad"};
 const FB_VER = "10.12.2", FB_FLAG = "poppy.online";
 // Sếp chốt 09/11: bắt buộc tài khoản (Google), tự khai, tự đồng ý điều khoản; không lưu email. Chạy thử (selftest, demo) thì bỏ qua cổng.
-const GATE_ON = false;   // BẬT (true) khi Sếp duyệt Điều khoản chơi và đưa trang dieu-khoan/ lên; tắt thì game chạy như trước (đăng nhập tùy chọn)
+const GATE_ON = true;    // BẬT (true) khi Sếp duyệt Điều khoản chơi và đưa trang dieu-khoan/ lên; tắt thì game chạy như trước (đăng nhập tùy chọn)
 const TESTING = (() => { const q = new URLSearchParams(location.search); return !!(q.get("selftest") || q.get("demo") || q.get("createStep") || q.get("nogate")); })();
 const TERMS_V = 1, SKIP_GATE = TESTING || !GATE_ON;
 const acctTick = {terms: false, age: false};
@@ -4454,6 +4454,23 @@ async function fbLogin(){
     toast("Đã đăng nhập ✅ Bạn bè sẽ thấy tên nhân vật của bạn, không thấy email", 4000);
   } catch(e){ if (e.code !== "auth/popup-closed-by-user") toast("Chưa đăng nhập được (" + (e.code || e.message) + "). Thử lại nha", 4500); }
 }
+async function fbDeleteAccount(){
+  if (!fb || !fbUser) return;
+  if (!confirm("Xóa tài khoản Poppy?\n\nMọi dữ liệu của bạn trên máy chủ (hồ sơ, bản sao lưu chó, giờ chơi) sẽ bị xóa vĩnh viễn.")) return;
+  if (!confirm("Bạn chắc chắn chứ? Xóa rồi không lấy lại được.")) return;
+  const uid = fbUser.uid, now = Date.now(), up = {[`users/${uid}`]: null, [`saves/${uid}`]: null, [`park/${uid}`]: null};
+  for (let i = 0; i < 400; i++) up[`activity/${dayKey(now - i*86400000)}/${uid}`] = null;
+  try {
+    if (NET.joined) netLeave();
+    await fb.database().ref().update(up);
+    try { await fbUser.delete(); }
+    catch(e){ if (e.code !== "auth/requires-recent-login") throw e; await fbUser.reauthenticateWithPopup(new fb.auth.GoogleAuthProvider()); await fb.auth().currentUser.delete(); }
+  } catch(e){ toast("Chưa xóa được (" + (e.code || e.message) + "). Thử lại nha", 4500); return; }
+  try { localStorage.removeItem(FB_FLAG); } catch(e){}
+  const wipeLocal = confirm("Đã xóa tài khoản trên máy chủ.\n\nXóa luôn các chó đang lưu trên máy này không?\n(OK = xóa, Cancel = giữ lại)");
+  if (wipeLocal) save.profiles = []; else save.profiles.forEach(x => { delete x.terms; });
+  save.current = null; persist(); location.reload();
+}
 async function fbLogout(){ try { localStorage.removeItem(FB_FLAG); } catch(e){} if (NET.joined) netLeave(); if (fb) await fb.auth().signOut(); fbUser = null; renderAccount(); toast("Đã đăng xuất"); }
 function fbSaveMe(){
   if (!fb || !fbUser || !prof) return;
@@ -4480,10 +4497,10 @@ function renderAccount(){
   const el = $("acctBox"); if (!el) return;
   el.innerHTML = fbUser
     ? `<div class="small">🌐 <b>Đã đăng nhập</b> để chơi cùng bạn bè. Bạn bè sẽ thấy: <b>${esc(prof ? prof.owner : "")}</b> và chó <b>${esc(prof ? prof.dog.name : "")}</b> (không thấy email).</div>
-       <div class="row" style="margin-top:8px"><button class="btn ghost" id="acOut">Đăng xuất</button></div>`
+       <div class="row" style="margin-top:8px"><button class="btn ghost" id="acOut">Đăng xuất</button><button class="btn ghost" id="acDel" style="color:#B4341A;border-color:#E9B8A8">🗑️ Xóa tài khoản</button></div>`
     : `<div class="small">🌐 <b>Chơi cùng bạn bè</b>: đăng nhập để gặp bạn ở công viên. Bạn bè chỉ thấy tên nhân vật và tên chó, không thấy email.</div>
        <div class="row" style="margin-top:8px"><button class="btn gold" id="acIn">Đăng nhập bằng Google</button></div>`;
-  const a = $("acIn"), b = $("acOut"); if (a) a.onclick = fbLogin; if (b) b.onclick = fbLogout;
+  const a = $("acIn"), b = $("acOut"), c = $("acDel"); if (a) a.onclick = fbLogin; if (b) b.onclick = fbLogout; if (c) c.onclick = fbDeleteAccount;
 }
 { let flag = false; try { flag = !!localStorage.getItem(FB_FLAG); } catch(e){} if (!TESTING && (GATE_ON || flag)) fbInit().catch(() => {}); }   // bắt buộc tài khoản: luôn nạp; chưa bắt buộc: chỉ khi đã đăng nhập trước đó
 
@@ -5424,6 +5441,8 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     ok("ngày ghi số liệu dạng năm-tháng-ngày", dayKey(new Date(2026, 10, 9, 23, 30).getTime()) === "2026-11-09");
     ok("người chủ có 8 màu quần", OWNER_PANTS.length === 8 && (() => { const o = buildOwner3D({pants: "#A8423A"}); let f = false; o.root.traverse(m => { if (m.isMesh && m.material.color && m.material.color.getHexString() === "a8423a") f = true; }); return f; })());
     ok("chạy thử thì bỏ qua cổng tài khoản", SKIP_GATE && !gateNeeded());
+    ok("bắt buộc tài khoản đã bật", GATE_ON === true);
+    { const sv = fbUser; fbUser = {uid: "x"}; showProfiles(); ok("đã đăng nhập thì có nút tự Xóa tài khoản", !!$("acDel")); $("ovProfiles").classList.remove("show"); fbUser = sv; renderAccount(); }
     { const sv = fbUser; acctTick.terms = acctTick.age = true; ok("chưa đăng nhập Google thì chưa được tiếp", !acctReady()); fbUser = {uid: "x"}; ok("đăng nhập và tích đủ 2 ô thì được tiếp", acctReady()); acctTick.age = false; ok("thiếu ô tuổi thì chưa được tiếp", !acctReady()); fbUser = sv; acctTick.terms = acctTick.age = false; }
     { const el = document.createElement("div"); el.innerHTML = acctFormHTML(); ok("bước tạo tài khoản có 2 ô tích và liên kết Điều khoản", el.querySelectorAll("input[type=checkbox]").length === 2 && el.querySelector('a[href="dieu-khoan/"]')); }
     ok("công viên có 13 cây to tạo bóng mát, không chắn lối đi", BIG_TREES.length === 13 && BIG_TREES.every(([x, z]) => !oFree({x, z})) && [KIOSKS[0].stand, KIOSKS[3].stand, TRAIN.stand, POOL.stand].every(p => oFree(p)));
