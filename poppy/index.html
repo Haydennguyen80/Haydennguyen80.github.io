@@ -1700,7 +1700,7 @@ function updateCamera(k){
   let tx = lerp(CAM_TARGET.x, dog.pos.x, follow), tz = lerp(CAM_TARGET.z, dog.pos.z, follow);
   if (camFree && !zoomedIn()) setCamFree(false);   // thu nhỏ lại thì camera bám theo chó như cũ
   if (camFree){ tx = camFreeX; tz = camFreeZ; }
-  if (outdoor){ tx = outdoor.x; tz = outdoor.z; }
+  if (outdoor){ tx = outdoor.x; tz = outdoor.z; if (outdoor.train && outdoor.train.phase !== "fetch"){ tx = dog.pos.x; tz = dog.pos.z; } }   // đang huấn luyện: camera nhìn theo chó
   const free = camFree || !!outdoor, kk = free ? Math.max(k, outdoor ? 0.12 : 0.35) : k;
   camLook.x = lerp(camLook.x, free ? tx : clamp(tx, -1.6, 1.6), kk); camLook.z = lerp(camLook.z, free ? tz : clamp(tz, -1.2, 1.4), kk);
   camLook.y = QS && QS.get("close") ? 0.25 : CAM_TARGET.y;
@@ -2966,7 +2966,7 @@ const PHARM = {x: 17.8, z: -22, w: 6, d: 7, stand: {x: 21.8, z: -22}};
 const RESTO = {x: 17.3, z: -35, w: 7, d: 9, stand: {x: 21.8, z: -35}};
 // 4 quầy trong công viên (Sếp chọn): tiệm kem, tiệm cà phê, tạp hóa, đồ ăn nhanh
 const KIOSKS = [{k: "kem", n: "KEM", x: 42, z: -8, c: "#F7A8C4"}, {k: "cafe", n: "CÀ PHÊ", x: 48, z: -8, c: "#B9875A"},
-                {k: "taphoa", n: "TẠP HÓA", x: 62, z: -8, c: "#7DBB6E"}, {k: "fast", n: "ĐỒ ĂN NHANH", x: 68, z: -8, c: "#F2A33A"}];
+                {k: "taphoa", n: "TẠP HÓA", x: 62, z: -8, c: "#7DBB6E"}, {k: "fast", n: "BÁNH RÁN", x: 68, z: -8, c: "#F2A33A"}];
 for (const q of KIOSKS) q.stand = {x: q.x, z: q.z + 2.3};
 const KW = 3.6, KD = 2.4;
 const TRAIN = {x0: 36, x1: 56, z0: -62, z1: -44, gx0: 44.5, gx1: 47.5, spot: {x: 46, z: -46.6}, booth: {x: 41, z: -41.8}, stand: {x: 41, z: -40.2}};
@@ -2974,6 +2974,9 @@ const TRAIN_COURSE = [{x: 40, z: -47.5}, {x: 40, z: -49.6}, {x: 40, z: -52.4, ju
   {x: 43, z: -58.4}, {x: 45, z: -59.6}, {x: 47, z: -58.4}, {x: 49, z: -59.6}, {x: 51, z: -58.4}, {x: 53, z: -59.6},
   {x: 54.5, z: -57}, {x: 54.5, z: -55.6}, {x: 54.5, z: -48.4}, {x: 51, z: -47.4}, {x: 46.8, z: -47.4}];
 const TRAIN_PRICE = 20;
+// Sếp 09/11: chủ đứng ngoài, huấn luyện viên dắt chó vào; học lâu gấp 5 (5 vòng bài tập); mỗi buổi +2 điểm (tạm, chờ Sếp, Bơ, Bi họp chốt cách lên điểm)
+const TRAIN_LAPS = 5, TRAIN_GAIN = 2;
+const TRAINER_HOME = {x: 48.2, z: -45.6}, TRAIN_IN = [{x: 46, z: -43.2}, {x: 46, z: -46.6}, {x: 40, z: -47.5}];
 const PLAY = {x0: 72, x1: 86, z0: -40, z1: -28};
 const QUEST_POLES = [{x: 4, z: 7.45}, {x: 12, z: 7.45}, {x: 20, z: 7.45}];
 const NPCS = [{x: 49, z: -13.5, h: 0.6, look: {hair: "dai", shirt: "#EE8FB5"}, say: "Cô thấy một bạn chó chạy về phía hồ nước đó con!"},
@@ -3117,10 +3120,10 @@ function buildTown(){
   for (let x = -14; x <= 106; x += 12) if (Math.abs(x - 48.2) > 2 && Math.abs(x - 72.2) > 2) lamp(x, ST1.road1 + 0.3, Math.PI);
   for (let z = -66; z <= -2; z += 12) lamp(ST2.sw0 + 0.3, z, Math.PI/2);
   // cột điện và dây điện dọc vỉa hè trước nhà (rất phố Việt)
-  const poleX = [-20, -12, -4, 4, 12, 20, 32, 44, 56, 68, 80, 92, 104], topY = G + 7, PZ = QUEST_POLES[0].z;
+  const poleX = [-12, 4, 12, 20, 60, 100], topY = G + 7, PZ = QUEST_POLES[0].z;   // Sếp 09/11: bỏ bớt cột điện (13 cột còn 6)
   for (const x of poleX) K.group(() => { const p = M(new THREE.CylinderGeometry(0.09, 0.13, 7, 8), "#9C9C98"); p.position.set(x, G + 3.5, PZ); K.add(p); box(1.2, 0.08, 0.08, "#7C7C78", x, topY - 0.4, PZ); });
   const wireMat = new THREE.LineBasicMaterial({color: "#3A3A3A"});
-  for (let i = 0; i < poleX.length - 1; i++) for (const dz of [-0.5, 0, 0.5]){
+  for (let i = 0; i < poleX.length - 1; i++) if (poleX[i+1] - poleX[i] <= 16) for (const dz of [-0.5, 0, 0.5]){
     const pts = []; for (let k = 0; k <= 12; k++){ const f = k/12; pts.push(new THREE.Vector3(poleX[i] + (poleX[i+1] - poleX[i])*f, topY - 0.4 - Math.sin(f*Math.PI)*0.55, PZ + dz)); }
     town.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wireMat));
   }
@@ -3169,15 +3172,47 @@ function buildPark(){
   for (const [x, z] of [[50, -14], [60, -14], [80, -2.5], [92, -38]]){ box(1.6, 0.25, 1.6, "#C9A27A", x, G + 0.12, z); for (let i = 0; i < 9; i++){ const f = add(M(SPHERE_LO, ["#F25C78","#FFD15C","#C38BEB"][i % 3])); f.scale.setScalar(0.16); f.position.set(x - 0.5 + (i % 3)*0.5, G + 0.33, z - 0.5 + Math.floor(i/3)*0.5); } }
   for (const [x, z] of [[46, -2.5], [62, -2.5], [80, -33], [96, -33], [80, -64.5], [56, -64.5], [103, -18], [103, -48], [39, -16], [39, -48]]) lamp(x, z, 0);
   // 4 quầy: kem, cà phê, tạp hóa, đồ ăn nhanh (mặt quầy nhìn ra lối đi chính)
-  townPick.kiosks = KIOSKS.map((q, i) => group(g => { g.position.set(q.x, 0, q.z);
-    const body = box(KW, 2.4, KD, q.c, 0, G + 1.2, 0, "kiosk"); body.userData.ki = i;
-    const ctr = box(KW - 0.4, 1.0, 0.3, "#FFFFFF", 0, G + 0.5, KD/2 + 0.12, "kiosk"); ctr.userData.ki = i;
-    box(KW - 0.6, 1.0, 0.04, "#3D5566", 0, G + 1.55, KD/2 + 0.01);
-    for (let s = 0; s < 6; s++){ const a = box(KW/6, 0.08, 0.9, s % 2 ? "#FFFFFF" : "#E5533D", -KW/2 + KW/12 + s*KW/6, G + 2.35, KD/2 + 0.35); a.rotation.x = 0.35; }
-    const sg = add(signPlane(q.n, KW - 0.2, 0.6, "#FFF4D6", "#8A3E1E", 0, G + 2.85, KD/2 + 0.01, 0, "kiosk", [640, 110])); sg.userData.ki = i;
-    for (const s of [-1, 1]){ const tb = new THREE.Group(); tb.position.set(s*1.6, G, KD/2 + 3.2);
+  townPick.vendors = [];
+  const tagAll = (g, kind, key, i) => g.traverse(m => { if (m.isMesh && !m.userData.kind){ m.userData.kind = kind; if (key) m.userData[key] = i; pickables.push(m); } });
+  // quầy mở mặt trước: tường sau, hai vách, mái, mặt quầy gỗ, mái hiên sọc có viền lượn, bảng hiệu, người bán đứng sau quầy
+  const stall = (w, d, c, sign, look, extra) => {
+    box(w + 0.3, 0.12, d + 0.3, "#D9CBB0", 0, G + 0.06, 0);
+    box(w, 2.5, 0.12, c, 0, G + 1.25, -d/2 + 0.06);
+    for (const s2 of [-1, 1]){ box(0.14, 2.5, d, c, s2*(w/2 - 0.07), G + 1.25, 0); box(0.18, 2.5, 0.18, shade(c, -0.25), s2*(w/2 - 0.07), G + 1.25, d/2 - 0.05); }
+    box(w + 0.4, 0.16, d + 0.4, shade(c, -0.22), 0, G + 2.58, 0.05); box(w + 0.5, 0.1, d + 0.5, "#FFFFFF", 0, G + 2.71, 0.05);
+    box(w - 0.3, 0.95, 0.34, "#FFFFFF", 0, G + 0.475, d/2 - 0.22); box(w - 0.3, 0.16, 0.02, c, 0, G + 0.72, d/2 - 0.04);
+    box(w - 0.1, 0.07, 0.6, "#B5784A", 0, G + 0.985, d/2 - 0.2);
+    box(w*0.5, 0.75, 0.04, "#2F3B33", 0, G + 1.85, -d/2 + 0.14);   // bảng thực đơn trên tường sau
+    for (let r = 0; r < 3; r++) box(w*0.36, 0.06, 0.02, "#FFF4D6", 0, G + 2.05 - r*0.2, -d/2 + 0.17);
+    const n = 7; for (let k = 0; k < n; k++){   // mái hiên sọc, viền lượn sóng
+      const a = box(w/n, 0.06, 0.8, k % 2 ? "#FFFFFF" : c, -w/2 + w/(2*n) + k*w/n, G + 2.42, d/2 + 0.3); a.rotation.x = 0.38;
+      const sc = add(M(new THREE.CylinderGeometry(w/(2*n), w/(2*n), 0.05, 12, 1, false, 0, Math.PI), k % 2 ? "#FFFFFF" : c)); sc.rotation.set(Math.PI/2, 0, Math.PI/2); sc.position.set(-w/2 + w/(2*n) + k*w/n, G + 2.27, d/2 + 0.68); }
+    box(w - 0.1, 0.65, 0.08, shade(c, -0.3), 0, G + 3.1, d/2 - 0.16);
+    add(signPlane(sign, w - 0.2, 0.55, "#FFF4D6", "#8A3E1E", 0, G + 3.1, d/2 - 0.11, 0, null, [640, 110]));
+    const v = buildOwner3D(look); v.root.scale.setScalar(1.25); v.root.position.set(0, G + 0.12, -0.15); add(v.root);
+    const apron = rbox(0.25, 0.3, 0.03, 0.02, look.apron || "#FFFFFF"); apron.position.set(0, 0.43, 0.105); v.root.add(apron);
+    if (look.hat === "paper"){ const h = cyl(0.12, 0.13, 0.12, "#FFFFFF"); h.position.set(0, 0.97, 0); v.root.add(h); }
+    else if (look.hat){ const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 8, 0, Math.PI*2, 0, Math.PI/2), mat(look.hat)); h.position.set(0, 0.87, 0); v.root.add(h); const b2 = rbox(0.2, 0.025, 0.12, 0.01, look.hat); b2.position.set(0, 0.875, 0.16); v.root.add(b2); }
+    townPick.vendors.push(v); if (extra) extra();
+  };
+  const cone = (x, z, col) => { const c2 = add(M(new THREE.ConeGeometry(0.06, 0.18, 10), "#E0B26A")); c2.rotation.x = Math.PI; c2.position.set(x, G + 1.11, z); const sc = add(M(SPHERE_LO, col)); sc.scale.setScalar(0.075); sc.position.set(x, G + 1.24, z); };
+  const cup = (x, z, col) => { const c2 = add(M(new THREE.CylinderGeometry(0.06, 0.045, 0.14, 12), col)); c2.position.set(x, G + 1.09, z); };
+  const donut = (x, z, col) => { const t = add(M(new THREE.TorusGeometry(0.07, 0.035, 8, 16), "#D9A066")); t.rotation.x = Math.PI/2; t.position.set(x, G + 1.05, z); const ic = add(M(new THREE.TorusGeometry(0.07, 0.03, 6, 16), col)); ic.rotation.x = Math.PI/2; ic.position.set(x, G + 1.07, z); };
+  const KLOOK = {kem: {hair: "dai", shirt: "#F7A8C4", hat: "paper", apron: "#FFFFFF"}, cafe: {hair: "ngan", shirt: "#FFFFFF", hat: "#6B4226", apron: "#6B4226"},
+                 taphoa: {hair: "bui", shirt: "#7DBB6E", apron: "#F2E6C9"}, fast: {hair: "duoi", shirt: "#F2A33A", hat: "#E5533D", apron: "#FFFFFF"}};
+  townPick.kiosks = KIOSKS.map((q, i) => { const g = group(g => { g.position.set(q.x, 0, q.z);
+    stall(KW, KD, q.c, q.n, KLOOK[q.k] || {}, () => { const fz = KD/2 - 0.2;
+      if (q.k === "kem"){ for (let k = 0; k < 4; k++) cone(-1.2 + k*0.22, fz, ["#F7A8C4","#FFF4D6","#8A5A3B","#9FD3C7"][k]); box(0.9, 0.3, 0.45, "#D7EEF5", 1.0, G + 1.17, fz - 0.05);
+        const big = add(M(new THREE.ConeGeometry(0.28, 0.8, 12), "#E0B26A")); big.rotation.x = Math.PI; big.position.set(0, G + 3.95, 0); const bs = add(M(SPHERE_LO, "#F7A8C4")); bs.scale.setScalar(0.34); bs.position.set(0, G + 4.45, 0); }
+      else if (q.k === "cafe"){ box(0.5, 0.5, 0.4, "#9C9C98", -1.1, G + 1.27, fz - 0.05); for (let k = 0; k < 3; k++) cup(0.6 + k*0.22, fz, "#FFFFFF");
+        const big = add(M(new THREE.CylinderGeometry(0.32, 0.24, 0.55, 16), "#FFFFFF")); big.position.set(0, G + 3.75, 0); const hd = add(M(new THREE.TorusGeometry(0.14, 0.05, 8, 16), "#FFFFFF")); hd.position.set(0.36, G + 3.78, 0); const cf = add(M(new THREE.CylinderGeometry(0.3, 0.3, 0.02, 16), "#6B4226")); cf.position.set(0, G + 4.02, 0); }
+      else if (q.k === "fast"){ for (let k = 0; k < 5; k++) donut(-1.2 + k*0.2, fz, ["#F7A8C4","#8A5A3B","#FFF4D6","#F7A8C4","#C38BEB"][k]); box(0.45, 0.3, 0.35, "#C8553D", 1.0, G + 1.17, fz - 0.05);
+        const big = add(M(new THREE.TorusGeometry(0.3, 0.14, 12, 24), "#D9A066")); big.position.set(0, G + 3.95, 0); const ic = add(M(new THREE.TorusGeometry(0.3, 0.12, 10, 24, Math.PI*1.4), "#F7A8C4")); ic.position.set(0, G + 3.95, 0.04); }
+      else { for (let k = 0; k < 4; k++) box(0.18, 0.24, 0.18, ["#E5533D","#4C8FE0","#FFD15C","#7DBB6E"][k], -1.2 + k*0.25, G + 1.14, fz); box(0.6, 0.25, 0.4, "#C9A27A", 0.9, G + 1.15, fz - 0.05); } });
+    for (const s2 of [-1, 1]){ const tb = new THREE.Group(); tb.position.set(s2*1.6, G, KD/2 + 3.2);
       const top = M(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 16), "#FFFFFF"); top.position.y = 0.72; tb.add(top); const leg = M(new THREE.CylinderGeometry(0.05, 0.05, 0.72, 6), "#666"); leg.position.y = 0.36; tb.add(leg);
-      const um = M(new THREE.ConeGeometry(0.9, 0.4, 8), q.c); um.position.y = 2.1; tb.add(um); const st = M(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), "#777"); st.position.y = 1.05; tb.add(st); add(tb); } }));
+      const um = M(new THREE.ConeGeometry(0.9, 0.4, 8), q.c); um.position.y = 2.1; tb.add(um); const st = M(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), "#777"); st.position.y = 1.05; tb.add(st); add(tb); } });
+    tagAll(g, "kiosk", "ki", i); return g; });
   // khu huấn luyện chó: rào trắng, rào nhảy, cọc zíc zắc, ống chui, cầu chữ A, quầy bán vé
   { const T = TRAIN, rail = (x0, z0, x1, z1) => { const len = Math.hypot(x1 - x0, z1 - z0), h = Math.abs(z1 - z0) < 0.01; if (len < 0.1) return;
       for (const y of [G + 0.3, G + 0.65]) box(h ? len : 0.06, 0.06, h ? 0.06 : len, "#FFFFFF", (x0 + x1)/2, y, (z0 + z1)/2);
@@ -3191,8 +3226,19 @@ function buildPark(){
     for (const s of [-1, 1]){ const a = box(1.2, 0.06, 2.2, "#F2A33A", 48, G + 0.55, -51 + s*0.9); a.rotation.x = s*0.55; }
     add(signPlane("KHU HUẤN LUYỆN CHÓ", 4.2, 0.6, "#2E8B57", "#FFFFFF", (T.gx0 + T.gx1)/2, G + 1.35, T.z1 + 0.05));
     for (const s of [-1, 1]) box(0.1, 1.4, 0.1, "#7A5233", (T.gx0 + T.gx1)/2 + s*2, G + 0.7, T.z1);
-    group(() => { box(2, 2.2, 1.4, "#FFD15C", T.booth.x, G + 1.1, T.booth.z, "booth"); box(1.2, 0.7, 0.04, "#3D5566", T.booth.x, G + 1.4, T.booth.z + 0.71);
-      add(signPlane("VÉ HUẤN LUYỆN", 2.2, 0.45, "#1E6F78", "#FFFFFF", T.booth.x, G + 2.45, T.booth.z + 0.72, 0, "booth", [600, 120])); }); }
+    { const g = group(g => { g.position.set(T.booth.x, 0, T.booth.z); stall(2, 1.4, "#FFD15C", "VÉ HUẤN LUYỆN", {hair: "ngan", shirt: "#1E6F78", hat: "#1E3A5F", apron: "#1E6F78"},
+        () => { for (let k = 0; k < 3; k++) box(0.22, 0.02, 0.14, ["#F25C78","#4C8FE0","#7DBB6E"][k], -0.5 + k*0.3, G + 1.03, 0.45); }); }); tagAll(g, "booth"); }
+    // huấn luyện viên mặc đồng phục: áo cam, sọc trắng, mũ lưỡi trai xanh đậm, còi, bảng tên
+    { const tr = buildOwner3D({hair: "ngan", shirt: "#E8742C"}); tr.root.scale.setScalar(1.3); add(tr.root);
+      const hat = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 8, 0, Math.PI*2, 0, Math.PI/2), mat("#1E3A5F")); hat.position.set(0, 0.87, 0); tr.root.add(hat);
+      const brim = rbox(0.22, 0.025, 0.14, 0.01, "#1E3A5F"); brim.position.set(0, 0.875, 0.17); tr.root.add(brim);
+      const badge = rbox(0.08, 0.05, 0.015, 0.01, "#FFFFFF"); badge.position.set(-0.07, 0.56, 0.105); tr.root.add(badge);
+      const wh = sph(0.025, "#FFD15C"); wh.position.set(0.05, 0.6, 0.11); tr.root.add(wh);
+      for (const s2 of [-1, 1]){ const st = rbox(0.02, 0.3, 0.012, 0.005, "#FFFFFF"); st.position.set(s2*0.13, 0.49, 0.1); tr.root.add(st); }
+      townPick.trainer = Object.assign(tr, {x: TRAINER_HOME.x, z: TRAINER_HOME.z, h: Math.PI, phase: 0, moving: false, wp: []});
+      tr.root.position.set(TRAINER_HOME.x, G, TRAINER_HOME.z); tr.root.rotation.y = Math.PI;
+      const tl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({color: "#1E3A5F"}));
+      tl.visible = false; scene.add(tl); townPick.trainer.leash = tl; } }
   // khu vui chơi: cầu tuột, bập bênh, thú nhún, hố cát (Bơ sẽ gửi thêm ý tưởng đồ chơi)
   { const cx = (PLAY.x0 + PLAY.x1)/2;
     ground(box(PLAY.x1 - PLAY.x0, 0.03, PLAY.z1 - PLAY.z0, "#F1D9A7", cx, G + 0.015, (PLAY.z0 + PLAY.z1)/2));
@@ -3323,6 +3369,7 @@ function goOutside(){
 function freeBlock(){ toast(`${prof.dog.name} đang chạy chơi trong công viên. Bấm 📣 Gọi chó 3 lần để chó về với bạn rồi mới đi nha`, 4500); }
 function goHome(){
   if (!outdoor) return;
+  if (trainBusy()) return;
   if (outdoor.free){ freeBlock(); return; }
   if (outdoor.swim) stopSwim(false);
   outdoor.train = null;
@@ -3364,6 +3411,7 @@ function ownerWalk(target, then=null){
 function tapOutdoor(x, y, hit){
   const kind = hit ? hit.object.userData.kind : null;
   closeRing();
+  if (trainBusy()) return;
   if (kind === "office") return ownerWalk(OFFICE.stand, openOffice);
   if (kind === "shop") return ownerWalk(SHOP.stand, ()=>openStore("pet"));
   if (kind === "pharm") return ownerWalk(PHARM.stand, ()=>openStore("pharm"));
@@ -3457,6 +3505,7 @@ function tickOutdoor(dt){
   if (away) o.free = false;
   if (dog3) dog3.root.visible = !away;
   leash.visible = !away && !o.free;
+  tickPeople(dt);
   if (!away && (tickSwim(dt) || tickTrain(dt))) leash.visible = false;
   else if (!away && o.free) tickFreeDog(dt, o);
   else if (!away){
@@ -3509,7 +3558,7 @@ const STORES = {
   kem:    {ic: "🍦", n: "Tiệm kem", items: [{k: "dogice", ic: "🍨", n: "Kem sữa chua cho chó", p: 8, dog: S => { S.happy = Math.min(happyCap(S.sick), S.happy + 8); S.thirst = Math.max(0, (S.thirst || 0) - 10); }}, {k: "cone", ic: "🍦", n: "Kem ốc quế cho bạn", p: 5, me: 1}]},
   cafe:   {ic: "☕", n: "Tiệm cà phê", items: [{k: "water", ic: "💧", n: "Bát nước mát cho chó", p: 2, dog: S => { S.thirst = 0; }}, {k: "coffee", ic: "☕", n: "Cà phê sữa đá cho bạn", p: 6, me: 1}]},
   taphoa: {ic: "🧺", n: "Tạp hóa", items: [TREATS_ITEM, {k: "pate", ic: "🥫", n: "Hộp pate cho chó", p: 12, dog: S => { S.hunger = Math.max(0, S.hunger - 40); }}]},
-  fast:   {ic: "🌭", n: "Đồ ăn nhanh", items: [{k: "sausage", ic: "🌭", n: "Xúc xích cho chó", p: 10, dog: S => { S.hunger = Math.max(0, S.hunger - 25); S.happy = Math.min(happyCap(S.sick), S.happy + 5); }}, {k: "banhmi", ic: "🥖", n: "Bánh mì cho bạn", p: 8, me: 1}]}};
+  fast:   {ic: "🍩", n: "Bánh rán & đồ ăn nhanh", items: [{k: "donut", ic: "🍩", n: "Bánh rán cho bạn", p: 6, me: 1}, {k: "sausage", ic: "🌭", n: "Xúc xích cho chó", p: 10, dog: S => { S.hunger = Math.max(0, S.hunger - 25); S.happy = Math.min(happyCap(S.sick), S.happy + 5); }}, {k: "banhmi", ic: "🥖", n: "Bánh mì cho bạn", p: 8, me: 1}]}};
 let curStore = "pet";
 function openStore(k){
   curStore = STORES[k] ? k : "pet"; const st = STORES[curStore], el = $("shopSheet");
@@ -3556,7 +3605,7 @@ function openTraining(){
   if (!outdoor) return;
   if (dogAway()){ awayHint(); return; }
   const el = $("shopSheet"), cmds = Object.keys(COMMANDS).concat(Object.keys(LEARN_EXTRA));
-  el.innerHTML = `<h2>🎓 Vé huấn luyện</h2><div class="sub">Một buổi ở khu huấn luyện: chó chạy rào, nhảy, luồn cọc, chui ống, rồi học một lệnh. Mức đã học +12, Thể dục +10. Bạn đang có <b>🪙 ${coins()} xu</b>.</div>
+  el.innerHTML = `<h2>🎓 Vé huấn luyện</h2><div class="sub">Huấn luyện viên chuyên nghiệp ra đón, dắt chó vào khu huấn luyện. Bạn đứng ngoài chờ. Chó tập ${TRAIN_LAPS} vòng: chạy rào, nhảy, luồn cọc, chui ống (khoảng 2 phút). Mỗi buổi: lệnh đã chọn +${TRAIN_GAIN}, Thể dục +10. Bạn đang có <b>🪙 ${coins()} xu</b>.</div>
     <div class="row" style="margin-top:8px">${cmds.map(c => `<button class="btn ghost" data-c="${c}">${(COMMANDS[c] || {n: LEARN_EXTRA[c]}).n} · 🪙 ${TRAIN_PRICE}</button>`).join("")}</div>
     <div class="row" style="margin-top:12px"><button class="btn ghost" id="trClose">Đóng</button></div>`;
   el.querySelectorAll("[data-c]").forEach(b => b.onclick = ()=>buyTraining(b.dataset.c));
@@ -3568,27 +3617,83 @@ function buyTraining(cmd){
   if ((prof.stats.energy ?? 80) < ALERT.red){ toast("Chó mệt rồi, cho chó nghỉ đã nha"); return; }
   addCoins(-TRAIN_PRICE); $("ovShop").classList.remove("show"); persist();
   const o = outdoor; o.free = false; o.noFree = true; o.wander = null; if (o.swim) stopSwim(false);
-  hint(`🎟️ Đã mua vé. Đi tới khu huấn luyện...`, 2500);
-  o.path = oPath(o, TRAIN.spot); o.then = ()=>{ o.train = {cmd, i: 0}; dog.pos = oNearest({x: TRAIN.spot.x + 0.7, z: TRAIN.spot.z - 0.6}); bubble("Học nào! 🎓", 1400, true); updateOutBtns(); };
+  hint(`🎟️ Đã mua vé. Huấn luyện viên đang ra đón ${prof.dog.name}...`, 3000);
+  o.path = oPath(o, TRAIN.stand); o.then = ()=>{ const T = townPick.trainer; o.train = {cmd, phase: "fetch", i: 0, lap: 0, t0: tSec};
+    T.wp = [TRAIN_IN[0], {x: o.x + 0.9, z: o.z - 0.6}]; o.h = Math.atan2(TRAIN_IN[0].x - o.x, TRAIN_IN[0].z - o.z); updateOutBtns(); };
   if (!o.path.length){ const t = o.then; o.then = null; t(); }
 }
+function trMove(T, dt, sp = 1.3){   // huấn luyện viên đi theo các điểm trong T.wp; hết điểm thì trả về true
+  const w = T.wp[0]; if (!w){ T.moving = false; return true; }
+  const dx = w.x - T.x, dz = w.z - T.z, d = Math.hypot(dx, dz), st = sp*dt;
+  if (d <= st + 0.02){ T.x = w.x; T.z = w.z; T.wp.shift(); } else { T.x += dx/d*st; T.z += dz/d*st; }
+  if (d > 0.02) T.h = Math.atan2(dx, dz); T.moving = true; return !T.wp.length;
+}
+function personAnim(P, x, z, h, moving, dt){
+  P.phase = (P.phase || 0) + (moving ? dt*9 : 0);
+  P.root.position.set(x, -0.16 + (moving ? Math.abs(Math.sin(P.phase))*0.03 : 0), z); P.root.rotation.y = h;
+  for (const L of P.legs){ const a = moving ? Math.sin(P.phase + (L.s > 0 ? 0 : Math.PI))*0.45 : 0; L.leg.rotation.x = a; L.sh.position.z = 0.02 + Math.sin(a)*0.13; }
+  for (const A of P.arms) A.arm.rotation.x = moving ? -Math.sin(P.phase + (A.s > 0 ? 0 : Math.PI))*0.4 : 0;
+}
+function tickPeople(dt){   // huấn luyện viên đi lại, người bán trong quầy vẫy tay nhẹ
+  const T = townPick.trainer; if (!T) return;
+  if (!(outdoor && outdoor.train)){ if (T.wp.length) trMove(T, dt); else T.moving = false; }
+  personAnim(T, T.x, T.z, T.h, T.moving, dt);
+  for (const [k, v] of (townPick.vendors || []).entries()) for (const A of v.arms) A.arm.rotation.x = A.s > 0 ? -0.25 - Math.max(0, Math.sin(tSec*1.3 + k*1.7))*0.5 : 0;
+}
+function trainerLeash(on){
+  const T = townPick.trainer; T.leash.visible = on; if (!on) return;
+  const hand = new THREE.Vector3(T.x + Math.cos(T.h)*0.27 + Math.sin(T.h)*0.05, 0.27, T.z - Math.sin(T.h)*0.27 + Math.cos(T.h)*0.05);
+  const neck = dog3.topMark.getWorldPosition(new THREE.Vector3()); neck.y -= 0.12;
+  const mid = hand.clone().lerp(neck, 0.5); mid.y -= 0.12;
+  T.leash.geometry.setFromPoints([hand, mid, neck]); T.leash.geometry.attributes.position.needsUpdate = true;
+}
+function dogFollowTrainer(T){
+  const fx = Math.sin(T.h), fz = Math.cos(T.h), want = {x: T.x - fx*0.6 + fz*0.35, z: T.z - fz*0.6 - fx*0.35};
+  const d = Math.hypot(want.x - dog.pos.x, want.z - dog.pos.z);
+  if (d > 0.2){ dog.path = [want]; dog.then = null; dog.speed = d > 1.2 ? 2.2 : 1.4; const st = d > 1.2 ? "run" : "walk"; if (dog.state !== st){ dog.state = st; dog.until = 0; } }
+  else if (dog.state === "walk" || dog.state === "run"){ dog.path = []; setState("idle", 500); }
+}
 function tickTrain(dt){
-  const o = outdoor, tr = o.train; if (!tr) return false;
+  const o = outdoor, tr = o.train, T = townPick.trainer; if (!tr) return false;
+  if (tr.phase === "fetch"){   // huấn luyện viên ra tận chỗ chủ đứng; chó vẫn ở cạnh chủ
+    trainerLeash(false);
+    if (trMove(T, dt)){ tr.phase = "lead"; tr.led = true; T.wp = TRAIN_IN.slice(); sfx("chime");
+      hint(`Huấn luyện viên dắt ${prof.dog.name} vào khu huấn luyện. Bạn đứng ngoài chờ nha 👀`, 4000); }
+    else return false;
+  }
+  if (tr.phase === "lead" || tr.phase === "back"){
+    const done = trMove(T, dt, 1.2); dogFollowTrainer(T); trainerLeash(true);
+    if (done && tr.phase === "lead"){ tr.phase = "course"; tr.i = 0; T.wp = [{x: 47.5, z: -53}]; trainerLeash(false); bubble("Học nào! 🎓", 1400, true); hint(`Vòng 1/${TRAIN_LAPS}`, 1800); }
+    else if (done){ T.wp = [TRAIN_IN[0], TRAINER_HOME]; trainerLeash(false); finishTraining(); }
+    return true;
+  }
+  if (tr.phase === "pick"){   // tập xong: chó ngồi chờ, huấn luyện viên tới móc dây
+    if (trMove(T, dt)){ tr.phase = "back"; T.wp = [TRAIN_IN[1], TRAIN_IN[0], {x: o.x + 0.9, z: o.z - 0.6}]; }
+    else if (dog.state !== "sit"){ dog.path = []; setState("sit", 5000); }
+    return true;
+  }
+  // tập bài: huấn luyện viên đứng giữa sân, quay theo chó
+  if (T.wp.length) trMove(T, dt); else { T.moving = false; T.h = Math.atan2(dog.pos.x - T.x, dog.pos.z - T.z); }
   if (dog.jump) return true;
   const wp = TRAIN_COURSE[tr.i];
-  if (!wp){ finishTraining(); return true; }
+  if (!wp){
+    tr.lap++;
+    if (tr.lap < TRAIN_LAPS){ tr.i = 0; hint(`Vòng ${tr.lap + 1}/${TRAIN_LAPS}`, 1800); return true; }
+    tr.phase = "pick"; T.wp = [{x: dog.pos.x + 0.6, z: dog.pos.z + 0.5}]; dog.path = []; setState("sit", 5000); return true;
+  }
   if (wp.jump){ tr.i++; jumpTo({x: wp.x, z: wp.z}, -0.16, null); return true; }
   const d = Math.hypot(wp.x - dog.pos.x, wp.z - dog.pos.z);
   if (d < 0.18){ tr.i++; return true; }
   dog.path = [wp]; dog.then = null; dog.speed = 2.5; if (dog.state !== "run"){ dog.state = "run"; dog.until = 0; }
   return true;
 }
+function trainBusy(){ if (outdoor && outdoor.train){ hint(`Huấn luyện viên đang dạy ${prof.dog.name}. Đứng chờ một chút nha 🎓`, 2500); return true; } return false; }
 function finishTraining(){
-  const o = outdoor, tr = o.train, P = prof, S = P.stats; o.train = null;
-  P.skills[tr.cmd] = Math.min(100, (P.skills[tr.cmd] || 0) + 12); P.practiced[tr.cmd] = gameNow(P);
+  const o = outdoor, tr = o.train, P = prof, S = P.stats; o.train = null; o.lastTrain = {laps: tr.lap, sec: tSec - tr.t0, led: !!tr.led};
+  P.skills[tr.cmd] = Math.min(100, (P.skills[tr.cmd] || 0) + TRAIN_GAIN); P.practiced[tr.cmd] = gameNow(P);
   S.fit = Math.min(100, (S.fit ?? 50) + 10); S.happy = Math.min(happyCap(S.sick), S.happy + 6); S.energy = Math.max(0, (S.energy ?? 80) - 8); S.xp += 4; loved();
   dog.path = []; dog.faceCam = true; gesture("wiggle"); sfx("chime");
-  hint(`🎓 Xong buổi huấn luyện! ${(COMMANDS[tr.cmd] || {n: LEARN_EXTRA[tr.cmd]}).n}: +12. Thể dục +10`, 4000);
+  hint(`🎓 Huấn luyện viên trả ${P.dog.name} cho bạn. ${(COMMANDS[tr.cmd] || {n: LEARN_EXTRA[tr.cmd]}).n}: +${TRAIN_GAIN}. Thể dục +10`, 4500);
   persist(); showStats(4000); updateOutBtns();
 }
 
@@ -3659,7 +3764,7 @@ function useService(k, days, cmd){
 const PLACES = [
   {k: "home", ic: "🏠", n: "Nhà", at: () => doorOutside(), pin: {x: 0, z: 0}},
   {k: "park", ic: "🌳", n: "Công viên", at: () => ({x: 35, z: 3}), pin: {x: 41, z: -27}},
-  {k: "food", ic: "🍦", n: "Quầy kem, cà phê, ăn nhanh", at: () => ({x: 55, z: -5.4}), pin: {x: 55, z: -8}},
+  {k: "food", ic: "🍦", n: "Quầy kem, cà phê, bánh rán", at: () => ({x: 55, z: -5.4}), pin: {x: 55, z: -8}},
   {k: "train", ic: "🎓", n: "Khu huấn luyện", at: () => TRAIN.stand, pin: {x: 46, z: -53}},
   {k: "pool", ic: "🏊", n: "Hồ bơi cho chó", at: () => POOL.stand, pin: {x: 94, z: -9}},
   {k: "office", ic: "🏢", n: COMPANY, at: () => OFFICE.stand, pin: {x: OFFICE.x, z: OFFICE.z}},
@@ -3689,7 +3794,7 @@ function mapSVG(){
     ${KIOSKS.map(q => r(q.x - KW/2, q.x + KW/2, q.z - KD/2, q.z + KD/2, q.c, 1)).join("")}
     <text x="${X(-7)}" y="${Z(10.6)}" font-size="11" fill="#fff" font-weight="700">ĐƯỜNG 1</text>
     <text x="${X(26.4)}" y="${Z(-60)}" font-size="11" fill="#fff" font-weight="700" transform="rotate(-90 ${X(26.4)} ${Z(-60)})">ĐƯỜNG 2</text>
-    ${PLACES.map(pl => pin(pl.pin || pl.at(), pl.ic, pl.n.replace("CTY ", "").replace("Quầy kem, cà phê, ăn nhanh", "4 quầy ăn uống"), pl.k)).join("")}
+    ${PLACES.map(pl => pin(pl.pin || pl.at(), pl.ic, pl.n.replace("CTY ", "").replace("Quầy kem, cà phê, bánh rán", "4 quầy ăn uống"), pl.k)).join("")}
     <circle cx="${X(here.x)}" cy="${Z(here.z)}" r="7" fill="#E5533D" stroke="#fff" stroke-width="3"><animate attributeName="r" values="6;9;6" dur="1.2s" repeatCount="indefinite"/></circle>
   </svg>`;
 }
@@ -3706,6 +3811,7 @@ function openMap(){
 function travelTo(k){
   $("ovMap").classList.remove("show");
   const pl = PLACES.find(x => x.k === k); if (!pl) return;
+  if (trainBusy()) return;
   if (outdoor && outdoor.free && (k === "home" || !inParkArea(pl.at()))){ freeBlock(); return; }
   if (k === "home"){ if (outdoor) fade(()=>setOutdoor(false)); return; }
   const go = ()=>{
@@ -4973,8 +5079,14 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     prof.medsExtra = 0; openStore("pharm"); buyItem("meds"); ok("nhà thuốc: mua hộp thuốc", prof.medsExtra === 3); leaveStore(); prof.medsExtra = 0;
     travelTo("train"); prof.skills.sit = 10; prof.stats.energy = 90; c0 = coins(); buyTraining("sit");
     if (outdoor.then){ outdoor.path = []; const t = outdoor.then; outdoor.then = null; t(); }
-    for (let i = 0; i < 400 && outdoor.train; i++){ if (dog.jump){ const j = dog.jump; dog.jump = null; dog.pos = {x: j.tx, z: j.tz}; } else if (dog.path.length) dog.pos = {x: dog.path[0].x, z: dog.path[0].z}; tickTrain(0.016); }
-    ok("vé huấn luyện: trừ 20 xu, chạy hết bài (rào, cọc, ống chui) thì lệnh Ngồi +12", coins() === c0 - 20 && prof.skills.sit === 22 && !outdoor.train);
+    { const ox = outdoor.x, oz = outdoor.z; let ownerStill = true, tLeash = false;
+      for (let i = 0; i < 6000 && outdoor.train; i++){ if (dog.jump){ const j = dog.jump; dog.jump = null; dog.pos = {x: j.tx, z: j.tz}; } else if (dog.path.length) dog.pos = {x: dog.path[0].x, z: dog.path[0].z};
+        tickTrain(0.1); if (townPick.trainer.leash.visible) tLeash = true; if (Math.hypot(outdoor.x - ox, outdoor.z - oz) > 0.01) ownerStill = false; }
+      ok("vé huấn luyện: trừ 20 xu, học xong lệnh Ngồi +2 (tạm, chờ họp)", coins() === c0 - 20 && prof.skills.sit === 12 && !outdoor.train);
+      ok("huấn luyện: chủ đứng ngoài khu, huấn luyện viên dắt chó vào rồi trả về", ownerStill && tLeash && !!outdoor.lastTrain && outdoor.lastTrain.led && outdoor.z > TRAIN.z1);
+      ok("huấn luyện lâu gấp 5: tập đủ 5 vòng", !!outdoor.lastTrain && outdoor.lastTrain.laps === TRAIN_LAPS && TRAIN_LAPS === 5); }
+    ok("có người đứng bán trong 4 quầy và quầy vé", (townPick.vendors || []).length === 5);
+    ok("quầy bánh rán có món bánh rán", STORES.fast.items.some(it => it.k === "donut"));
     camPitch = PITCH_OUT[0]; updateCamera(1); ok("ngoài trời nghiêng được khoảng 120 độ, nhìn lên trời không chui xuống đất", PITCH_OUT[1] - PITCH_OUT[0] > 115*Math.PI/180 && camera.position.y >= 0.59); camPitch = 0.8;
     { const off = OCCL.find(o => o.obj.children.some(m => m.userData.kind === "office")); outdoor.x = OFFICE.x; outdoor.z = 13.6; dog.pos = {x: 40.6, z: 13.6};
       camera.position.set(OFFICE.x, 3, 27); updateOccluders(); const hid = !!off && !off.obj.visible;
@@ -5062,7 +5174,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   if (QS.get("hour")){ const d = new Date(); d.setHours(+QS.get("hour"), 0, 0, 0); p.clock = d.getTime(); }
   if (QS.get("tv")){ p.tv = +QS.get("tv"); applyDevices(); }
   if (QS.get("lamp")){ p.lamp = true; applyDevices(); }
-  if (QS.get("out")) setTimeout(()=>{ setOutdoor(true); const w = QS.get("walkto"); if (w){ const [x, z] = w.split(",").map(Number); outdoor.x = x; outdoor.z = z; dog.pos = {x: x + 0.6, z: z + 0.4}; } if (QS.get("lost")) { startLost(); prof.lost.stage = QS.get("lost"); refreshQuest(); } if (QS.get("ui") === "shop") openShop(); if (STORES[QS.get("ui")]) openStore(QS.get("ui")); if (QS.get("ui") === "train") openTraining(); if (QS.get("act") === "free") freeDog(); if (QS.get("act") === "train") buyTraining("sit"); if (QS.get("ui") === "office") openOffice(); if (QS.get("ui") === "map") openMap(); if (QS.get("act") === "swim") swim(); }, 200);
+  if (QS.get("out")) setTimeout(()=>{ setOutdoor(true); const w = QS.get("walkto"); if (w){ const [x, z] = w.split(",").map(Number); outdoor.x = x; outdoor.z = z; dog.pos = {x: x + 0.6, z: z + 0.4}; } if (QS.get("oyaw")){ camYaw = +QS.get("oyaw")*Math.PI/180; camPitch = +(QS.get("opitch") || 35)*Math.PI/180; camZoom = +(QS.get("ozoom") || 1); } if (QS.get("lost")) { startLost(); prof.lost.stage = QS.get("lost"); refreshQuest(); } if (QS.get("ui") === "shop") openShop(); if (STORES[QS.get("ui")]) openStore(QS.get("ui")); if (QS.get("ui") === "train") openTraining(); if (QS.get("act") === "free") freeDog(); if (QS.get("act") === "train") buyTraining("sit"); if (QS.get("act") === "train" && QS.get("trskip") && outdoor.then){ outdoor.path = []; const t0 = outdoor.then; outdoor.then = null; t0(); } if (QS.get("act") === "train" && QS.get("trskip") && outdoor.train){ const T = townPick.trainer, tr = outdoor.train; if (QS.get("trskip") === "lead"){ T.x = 46; T.z = -44.4; tr.phase = "lead"; tr.led = true; T.wp = TRAIN_IN.slice(1); dog.pos = {x: 46.4, z: -43.6}; } else { tr.phase = "course"; tr.i = 6; T.x = 47.5; T.z = -53; T.wp = []; dog.pos = {x: 45, z: -59.6}; } } if (QS.get("ui") === "office") openOffice(); if (QS.get("ui") === "map") openMap(); if (QS.get("act") === "swim") swim(); }, 200);
   if (QS.get("roomui")){ renderRoomSheet(); $("ovRoom").classList.add("show"); }
   if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,callName,()=>goChair(true),tapToy,openFoodMenu,closeFoodMenu,()=>feedBowl("bo",50),()=>startGnaw(),sayNo,()=>{prof.bladder=100;},()=>{ if(prof.messes.length) cleanMess(0); },openCloset,()=>$("ovCloset").classList.remove("show"),()=>{ petDog(); petDog(); },rubBelly,showInfo,showCard,()=>{resize();}];
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
