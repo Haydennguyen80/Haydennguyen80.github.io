@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['name', 'dog', 'lastSeen'])",
+        "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30" },
+        "dog": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30" },
+        "breed": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "lastSeen": { ".validate": "newData.isNumber()" },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

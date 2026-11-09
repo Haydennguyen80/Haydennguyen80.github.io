@@ -4331,6 +4331,54 @@ function runPreview(){
 /* =========================================================
    HỒ SƠ
    ========================================================= */
+/* =========================================================
+   CHƠI CÙNG BẠN BÈ: tài khoản Firebase (Sếp duyệt 09/11). Bước 2: đăng nhập bằng Google.
+   Bạn bè chỉ thấy tên nhân vật và tên chó, không thấy email.
+   ========================================================= */
+const FB_CONFIG = {apiKey: "AIzaSyBjkbtdqVoZQnoQe1vNv6X9DGMCvMwo9KM", authDomain: "poppy-830f5.firebaseapp.com",
+  databaseURL: "https://poppy-830f5-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "poppy-830f5",
+  storageBucket: "poppy-830f5.firebasestorage.app", messagingSenderId: "139697342936", appId: "1:139697342936:web:364866a67b6b03796b0aad"};
+const FB_VER = "10.12.2", FB_FLAG = "poppy.online";
+let fb = null, fbUser = null, fbLoading = null;
+function loadScript(src){ return new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = src; sc.onload = ok; sc.onerror = () => bad(new Error("không tải được " + src)); document.head.appendChild(sc); }); }
+function fbInit(){
+  if (fbLoading) return fbLoading;
+  fbLoading = (async () => {
+    for (const m of ["app", "auth", "database"]) await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${m}-compat.js`);
+    firebase.initializeApp(FB_CONFIG); fb = firebase;
+    fb.auth().getRedirectResult().catch(e => toast("Chưa đăng nhập được (" + (e.code || e.message) + ")"));
+    fb.auth().onAuthStateChanged(u => { fbUser = u; if (u) fbSaveMe(); renderAccount(); });
+    return fb;
+  })();
+  fbLoading.catch(() => { fbLoading = null; });
+  return fbLoading;
+}
+async function fbLogin(){
+  try {
+    await fbInit(); const prov = new fb.auth.GoogleAuthProvider(); prov.setCustomParameters({prompt: "select_account"});
+    try { await fb.auth().signInWithPopup(prov); }
+    catch(e){ if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment", "auth/cancelled-popup-request"].includes(e.code)) await fb.auth().signInWithRedirect(prov); else throw e; }
+    try { localStorage.setItem(FB_FLAG, "1"); } catch(e){}
+    toast("Đã đăng nhập ✅ Bạn bè sẽ thấy tên nhân vật của bạn, không thấy email", 4000);
+  } catch(e){ if (e.code !== "auth/popup-closed-by-user") toast("Chưa đăng nhập được (" + (e.code || e.message) + "). Thử lại nha", 4500); }
+}
+async function fbLogout(){ try { localStorage.removeItem(FB_FLAG); } catch(e){} if (fb) await fb.auth().signOut(); fbUser = null; renderAccount(); toast("Đã đăng xuất"); }
+function fbSaveMe(){
+  if (!fb || !fbUser || !prof) return;
+  fb.database().ref("users/" + fbUser.uid).set({name: String(prof.owner || "Bạn").slice(0, 30), dog: String(prof.dog.name).slice(0, 30), breed: String(prof.dog.breed).slice(0, 20), lastSeen: Date.now()})
+    .catch(e => console.warn("lưu hồ sơ trực tuyến:", e));
+}
+function renderAccount(){
+  const el = $("acctBox"); if (!el) return;
+  el.innerHTML = fbUser
+    ? `<div class="small">🌐 <b>Đã đăng nhập</b> để chơi cùng bạn bè. Bạn bè sẽ thấy: <b>${esc(prof ? prof.owner : "")}</b> và chó <b>${esc(prof ? prof.dog.name : "")}</b> (không thấy email).</div>
+       <div class="row" style="margin-top:8px"><button class="btn ghost" id="acOut">Đăng xuất</button></div>`
+    : `<div class="small">🌐 <b>Chơi cùng bạn bè</b>: đăng nhập để gặp bạn ở công viên. Bạn bè chỉ thấy tên nhân vật và tên chó, không thấy email.</div>
+       <div class="row" style="margin-top:8px"><button class="btn gold" id="acIn">Đăng nhập bằng Google</button></div>`;
+  const a = $("acIn"), b = $("acOut"); if (a) a.onclick = fbLogin; if (b) b.onclick = fbLogout;
+}
+try { if (localStorage.getItem(FB_FLAG) && !new URLSearchParams(location.search).get("selftest")) fbInit().catch(() => {}); } catch(e){}
+
 function showProfiles(){
   closeRing();
   const el = $("profilesSheet");
@@ -4343,7 +4391,9 @@ function showProfiles(){
       <button class="btn gold" id="pNew">+ Thêm chó mới</button>
       <button class="btn ghost" id="pImport">Mở bản sao</button>
       ${prof?`<button class="btn ghost" id="pClose">Đóng</button>`:""}
-    </div>`;
+    </div>
+    <div id="acctBox" style="margin-top:16px;padding-top:12px;border-top:2px dashed #E5DCC8"></div>`;
+  renderAccount();
   el.querySelectorAll("[data-id]").forEach(c=>c.onclick=()=>{ $("ovProfiles").classList.remove("show"); startProfile(c.dataset.id); });
   $("pNew").onclick=()=>{ $("ovProfiles").classList.remove("show"); openCreate(false); };
   $("pImport").onclick=()=>$("fileIn").click();
@@ -5166,6 +5216,8 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     ok("quầy và quầy vé không tự ẩn khi che tầm nhìn", townPick.kiosks.every(g => g.userData.keep && !OCCL.some(o => o.obj === g)));
     ok("thực đơn nhiều món: kem, cà phê, tạp hóa từ 12 món, bánh rán từ 8 món", STORES.kem.items.length >= 12 && STORES.cafe.items.length >= 12 && STORES.taphoa.items.length >= 12 && STORES.fast.items.length >= 8);
     openStore("cafe"); ok("quầy chia mục Cho chó và Cho bạn", $("shopSheet").innerText.includes("Cho chó") && $("shopSheet").innerText.includes("Cho bạn")); leaveStore();
+    showProfiles(); ok("hồ sơ có mục Chơi cùng bạn bè, nút Đăng nhập bằng Google", !!$("acIn") && $("acctBox").innerText.includes("không thấy email")); $("ovProfiles").classList.remove("show");
+    ok("cấu hình Firebase trỏ đúng máy chủ Singapore", FB_CONFIG.projectId === "poppy-830f5" && FB_CONFIG.databaseURL.includes("asia-southeast1"));
     ok("có người đứng bán trong 4 quầy và quầy vé", (townPick.vendors || []).length === 5);
     ok("quầy bánh rán có món bánh rán", STORES.fast.items.some(it => it.k === "donut"));
     camPitch = PITCH_OUT[0]; updateCamera(1); ok("ngoài trời nghiêng được khoảng 120 độ, nhìn lên trời không chui xuống đất", PITCH_OUT[1] - PITCH_OUT[0] > 115*Math.PI/180 && camera.position.y >= 0.59); camPitch = 0.8;
@@ -5255,7 +5307,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   if (QS.get("hour")){ const d = new Date(); d.setHours(+QS.get("hour"), 0, 0, 0); p.clock = d.getTime(); }
   if (QS.get("tv")){ p.tv = +QS.get("tv"); applyDevices(); }
   if (QS.get("lamp")){ p.lamp = true; applyDevices(); }
-  if (QS.get("out")) setTimeout(()=>{ setOutdoor(true); const w = QS.get("walkto"); if (w){ const [x, z] = w.split(",").map(Number); outdoor.x = x; outdoor.z = z; dog.pos = {x: x + 0.6, z: z + 0.4}; } if (QS.get("oyaw")){ camYaw = +QS.get("oyaw")*Math.PI/180; camPitch = +(QS.get("opitch") || 35)*Math.PI/180; camZoom = +(QS.get("ozoom") || 1); } if (QS.get("lost")) { startLost(); prof.lost.stage = QS.get("lost"); refreshQuest(); } if (QS.get("ui") === "shop") openShop(); if (STORES[QS.get("ui")]) openStore(QS.get("ui")); if (QS.get("ui") === "train") openTraining(); if (QS.get("act") === "free") freeDog(); if (QS.get("act") === "train") buyTraining("sit"); if (QS.get("act") === "train" && QS.get("trskip") && outdoor.then){ outdoor.path = []; const t0 = outdoor.then; outdoor.then = null; t0(); } if (QS.get("act") === "train" && QS.get("trskip") && outdoor.train){ const T = townPick.trainer, tr = outdoor.train; if (QS.get("trskip") === "lead"){ T.x = 46; T.z = -44.4; tr.phase = "lead"; tr.led = true; T.wp = TRAIN_IN.slice(1); dog.pos = {x: 46.4, z: -43.6}; } else { tr.phase = "course"; tr.i = 6; T.x = 47.5; T.z = -53; T.wp = []; dog.pos = {x: 45, z: -59.6}; } } if (QS.get("ui") === "office") openOffice(); if (QS.get("ui") === "map") openMap(); if (QS.get("ui") === "jobs") openJobs(); if (QS.get("act") === "swim") swim(); }, 200);
+  if (QS.get("out")) setTimeout(()=>{ setOutdoor(true); const w = QS.get("walkto"); if (w){ const [x, z] = w.split(",").map(Number); outdoor.x = x; outdoor.z = z; dog.pos = {x: x + 0.6, z: z + 0.4}; } if (QS.get("oyaw")){ camYaw = +QS.get("oyaw")*Math.PI/180; camPitch = +(QS.get("opitch") || 35)*Math.PI/180; camZoom = +(QS.get("ozoom") || 1); } if (QS.get("lost")) { startLost(); prof.lost.stage = QS.get("lost"); refreshQuest(); } if (QS.get("ui") === "shop") openShop(); if (STORES[QS.get("ui")]) openStore(QS.get("ui")); if (QS.get("ui") === "train") openTraining(); if (QS.get("act") === "free") freeDog(); if (QS.get("act") === "train") buyTraining("sit"); if (QS.get("act") === "train" && QS.get("trskip") && outdoor.then){ outdoor.path = []; const t0 = outdoor.then; outdoor.then = null; t0(); } if (QS.get("act") === "train" && QS.get("trskip") && outdoor.train){ const T = townPick.trainer, tr = outdoor.train; if (QS.get("trskip") === "lead"){ T.x = 46; T.z = -44.4; tr.phase = "lead"; tr.led = true; T.wp = TRAIN_IN.slice(1); dog.pos = {x: 46.4, z: -43.6}; } else { tr.phase = "course"; tr.i = 6; T.x = 47.5; T.z = -53; T.wp = []; dog.pos = {x: 45, z: -59.6}; } } if (QS.get("ui") === "office") openOffice(); if (QS.get("ui") === "map") openMap(); if (QS.get("ui") === "jobs") openJobs(); if (QS.get("ui") === "profiles") showProfiles(); if (QS.get("act") === "swim") swim(); }, 200);
   if (QS.get("roomui")){ renderRoomSheet(); $("ovRoom").classList.add("show"); }
   if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,callName,()=>goChair(true),tapToy,openFoodMenu,closeFoodMenu,()=>feedBowl("bo",50),()=>startGnaw(),sayNo,()=>{prof.bladder=100;},()=>{ if(prof.messes.length) cleanMess(0); },openCloset,()=>$("ovCloset").classList.remove("show"),()=>{ petDog(); petDog(); },rubBelly,showInfo,showCard,()=>{resize();}];
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
