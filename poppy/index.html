@@ -127,6 +127,11 @@ textarea{width:100%;min-height:70px;font-size:12px;border-radius:10px;border:2px
 #bedMenu .amt.sug{background:var(--c2)!important;color:var(--c1d);border-color:var(--c2)!important}
 #bedTag{position:absolute;transform:translate(-50%,-100%);background:#14505A;color:#FFF1D0;font-weight:800;font-size:13px;padding:4px 10px;border-radius:999px;pointer-events:none;display:none;white-space:nowrap;z-index:4}
 #bedTag.show{display:block}
+.volRow{display:grid;grid-template-columns:96px 1fr 46px;align-items:center;gap:8px;margin:6px 0;font-size:14px}
+.volRow input{width:100%;accent-color:#1E6F78}
+.volRow b{text-align:right;color:var(--c1d)}
+#btnFollow{position:absolute;right:12px;bottom:14px;display:none;background:#fff;color:var(--c1d);border:2px solid var(--c1);border-radius:999px;padding:8px 14px;font-weight:800;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:5}
+#btnFollow.show{display:block}
 #noBtn{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:none;background:#D23F2A;color:#fff;border:3px solid #fff;border-radius:999px;padding:12px 26px;font-weight:900;font-size:18px;box-shadow:0 6px 16px rgba(0,0,0,.3);z-index:6;animation:pulseNo 1s ease-in-out infinite}
 #noBtn.show{display:block}
 @keyframes pulseNo{50%{transform:translateX(-50%) scale(1.08)}}
@@ -173,6 +178,7 @@ textarea{width:100%;min-height:70px;font-size:12px;border-radius:10px;border:2px
     <div id="foodMenu"></div>
     <div id="bedMenu"></div>
     <div id="bedTag"></div>
+    <button id="btnFollow">🎯 Về chó</button>
     <button id="noBtn">🚫 Không!</button>
     <div id="bubble"></div>
     <div id="hint"></div>
@@ -833,7 +839,10 @@ const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 90);
 const CAM_TARGET = new THREE.Vector3(-0.15, 0.3, 0.15);
 // xoay 360 độ: góc ngang (yaw), góc nghiêng 25–70 độ (pitch), phóng to thu nhỏ (zoom)
 const PITCH_MIN = 25*Math.PI/180, PITCH_MAX = 70*Math.PI/180, ZOOM_MIN = 0.5, ZOOM_MAX = 1.45;
-let camYaw = 32*Math.PI/180, camPitch = Math.asin(0.62), camZoom = 1;
+let camYaw = 32*Math.PI/180, camPitch = Math.asin(0.62), camZoom = 1, camZoomDef = 1;
+// đã phóng to thì kéo một ngón để trượt khung nhìn (Sếp chọn 09/11); camFree: camera thôi bám theo chó
+let camFree = false, camFreeX = 0, camFreeZ = 0;
+const zoomedIn = () => camZoom < camZoomDef*0.88;
 const CAM_DIR = new THREE.Vector3();
 function camDir(){ const cp = Math.cos(camPitch); return CAM_DIR.set(Math.sin(camYaw)*cp, Math.sin(camPitch), Math.cos(camYaw)*cp); }
 let W = 360, H = 500;
@@ -1718,12 +1727,21 @@ let camDist = 6.4;
 const camLook = CAM_TARGET.clone();
 function updateCamera(k){
   const follow = QS && QS.get("close") ? 1 : 0.55;
-  const tx = lerp(CAM_TARGET.x, dog.pos.x, follow), tz = lerp(CAM_TARGET.z, dog.pos.z, follow);
-  camLook.x = lerp(camLook.x, clamp(tx, -1.6, 1.6), k); camLook.z = lerp(camLook.z, clamp(tz, -1.2, 1.4), k);
+  let tx = lerp(CAM_TARGET.x, dog.pos.x, follow), tz = lerp(CAM_TARGET.z, dog.pos.z, follow);
+  if (camFree && !zoomedIn()) setCamFree(false);   // thu nhỏ lại thì camera bám theo chó như cũ
+  if (camFree){ tx = camFreeX; tz = camFreeZ; }
+  camLook.x = lerp(camLook.x, camFree ? tx : clamp(tx, -1.6, 1.6), camFree ? Math.max(k, 0.35) : k); camLook.z = lerp(camLook.z, camFree ? tz : clamp(tz, -1.2, 1.4), camFree ? Math.max(k, 0.35) : k);
   camLook.y = QS && QS.get("close") ? 0.25 : CAM_TARGET.y;
   camera.position.copy(camLook).addScaledVector(camDir(), camDist*camZoom);
   camera.lookAt(camLook);
   updateWalls();
+}
+function setCamFree(on){ camFree = on; if (on){ camFreeX = camLook.x; camFreeZ = camLook.z; } const b = $("btnFollow"); if (b) b.classList.toggle("show", on); }
+function panBy(dx, dy){   // kéo ngón tay: cảnh chạy theo ngón tay, khung nhìn không ra khỏi phòng
+  if (!camFree) setCamFree(true);
+  const k = camDist*camZoom*0.0016, sy = Math.sin(camYaw), cy = Math.cos(camYaw);
+  camFreeX = clamp(camFreeX - (cy*dx + sy*dy)*k, -2.6, 2.6);
+  camFreeZ = clamp(camFreeZ - (-sy*dx + cy*dy)*k, -2.2, 2.2);
 }
 function project(v){ _a.copy(v).project(camera); return [(_a.x*0.5+0.5)*W, (-_a.y*0.5+0.5)*H]; }
 const toWorld = p => new THREE.Vector3(p.x, 0, p.z);
@@ -1799,7 +1817,7 @@ function bark(times=2){
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(0.35, t0+0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, t0+0.18);
-      o.connect(f); f.connect(g); g.connect(audioCtx.destination);
+      o.connect(f); f.connect(g); g.connect(audioBus(audioCtx));
       o.start(t0); o.stop(t0+0.2);
     }
   } catch(e){}
@@ -1807,9 +1825,30 @@ function bark(times=2){
 
 // ---- tiếng động (tự tạo bằng Web Audio, không cần tải file) ----
 let noiseBuf = null;
+// Sếp chọn 09/11: tăng âm lượng mặc định + 2 thanh chỉnh (Nhạc, Hiệu ứng) + sửa iPhone
+const FX_BOOST = 4, MUSIC_BOOST = 6;
+function volOf(k){ const v = save.settings && save.settings[k]; return v == null ? 1 : clamp(+v, 0, 1); }
+function audioBus(c, bus){
+  if (!c.fxBus){
+    const comp = c.createDynamicsCompressor();   // chặn đỉnh: tiếng to không bị rè
+    comp.threshold.value = -10; comp.knee.value = 6; comp.ratio.value = 8; comp.attack.value = 0.003; comp.release.value = 0.2;
+    comp.connect(c.destination);
+    c.fxBus = c.createGain(); c.fxBus.connect(comp);
+    c.musBus = c.createGain(); c.musBus.connect(comp);
+  }
+  c.fxBus.gain.value = FX_BOOST*volOf("volFx"); c.musBus.gain.value = MUSIC_BOOST*volOf("volMusic");
+  return bus === "mus" ? c.musBus : c.fxBus;
+}
 function ac(){
   if (!soundOn()) return null;
-  try { audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); return audioCtx; } catch(e){ return null; }
+  try { audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); audioBus(audioCtx); return audioCtx; } catch(e){ return null; }
+}
+// iPhone: khi gạt công tắc im lặng, Safari tắt tiếng Web Audio. Khai báo đây là âm thanh phát lại (như app nghe nhạc).
+let iosUnlocked = false;
+function unlockIOSAudio(){
+  if (iosUnlocked) return; iosUnlocked = true;
+  try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch(e){}
+  try { const a = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="); a.setAttribute("playsinline", ""); a.play().catch(()=>{}); } catch(e){}
 }
 function noiseSrc(c){
   if (!noiseBuf){ noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = noiseBuf.getChannelData(0); for (let i=0;i<d.length;i++) d[i] = Math.random()*2 - 1; }
@@ -1819,15 +1858,15 @@ function env(c, g, t0, a, peak, dur){ g.gain.setValueAtTime(0.0001, t0); g.gain.
 function noiseHit(c, t0, freq, q, peak, dur, type="bandpass"){
   const n = noiseSrc(c), f = c.createBiquadFilter(), g = c.createGain();
   f.type = type; f.frequency.value = freq; f.Q.value = q;
-  n.connect(f); f.connect(g); g.connect(c.destination); env(c, g, t0, Math.min(0.01, dur/3), peak, dur);
+  n.connect(f); f.connect(g); g.connect(audioBus(c)); env(c, g, t0, Math.min(0.01, dur/3), peak, dur);
   n.start(t0, Math.random()*0.5); n.stop(t0 + dur + 0.02);
 }
-function tone(c, t0, type, f0, f1, peak, dur, f2){
+function tone(c, t0, type, f0, f1, peak, dur, f2, bus){
   const o = c.createOscillator(), g = c.createGain();
   o.type = type; o.frequency.setValueAtTime(f0, t0);
   if (f2){ o.frequency.exponentialRampToValueAtTime(f1, t0 + dur*0.4); o.frequency.exponentialRampToValueAtTime(f2, t0 + dur); }
   else o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-  o.connect(g); g.connect(c.destination); env(c, g, t0, Math.min(0.02, dur/4), peak, dur);
+  o.connect(g); g.connect(audioBus(c, bus)); env(c, g, t0, Math.min(0.02, dur/4), peak, dur);
   o.start(t0); o.stop(t0 + dur + 0.02);
 }
 function sfx(name){
@@ -1837,11 +1876,11 @@ function sfx(name){
     case "snore": {      // hít vào khò... thở ra phì
       const n = noiseSrc(c), f = c.createBiquadFilter(), g = c.createGain(), o = c.createOscillator(), og = c.createGain(), lp = c.createBiquadFilter();
       f.type = "bandpass"; f.frequency.setValueAtTime(380, t); f.frequency.linearRampToValueAtTime(620, t+0.9); f.Q.value = 3;
-      n.connect(f); f.connect(g); g.connect(c.destination);
+      n.connect(f); f.connect(g); g.connect(audioBus(c));
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t+0.6); g.gain.exponentialRampToValueAtTime(0.0001, t+1.0);
       o.type = "sawtooth"; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(95, t+0.9);
       lp.type = "lowpass"; lp.frequency.value = 320;
-      o.connect(lp); lp.connect(og); og.connect(c.destination);
+      o.connect(lp); lp.connect(og); og.connect(audioBus(c));
       og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.11, t+0.55); og.gain.exponentialRampToValueAtTime(0.0001, t+1.0);
       n.start(t); n.stop(t+1.05); o.start(t); o.stop(t+1.05);
       noiseHit(c, t+1.35, 900, 0.8, 0.035, 0.7);   // thở ra "phù"
@@ -1867,7 +1906,7 @@ function sfx(name){
   }
 }
 // trình duyệt điện thoại chỉ cho phát tiếng sau lần chạm đầu tiên
-document.addEventListener("pointerdown", ()=>{ if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); else if (!audioCtx) ac(); }, {passive: true});
+document.addEventListener("pointerdown", ()=>{ unlockIOSAudio(); if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); else if (!audioCtx) ac(); }, {passive: true});
 function bubble(text, ms=2600, force=false){
   if (restMode && !force) return;
   bark(Math.random()<0.5 ? 1 : 2);
@@ -2822,7 +2861,7 @@ function tickDevices(){
   if (tSec - tvLast > 0.08){ tvLast = tSec; drawTV(tSec); }
   if (prof.tv === 2 && soundOn() && tSec > tvNoteAt){   // nhạc nhỏ, Bi tự soạn
     tvNoteAt = tSec + 0.32; const f = TV_SONG[tvNote++ % TV_SONG.length];
-    try { const c = ac(); if (c && f) tone(c, c.currentTime, "triangle", f, f, 0.035, 0.28); } catch(e){}
+    try { const c = ac(); if (c && f) tone(c, c.currentTime, "triangle", f, f, 0.035, 0.28, undefined, "mus"); } catch(e){}
   }
 }
 
@@ -2960,15 +2999,17 @@ canvas.addEventListener("pointerdown", e=>{
   if (ptrs.size > 2) return;
   const hit = pickAt(x, y);
   if (hit && hit.object.userData.kind === "dog"){ gest = {mode: "dog"}; tapAt(x, y, hit); return; }
-  gest = {mode: "pending", x0: x, y0: y, x, y};
+  gest = {mode: "pending", x0: x, y0: y, x, y, pan: e.button === 2};   // máy tính: kéo chuột phải cũng trượt
 });
+canvas.addEventListener("contextmenu", e => e.preventDefault());
 canvas.addEventListener("pointermove", e=>{
   const [x, y] = canvasXY(e);
   if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, {x, y});
   if (gest && gest.mode === "pinch"){ if (ptrs.size >= 2){ const [a, b] = [...ptrs.values()]; camZoom = clamp(gest.z0*gest.d0/(Math.hypot(a.x-b.x, a.y-b.y) || 1), ZOOM_MIN, ZOOM_MAX); } return; }
-  if (gest && (gest.mode === "pending" || gest.mode === "orbit")){
-    if (gest.mode === "pending" && Math.hypot(x - gest.x0, y - gest.y0) > 8){ gest.mode = "orbit"; closeRing(); closeFoodMenu(); }
+  if (gest && (gest.mode === "pending" || gest.mode === "orbit" || gest.mode === "pan")){
+    if (gest.mode === "pending" && Math.hypot(x - gest.x0, y - gest.y0) > 8){ gest.mode = gest.pan || zoomedIn() ? "pan" : "orbit"; closeRing(); closeFoodMenu(); closeBedMenu(); }
     if (gest.mode === "orbit"){ camYaw -= (x - gest.x)*0.009; camPitch = clamp(camPitch + (y - gest.y)*0.006, PITCH_MIN, PITCH_MAX); }
+    if (gest.mode === "pan") panBy(x - gest.x, y - gest.y);
     gest.x = x; gest.y = y; return;
   }
   if (!rubbing || !prof) return;
@@ -3125,14 +3166,30 @@ function renderCreate(){
     $("cBack").onclick=()=>{d.name=inp.value; d.step=2;renderCreate();};
     $("cDone").onclick=()=>{
       const v=inp.value.trim(); if(!v){ inp.focus(); toast("Bạn đặt tên cho chó trước nha"); return; }
-      const p = newProfile(d.owner, d.look, v, d.ownerLook);
+      d.name = v; d.step = 4; renderCreate();   // Sếp chọn 09/11: hồ sơ mới bắt buộc chọn phòng rồi mới vào game
+    };
+    inp.onkeydown = e=>{ if(e.key==="Enter") $("cDone").click(); };
+  } else if (d.step===4){
+    const P = PALETTES[d.palette ?? 0], L = LAYOUTS[d.layout ?? 0], ready = d.layout != null && d.palette != null;
+    el.innerHTML = `<h2>Chọn phòng cho ${esc(d.name)}</h2><div class="sub">Chọn 1 kiểu sắp xếp và 1 bộ màu (25 phòng). Sau này đổi được bằng nút 🏠 Phòng.</div>
+      <div class="opt-label">1. Kiểu sắp xếp</div>
+      <div class="roomGrid">${LAYOUTS.map((l, i) => `<div class="roomCard ${i===d.layout?"sel":""}" data-l="${i}">${roomSVG(l, P)}${l.n}</div>`).join("")}</div>
+      <div class="opt-label">2. Bộ màu</div>
+      <div class="roomGrid">${PALETTES.map((q, i) => `<div class="roomCard ${i===d.palette?"sel":""}" data-p="${i}">${roomSVG(L, q)}<div class="palDots">${[q.wall, q.sofa, q.rug, q.floor[0]].map(c=>`<i style="background:${c}"></i>`).join("")}</div>${q.n}</div>`).join("")}</div>
+      <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn ghost" id="cBack">Quay lại</button><button class="btn gold" id="cDone" ${ready ? "" : "disabled"}>${ready ? "🏠 Vào nhà" : "Chọn đủ 2 mục nha"}</button></div>`;
+    el.querySelectorAll("[data-l]").forEach(c => c.onclick = () => { d.layout = +c.dataset.l; renderCreate(); });
+    el.querySelectorAll("[data-p]").forEach(c => c.onclick = () => { d.palette = +c.dataset.p; renderCreate(); });
+    $("cBack").onclick = ()=>{ d.step = 3; renderCreate(); };
+    $("cDone").onclick = ()=>{
+      if (d.layout == null || d.palette == null){ toast("Chọn kiểu sắp xếp và bộ màu trước nha"); return; }
+      const v = d.name;
+      const p = newProfile(d.owner, d.look, v, d.ownerLook); p.room = {layout: d.layout, palette: d.palette};
       save.profiles.push(p); save.current = p.id; persist();
       cancelAnimationFrame(previewRAF);
       $("ovCreate").classList.remove("show");
       startProfile(p.id);
       setTimeout(()=>hint(`Bấm lên sàn để ra lệnh. Chạm ${v} để cưng. Chạm bát để cho ăn.`, 6000), 600);
     };
-    inp.onkeydown = e=>{ if(e.key==="Enter") $("cDone").click(); };
     runPreview3D();
   }
   const c = $("cCancel"); if (c) c.onclick = ()=>{ $("ovCreate").classList.remove("show"); if(!prof) showProfiles(); };
@@ -3230,7 +3287,7 @@ function buildProfileRoom(resetCam){
   const r = profRoom(prof);
   if (roomKey !== r.layout + "/" + r.palette) buildRoom(r.layout, r.palette);
   updatePhotos(); applyDevices();
-  if (resetCam){ camYaw = LAYOUTS[r.layout].cam*Math.PI/180; camPitch = Math.asin(0.62); camZoom = W < H ? 1.15 : 1; }
+  if (resetCam){ camYaw = LAYOUTS[r.layout].cam*Math.PI/180; camPitch = Math.asin(0.62); camZoomDef = camZoom = W < H ? 1.15 : 1; setCamFree(false); }
 }
 function applyRoomChoice(layout, palette){   // đổi phòng ngay trong lúc chơi
   if (!prof) return;
@@ -3503,11 +3560,14 @@ function showInfo(){
     ${Object.keys(LEARN_EXTRA).map(k=>statRow(LEARN_EXTRA[k], p.skills[k]||0, true)).join("")}
     ${statRow("Năng lượng", S.energy ?? 80, false, (S.energy ?? 80) < 25 ? "Mệt, cần ngủ" : "Khỏe")}
     <div class="small" style="margin-top:6px">Không có giờ cố định: các thanh tự giảm dần, bạn tự nhớ cho ăn, cho uống, cho chơi, cho tập và cho nghỉ. Thanh dưới 25% màu cam, dưới 15% màu đỏ, dưới 10% thì chó bị bệnh (không chết), chăm lại thì khỏi dần. Chơi càng nhiều, chó càng thông minh và thân thiết.<br>Bịch treat còn: <b>${p.treats.left}/${TREAT_BAG}</b> viên. Mức đã học chỉ tăng khi cho đồ ăn thưởng ngay sau lúc chó làm đúng.</div>
+    <div class="opt-label">🔊 Âm lượng</div>
+    <div class="volRow"><span>🎵 Nhạc</span><input type="range" min="0" max="100" step="5" id="iVolMusic" value="${Math.round(volOf("volMusic")*100)}"><b id="iVolMusicV">${Math.round(volOf("volMusic")*100)}%</b></div>
+    <div class="volRow"><span>🐶 Hiệu ứng</span><input type="range" min="0" max="100" step="5" id="iVolFx" value="${Math.round(volOf("volFx")*100)}"><b id="iVolFxV">${Math.round(volOf("volFx")*100)}%</b></div>
     <div class="row" style="margin-top:14px">
       <button class="btn" id="iExport">Lưu bản sao</button>
       <button class="btn ghost" id="iImport">Mở bản sao</button>
       <button class="btn ghost" id="iRename">Đổi tên</button>
-      <button class="btn ghost" id="iSound">${soundOn() ? "Tắt tiếng sủa" : "Bật tiếng sủa"}</button>
+      <button class="btn ghost" id="iSound">${soundOn() ? "🔇 Tắt âm thanh" : "🔊 Bật âm thanh"}</button>
       <button class="btn ghost" id="iClose">Đóng</button>
     </div>
     <div class="small" style="margin-top:8px">"Lưu bản sao" tải về một file chứa tất cả hồ sơ. Giữ file đó để không mất chó khi xóa dữ liệu trình duyệt hoặc đổi máy.</div>`;
@@ -3522,6 +3582,11 @@ function showInfo(){
     persist(); refreshTop(); showInfo(); toast("Đã đổi tên");
   };
   $("iSound").onclick = ()=>{ save.settings = save.settings || {}; save.settings.sound = !soundOn(); persist(); showInfo(); };
+  for (const [id, key, test] of [["iVolMusic", "volMusic", null], ["iVolFx", "volFx", "chime"]]){
+    const r = $(id);
+    r.oninput = ()=>{ save.settings = save.settings || {}; save.settings[key] = +r.value/100; $(id + "V").textContent = r.value + "%"; if (audioCtx) audioBus(audioCtx); };
+    r.onchange = ()=>{ persist(); if (test) sfx(test); else { const c = ac(); if (c) tone(c, c.currentTime + 0.01, "triangle", 659, 659, 0.035, 0.3, undefined, "mus"); } };
+  }
   $("ovInfo").classList.add("show");
 }
 function exportSave(){
@@ -3670,6 +3735,7 @@ $("stopPlay").onclick = ()=>stopPlay();
 $("tInfo").onclick = showInfo;
 $("tCard").onclick = showCard;
 $("btnProfiles").onclick = showProfiles;
+$("btnFollow").onclick = ()=>setCamFree(false);
 $("btnRoom").onclick = ()=>{ if (prof){ renderRoomSheet(); $("ovRoom").classList.add("show"); } };
 // sơ đồ nhìn từ trên xuống của một bố cục, tô theo bộ màu
 function roomSVG(L, P){
@@ -3910,6 +3976,21 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   prof.pets.recent = []; prof.pets.gained = 14.9; const b0 = prof.stats.bond; for (let i=0;i<5;i++){ prof.pets.recent=[]; petDog(); }
   ok("cưng tối đa 15 điểm mỗi ngày", prof.pets.gained <= 15.0001 && prof.stats.bond - b0 <= 0.11, prof.pets.gained.toFixed(2));
   ok("cưng chó thì vẫy đuôi mạnh", excitedUntil > performance.now());
+  // 3 lỗi Sếp báo 09/11: trượt khi phóng to, hồ sơ mới chọn phòng, âm thanh
+  { camFree = false; camZoom = camZoomDef; updateCamera(1); const lx = camLook.x, lz = camLook.z;
+    camZoom = camZoomDef*0.6; panBy(120, 0); for (let i = 0; i < 30; i++) updateCamera(0.2);
+    ok("đã phóng to: kéo một ngón thì khung nhìn trượt, nút Về chó hiện", camFree && Math.hypot(camLook.x - lx, camLook.z - lz) > 0.3 && $("btnFollow").classList.contains("show"));
+    camZoom = camZoomDef; updateCamera(1); ok("thu nhỏ lại thì camera bám theo chó như cũ", !camFree && !$("btnFollow").classList.contains("show"));
+    for (let i = 0; i < 400; i++) panBy(-50, -50); ok("trượt không ra khỏi phòng", Math.abs(camFreeX) <= 2.6 && Math.abs(camFreeZ) <= 2.2); setCamFree(false); }
+  { openCreate(false); draft.owner = "Bé"; draft.name = "Mực"; draft.step = 4; renderCreate();
+    ok("tạo hồ sơ: có bước chọn phòng, chưa chọn thì không vào được", $("createSheet").innerText.includes("Chọn phòng") && $("cDone").disabled);
+    const n0 = save.profiles.length; draft.layout = 2; draft.palette = 3; renderCreate(); $("cDone").click();
+    const np = save.profiles[save.profiles.length - 1];
+    ok("chọn xong: hồ sơ mới nhận đúng phòng đã chọn", save.profiles.length === n0 + 1 && np.room.layout === 2 && np.room.palette === 3 && roomKey === "2/3");
+    save.profiles.pop(); startProfile(p.id); }
+  { save.settings = {}; const c = ac(); ok("âm thanh: kênh hiệu ứng mặc định to gấp 4, có bộ chặn đỉnh", !!c && Math.abs(c.fxBus.gain.value - FX_BOOST) < 1e-6 && c.musBus.gain.value === MUSIC_BOOST);
+    save.settings.volFx = 0.5; audioBus(c); ok("thanh âm lượng Hiệu ứng 50% thì giảm một nửa", Math.abs(c.fxBus.gain.value - FX_BOOST/2) < 1e-6);
+    showInfo(); ok("Thông tin có 2 thanh âm lượng Nhạc và Hiệu ứng", !!$("iVolMusic") && !!$("iVolFx")); $("ovInfo").classList.remove("show"); save.settings = {}; audioBus(c); }
   // TV, đèn, nệm, chó ốm (Sếp góp ý 09/11)
   fresh(); prof.tv = 0; tapTV(); ok("bấm TV: bật kênh 1, màn hình đổi", prof.tv === 1 && room.tvScreen.material !== room.tvOffMat);
   tapTV(); tapTV(); tapTV(); ok("bấm TV 4 lần: qua 3 kênh rồi tắt", prof.tv === 0 && room.tvScreen.material === room.tvOffMat);
@@ -3977,7 +4058,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
   if (QS.get("side")) setInterval(()=>{ if (!dog.path.length){ dog.faceCam = false; dog.lookAt = {x: dog.pos.x + 1, z: dog.pos.z + 0.25}; } }, 150);   // chạy thử: nhìn chó từ bên hông
   const st = QS.get("state"); if (st) setTimeout(()=>{ if(st==="ball"||st==="bone") playToy(st); else if(st==="ring") openRing(W*0.42, H*0.74, {x: 0.4, z: 1.3}); else if(st==="walk") walkTo({x: 0.6, z: -1.4}, false); else if(st==="chair") goChair(true); else if(st==="call") callName(); else if(st==="sofa") goPerch("sofa", true); else if(st==="belly"){ petDog(); setTimeout(petDog, 300); setInterval(()=>{ if (dog.state==="belly") rubBelly(); }, 600); } else if(st==="stats") showStats(600000); else if(st==="potty"){ prof.skills.potty = +(QS.get("skill")||0); prof.bladder = 100; } else if(st==="mess"){ prof.messes = [{x:0.6,z:1.0,t:0},{x:-0.6,z:1.3,t:gameNow(prof)}]; buildMesses(); } else if(st==="gnaw") startGnaw(QS.get("spot")||"sofa"); else if(st==="marks"){ prof.marks = {sofa: 7, table: 4, cab: 2}; buildMarks(); } else if(st==="bedmenu") openBedMenu(); else if(st==="rest") startRest(); else if(st==="sleepbed") toggleRest(); else if(st==="food") openFoodMenu(); else if(st==="closet") openCloset(); else if(st==="info") showInfo(); else if(st==="card") showCard(); else if(st.startsWith("g_")){ const gn = st.slice(2); const again = ()=>gesture(gn, ()=>setTimeout(again, 400), {dir: 1}); dog.faceCam = true; again(); } else if(st==="dream"){ toggleRest(); } else setState(st, 600000); }, 300);
-} else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); if (QS.get("coat")) draft.look.coat=+QS.get("coat"); if (QS.get("cols")) QS.get("cols").split(",").forEach(p=>{ const [k,v]=p.split(":"); draft.look.colors[k]="#"+v; }); if (QS.get("reg")) draft.region=QS.get("reg"); if (QS.get("hair")) draft.ownerLook.hair=QS.get("hair"); if (QS.get("shirt")) draft.ownerLook.shirt="#"+QS.get("shirt"); renderCreate();
+} else if (QS.get("createStep")){ persist = ()=>{}; openCreate(true); draft.owner="Ryan"; draft.look.breed=QS.get("breed")||"pom"; const BB=BREEDS[draft.look.breed]; draft.look.ear=BB.ears[0][0]; draft.look.tail=BB.tails[0][0]; draft.step=+QS.get("createStep"); draft.name = draft.name || "Bông"; if (QS.get("coat")) draft.look.coat=+QS.get("coat"); if (QS.get("cols")) QS.get("cols").split(",").forEach(p=>{ const [k,v]=p.split(":"); draft.look.colors[k]="#"+v; }); if (QS.get("reg")) draft.region=QS.get("reg"); if (QS.get("hair")) draft.ownerLook.hair=QS.get("hair"); if (QS.get("shirt")) draft.ownerLook.shirt="#"+QS.get("shirt"); renderCreate();
 } else if (save.profiles.length === 0) openCreate(true);
 else {
   const id = save.current && save.profiles.some(p=>p.id===save.current) ? save.current : save.profiles[0].id;
