@@ -2627,7 +2627,7 @@ function frame(now){
   if (play) $("stopPlayTime").textContent = fmtTime(performance.now() - play.start);
 
   prof.resting = dog.state === "sleep";
-  tickRest(dt); tickDevices(); tickOutdoor(dt); tickAway();
+  tickRest(dt); tickDevices(); tickOutdoor(dt); tickAway(); netTick(dt);
   tickStats(); tickMesses();
   liveApply = true; applyTime(prof, Date.now()); liveApply = false;
   if (prof.messes.length !== messMeshes.length) buildMesses();
@@ -3437,6 +3437,7 @@ function tapOutdoor(x, y, hit){
   const kind = hit ? hit.object.userData.kind : null;
   closeRing();
   if (trainBusy()) return;
+  if (kind === "peer") return showPeer(hit.object.userData.uid);
   if (kind === "office") return ownerWalk(OFFICE.stand, openOffice);
   if (kind === "shop") return ownerWalk(SHOP.stand, ()=>openStore("pet"));
   if (kind === "pharm") return ownerWalk(PHARM.stand, ()=>openStore("pharm"));
@@ -4362,7 +4363,7 @@ async function fbLogin(){
     toast("Đã đăng nhập ✅ Bạn bè sẽ thấy tên nhân vật của bạn, không thấy email", 4000);
   } catch(e){ if (e.code !== "auth/popup-closed-by-user") toast("Chưa đăng nhập được (" + (e.code || e.message) + "). Thử lại nha", 4500); }
 }
-async function fbLogout(){ try { localStorage.removeItem(FB_FLAG); } catch(e){} if (fb) await fb.auth().signOut(); fbUser = null; renderAccount(); toast("Đã đăng xuất"); }
+async function fbLogout(){ try { localStorage.removeItem(FB_FLAG); } catch(e){} if (NET.joined) netLeave(); if (fb) await fb.auth().signOut(); fbUser = null; renderAccount(); toast("Đã đăng xuất"); }
 function fbSaveMe(){
   if (!fb || !fbUser || !prof) return;
   fb.database().ref("users/" + fbUser.uid).set({name: String(prof.owner || "Bạn").slice(0, 30), dog: String(prof.dog.name).slice(0, 30), breed: String(prof.dog.breed).slice(0, 20), lastSeen: Date.now()})
@@ -4378,6 +4379,88 @@ function renderAccount(){
   const a = $("acIn"), b = $("acOut"); if (a) a.onclick = fbLogin; if (b) b.onclick = fbLogout;
 }
 try { if (localStorage.getItem(FB_FLAG) && !new URLSearchParams(location.search).get("selftest")) fbInit().catch(() => {}); } catch(e){}
+
+/* ---------- BƯỚC 3: thấy nhau trong công viên ----------
+   Đã đăng nhập và đang ở trong công viên: gửi vị trí của mình (chủ + chó) lên park/<uid>, nhận vị trí của người khác.
+   Ra khỏi công viên, về nhà, đăng xuất, tắt game hay mất mạng: tự rút khỏi danh sách (onDisconnect). */
+const NET_SEND_MS = 300, NET_BEAT_MS = 10000, NET_STALE_MS = 45000;
+const NET = {joined: false, ref: null, list: null, lastSend: 0, last: null, peers: {}};
+function myParkData(){
+  const P = prof, o = outdoor, L = Object.assign({}, OWNER_DEFAULT, P.ownerLook || {}), r2 = v => Math.round(v*100)/100;
+  return {name: String(P.owner || "Bạn").slice(0, 30), dog: String(P.dog.name).slice(0, 30), breed: String(P.dog.breed).slice(0, 20),
+    coat: +P.dog.coat || 0, ear: String(P.dog.ear || "").slice(0, 20), tail: String(P.dog.tail || "").slice(0, 20), eye: +P.dog.eye || 0,
+    hair: String(L.hair || "ngan").slice(0, 20), shirt: String(L.shirt || "#4C8FE0").slice(0, 10),
+    x: r2(o.x), z: r2(o.z), h: r2(o.h || 0), dx: r2(dog.pos.x), dz: r2(dog.pos.z), t: Date.now()};
+}
+function netWant(){ return !!(fb && fbUser && prof && outdoor && inParkArea(outdoor) && !dogAway()); }
+function netJoin(){
+  NET.joined = true; NET.ref = fb.database().ref("park/" + fbUser.uid); NET.ref.onDisconnect().remove();
+  NET.list = fb.database().ref("park");
+  NET.list.on("child_added", sn => { if (sn.key !== fbUser.uid) peerUpsert(sn.key, sn.val()); });
+  NET.list.on("child_changed", sn => { if (sn.key !== fbUser.uid) peerUpsert(sn.key, sn.val()); });
+  NET.list.on("child_removed", sn => peerRemove(sn.key));
+  NET.lastSend = 0;
+}
+function netLeave(){
+  if (NET.ref){ NET.ref.remove().catch(()=>{}); NET.ref.onDisconnect().cancel(); }
+  if (NET.list) NET.list.off();
+  NET.joined = false; NET.ref = null; NET.list = null; NET.last = null;
+  for (const id of Object.keys(NET.peers)) peerRemove(id);
+}
+function netTick(dt){
+  const want = netWant();
+  if (want && !NET.joined) netJoin(); else if (!want && NET.joined) netLeave();
+  if (NET.joined){
+    const now = Date.now(), d = myParkData(), L = NET.last;
+    const moved = !L || Math.hypot(d.x - L.x, d.z - L.z) > 0.08 || Math.hypot(d.dx - L.dx, d.dz - L.dz) > 0.08;
+    if ((moved && now - NET.lastSend > NET_SEND_MS) || now - NET.lastSend > NET_BEAT_MS){ NET.lastSend = now; NET.last = d; NET.ref.set(d).catch(e => console.warn("gửi vị trí:", e)); }
+  }
+  tickPeers(dt);
+}
+function nameTag(text){
+  const tex = canvasTex(512, 96, (g, w, h) => { g.fillStyle = "rgba(255,255,255,0.92)"; const r = 40; g.beginPath(); g.roundRect ? g.roundRect(4, 8, w - 8, h - 16, r) : g.rect(4, 8, w - 8, h - 16); g.fill();
+    g.fillStyle = "#145060"; let fs = 44; g.font = `800 ${fs}px 'Baloo 2', Nunito, sans-serif`; const tw = g.measureText(text).width; if (tw > w*0.9){ fs = Math.floor(fs*w*0.9/tw); g.font = `800 ${fs}px 'Baloo 2', Nunito, sans-serif`; }
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, w/2, h/2 + 2); });
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: tex, depthTest: false, transparent: true})); sp.scale.set(2.2, 0.41, 1); sp.renderOrder = 8; return sp;
+}
+function peerUpsert(id, v){
+  if (!v || typeof v.x !== "number" || !BREEDS[v.breed]) return;
+  let P = NET.peers[id];
+  if (!P){
+    const own = buildOwner3D({hair: v.hair, shirt: /^#[0-9A-Fa-f]{3,8}$/.test(v.shirt || "") ? v.shirt : "#4C8FE0"}); own.root.scale.setScalar(1.3); scene.add(own.root);
+    const d = buildDog3D({breed: v.breed, coat: v.coat|0, ear: v.ear, tail: v.tail, eye: v.eye|0, colors: {}}, {preview: true}); scene.add(d.root);
+    const tag = nameTag(`${v.name} · 🐶 ${v.dog}`); scene.add(tag);
+    const picks = []; for (const root of [own.root, d.root]) root.traverse(m => { if (m.isMesh){ m.userData.kind = "peer"; m.userData.uid = id; pickables.push(m); picks.push(m); } });
+    P = NET.peers[id] = {own, d, tag, picks, cur: {x: v.x, z: v.z, h: v.h || 0, dx: v.dx, dz: v.dz, dh: 0}, moving: false};
+  }
+  P.v = v;
+}
+function peerRemove(id){
+  const P = NET.peers[id]; if (!P) return;
+  for (const o of [P.own.root, P.d.root, P.tag]) scene.remove(o);
+  for (const m of P.picks){ const i = pickables.indexOf(m); if (i >= 0) pickables.splice(i, 1); }
+  delete NET.peers[id];
+}
+function tickPeers(dt){
+  const now = Date.now();
+  for (const [id, P] of Object.entries(NET.peers)){
+    const v = P.v, c = P.cur, show = !!outdoor && now - v.t < NET_STALE_MS;
+    P.own.root.visible = P.d.root.visible = P.tag.visible = show; if (!show) continue;
+    const k = Math.min(1, dt*8), ox = c.x, odx = c.dx, odz = c.dz;
+    c.x += (v.x - c.x)*k; c.z += (v.z - c.z)*k; c.dx += (v.dx - c.dx)*k; c.dz += (v.dz - c.dz)*k;
+    let dh = (v.h || 0) - c.h; while (dh > Math.PI) dh -= 2*Math.PI; while (dh < -Math.PI) dh += 2*Math.PI; c.h += dh*k;
+    const mv = Math.hypot(v.x - c.x, v.z - c.z) > 0.05, dmv = Math.hypot(c.dx - odx, c.dz - odz) > 0.002;
+    if (dmv) c.dh = Math.atan2(c.dx - odx, c.dz - odz);
+    personAnim(P.own, c.x, c.z, c.h, mv, dt);
+    P.d.root.position.set(c.dx, -0.16 + (dmv ? Math.abs(Math.sin(tSec*12))*0.02 : 0), c.dz); P.d.root.rotation.y = c.dh;
+    updateDog3D(poseFor(dmv ? "stand" : "sit", P.d.B), tSec, P.d);
+    P.tag.position.set(c.x, -0.16 + 1.75, c.z);
+  }
+}
+function showPeer(id){
+  const P = NET.peers[id]; if (!P) return;
+  toast(`👋 ${P.v.name} và chó ${P.v.dog} đang chơi ở công viên. Kết bạn: sắp có (bước 4)`, 4000);
+}
 
 function showProfiles(){
   closeRing();
@@ -4429,6 +4512,7 @@ function startProfile(id){
   toy = null; trainWin = null; bowlFull = false;
   buildProfileRoom(true);
   buildDog3D(prof.dog);
+  if (fbUser) fbSaveMe();   // đổi hồ sơ: bạn bè thấy đúng tên nhân vật và chó đang chơi
   for (const m of prof.messes){ const f = nearestFree(m); m.x = f.x; m.z = f.z; }
   dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0; dog.onChair = false; dog.jump = null; dog.pendingPerch = null;
   dog.pose = poseFor("stand", BREEDS[prof.dog.breed]); setState("happy", 1500); dog.next = 0; excite(8000);
@@ -5218,6 +5302,17 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     openStore("cafe"); ok("quầy chia mục Cho chó và Cho bạn", $("shopSheet").innerText.includes("Cho chó") && $("shopSheet").innerText.includes("Cho bạn")); leaveStore();
     showProfiles(); ok("hồ sơ có mục Chơi cùng bạn bè, nút Đăng nhập bằng Google", !!$("acIn") && $("acctBox").innerText.includes("không thấy email")); $("ovProfiles").classList.remove("show");
     ok("cấu hình Firebase trỏ đúng máy chủ Singapore", FB_CONFIG.projectId === "poppy-830f5" && FB_CONFIG.databaseURL.includes("asia-southeast1"));
+    { travelTo("park"); const t = Date.now(), base = {name: "Bạn A", dog: "Mực", breed: "pom", coat: 0, ear: "", tail: "", eye: 0, hair: "ngan", shirt: "#E5533D", h: 0, t};
+      peerUpsert("t1", Object.assign({}, base, {x: outdoor.x + 2, z: outdoor.z, dx: outdoor.x + 2.5, dz: outdoor.z}));
+      tickPeers(0.5); const P = NET.peers.t1;
+      ok("người chơi khác hiện trong công viên: người, chó, bảng tên", !!P && P.own.root.visible && P.d.root.visible && P.tag.visible && P.picks.length > 0);
+      peerUpsert("t1", Object.assign({}, base, {x: outdoor.x + 4, z: outdoor.z, dx: outdoor.x + 4.5, dz: outdoor.z, t: Date.now()})); for (let i = 0; i < 40; i++) tickPeers(0.05);
+      ok("người chơi khác đi tới chỗ mới thì nhân vật đi theo", Math.abs(NET.peers.t1.cur.x - (outdoor.x + 4)) < 0.2);
+      peerUpsert("t1", Object.assign({}, base, {x: outdoor.x + 4, z: outdoor.z, dx: outdoor.x + 4.5, dz: outdoor.z, t: Date.now() - 60000})); tickPeers(0.05);
+      ok("người chơi mất mạng lâu (quá 45 giây) thì ẩn đi", !NET.peers.t1.own.root.visible);
+      const n0 = pickables.length; peerRemove("t1"); ok("người chơi rời công viên thì xóa khỏi màn hình", !NET.peers.t1 && pickables.length < n0);
+      const d = myParkData(); ok("dữ liệu gửi đi chỉ có tên nhân vật, chó, vị trí (không email)", d.name && d.dog && typeof d.x === "number" && !JSON.stringify(d).includes("@"));
+      ok("chưa đăng nhập thì không gửi vị trí", !netWant()); }
     ok("có người đứng bán trong 4 quầy và quầy vé", (townPick.vendors || []).length === 5);
     ok("quầy bánh rán có món bánh rán", STORES.fast.items.some(it => it.k === "donut"));
     camPitch = PITCH_OUT[0]; updateCamera(1); ok("ngoài trời nghiêng được khoảng 120 độ, nhìn lên trời không chui xuống đất", PITCH_OUT[1] - PITCH_OUT[0] > 115*Math.PI/180 && camera.position.y >= 0.59); camPitch = 0.8;
@@ -5307,7 +5402,9 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   if (QS.get("hour")){ const d = new Date(); d.setHours(+QS.get("hour"), 0, 0, 0); p.clock = d.getTime(); }
   if (QS.get("tv")){ p.tv = +QS.get("tv"); applyDevices(); }
   if (QS.get("lamp")){ p.lamp = true; applyDevices(); }
-  if (QS.get("out")) setTimeout(()=>{ setOutdoor(true); const w = QS.get("walkto"); if (w){ const [x, z] = w.split(",").map(Number); outdoor.x = x; outdoor.z = z; dog.pos = {x: x + 0.6, z: z + 0.4}; } if (QS.get("oyaw")){ camYaw = +QS.get("oyaw")*Math.PI/180; camPitch = +(QS.get("opitch") || 35)*Math.PI/180; camZoom = +(QS.get("ozoom") || 1); } if (QS.get("lost")) { startLost(); prof.lost.stage = QS.get("lost"); refreshQuest(); } if (QS.get("ui") === "shop") openShop(); if (STORES[QS.get("ui")]) openStore(QS.get("ui")); if (QS.get("ui") === "train") openTraining(); if (QS.get("act") === "free") freeDog(); if (QS.get("act") === "train") buyTraining("sit"); if (QS.get("act") === "train" && QS.get("trskip") && outdoor.then){ outdoor.path = []; const t0 = outdoor.then; outdoor.then = null; t0(); } if (QS.get("act") === "train" && QS.get("trskip") && outdoor.train){ const T = townPick.trainer, tr = outdoor.train; if (QS.get("trskip") === "lead"){ T.x = 46; T.z = -44.4; tr.phase = "lead"; tr.led = true; T.wp = TRAIN_IN.slice(1); dog.pos = {x: 46.4, z: -43.6}; } else { tr.phase = "course"; tr.i = 6; T.x = 47.5; T.z = -53; T.wp = []; dog.pos = {x: 45, z: -59.6}; } } if (QS.get("ui") === "office") openOffice(); if (QS.get("ui") === "map") openMap(); if (QS.get("ui") === "jobs") openJobs(); if (QS.get("ui") === "profiles") showProfiles(); if (QS.get("act") === "swim") swim(); }, 200);
+  if (QS.get("out")) setTimeout(()=>{ setOutdoor(true); const w = QS.get("walkto"); if (w){ const [x, z] = w.split(",").map(Number); outdoor.x = x; outdoor.z = z; dog.pos = {x: x + 0.6, z: z + 0.4}; } if (QS.get("oyaw")){ camYaw = +QS.get("oyaw")*Math.PI/180; camPitch = +(QS.get("opitch") || 35)*Math.PI/180; camZoom = +(QS.get("ozoom") || 1); } if (QS.get("lost")) { startLost(); prof.lost.stage = QS.get("lost"); refreshQuest(); } if (QS.get("ui") === "shop") openShop(); if (STORES[QS.get("ui")]) openStore(QS.get("ui")); if (QS.get("ui") === "train") openTraining(); if (QS.get("act") === "free") freeDog(); if (QS.get("act") === "train") buyTraining("sit"); if (QS.get("act") === "train" && QS.get("trskip") && outdoor.then){ outdoor.path = []; const t0 = outdoor.then; outdoor.then = null; t0(); } if (QS.get("act") === "train" && QS.get("trskip") && outdoor.train){ const T = townPick.trainer, tr = outdoor.train; if (QS.get("trskip") === "lead"){ T.x = 46; T.z = -44.4; tr.phase = "lead"; tr.led = true; T.wp = TRAIN_IN.slice(1); dog.pos = {x: 46.4, z: -43.6}; } else { tr.phase = "course"; tr.i = 6; T.x = 47.5; T.z = -53; T.wp = []; dog.pos = {x: 45, z: -59.6}; } } if (QS.get("ui") === "office") openOffice(); if (QS.get("ui") === "map") openMap(); if (QS.get("ui") === "jobs") openJobs(); if (QS.get("ui") === "profiles") showProfiles();
+    if (QS.get("fakepeers")){ const t = Date.now(); peerUpsert("demo1", {name: "Aiden", dog: "Bo", breed: "dachshund", coat: 1, ear: "", tail: "", eye: 0, hair: "xoan", shirt: "#E5533D", x: outdoor.x + 2.2, z: outdoor.z - 1.6, h: -0.6, dx: outdoor.x + 2.8, dz: outdoor.z - 1.0, t});
+      peerUpsert("demo2", {name: "Ryan", dog: "Mochi", breed: "pom", coat: 0, ear: "", tail: "", eye: 1, hair: "ngan", shirt: "#7DBB6E", x: outdoor.x - 2.4, z: outdoor.z - 2.2, h: 0.5, dx: outdoor.x - 1.8, dz: outdoor.z - 2.6, t}); } if (QS.get("act") === "swim") swim(); }, 200);
   if (QS.get("roomui")){ renderRoomSheet(); $("ovRoom").classList.add("show"); }
   if (QS.get("soak")){ let n=0; const acts=[petDog,()=>doCommand("come", randomFreePoint()),()=>doCommand("lie", randomFreePoint()),()=>doCommand("sit", randomFreePoint()),()=>openRing(rnd(50,W-50), H*0.7, randomFreePoint()),()=>stopPlay(),()=>playToy("ball"),()=>playToy("bone"),drinkWater,exercise,()=>doCommand("sit"),()=>doCommand("stand"),()=>doCommand("come"),giveTreat,feedBowl,()=>playToy("ball"),()=>playToy("bone"),toggleRest,()=>openRing(W/2,H/2,randomFreePoint()),closeRing,callName,()=>goChair(true),tapToy,openFoodMenu,closeFoodMenu,()=>feedBowl("bo",50),()=>startGnaw(),sayNo,()=>{prof.bladder=100;},()=>{ if(prof.messes.length) cleanMess(0); },openCloset,()=>$("ovCloset").classList.remove("show"),()=>{ petDog(); petDog(); },rubBelly,showInfo,showCard,()=>{resize();}];
     const iv=setInterval(()=>{ try{ pick(acts)(); document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); n++; document.title="soak "+n+" state="+dog.state+" pos="+dog.pos.x.toFixed(2)+","+dog.pos.z.toFixed(2)+" nan="+(isNaN(dog.pos.x)||isNaN(dog.pos.z))+" free="+isFree(dog.pos)+" inroom="+(dog.pos.x>ROOM.x0&&dog.pos.x<ROOM.x1&&dog.pos.z>ROOM.z0&&dog.pos.z<ROOM.z1); }catch(e){ document.title="SOAKERR "+e.message; clearInterval(iv);} }, 700); }
