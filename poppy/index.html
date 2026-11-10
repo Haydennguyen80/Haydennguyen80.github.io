@@ -198,6 +198,7 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
     <span class="badge" id="tbCoins">🪙 100</span>
     <span class="badge" id="tbLevel">Cấp 1</span>
     <button class="tb-btn" id="btnFriends" style="display:none" title="Bạn bè">👥</button>
+    <button class="tb-btn" id="btnBedroom">🛏️ P. ngủ</button>
     <button class="tb-btn" id="btnRoom">🏠 Phòng</button>
     <button class="tb-btn" id="btnProfiles">Đổi hồ sơ</button>
   </div>
@@ -1717,11 +1718,12 @@ const camLook = CAM_TARGET.clone();
 function updateCamera(k){
   const follow = QS && QS.get("close") ? 1 : 0.55;
   let tx = lerp(CAM_TARGET.x, dog.pos.x, follow), tz = lerp(CAM_TARGET.z, dog.pos.z, follow);
-  if (camFree && !zoomedIn()) setCamFree(false);   // thu nhỏ lại thì camera bám theo chó như cũ
+  if (camFree && !zoomedIn() && !inBR) setCamFree(false);   // thu nhỏ lại thì camera bám theo chó như cũ
   if (camFree){ tx = camFreeX; tz = camFreeZ; }
   if (outdoor){ tx = outdoor.x; tz = outdoor.z; if (outdoor.train && outdoor.train.phase !== "fetch"){ tx = dog.pos.x; tz = dog.pos.z; } }   // đang huấn luyện: camera nhìn theo chó
   if (ride){ tx = ride.stage === "go" ? Math.max(-6, ride.car.x) : 0.4; tz = 6.4; }   // xe đón: nhìn cảnh trước nhà
-  const out = !!outdoor || !!ride, free = camFree || out, kk = free ? Math.max(k, out ? (ride ? 0.5 : 0.12) : 0.35) : k;
+  if (inBR){ tx = BR.x + clamp(br.x, -1.2, 1.2)*0.5; tz = BR.z + clamp(br.z, -1, 1)*0.5; }   // phòng ngủ
+  const out = !!outdoor || !!ride, free = camFree || out || inBR, kk = free ? Math.max(k, out ? (ride ? 0.5 : 0.12) : 0.35) : k;
   camLook.x = lerp(camLook.x, free ? tx : clamp(tx, -1.6, 1.6), kk); camLook.z = lerp(camLook.z, free ? tz : clamp(tz, -1.2, 1.4), kk);
   camLook.y = QS && QS.get("close") ? 0.25 : CAM_TARGET.y;
   camera.position.copy(camLook).addScaledVector(camDir(), camDist*camZoom*(out ? 1.5 : 1));
@@ -1946,7 +1948,8 @@ function sfx(name){
 // trình duyệt điện thoại chỉ cho phát tiếng sau lần chạm đầu tiên
 document.addEventListener("pointerdown", ()=>{ unlockIOSAudio(); if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); else if (!audioCtx) ac(); }, {passive: true});
 function bubble(text, ms=2600, force=false){
-  if (typeof dogAway === "function" && dogAway()) return;   // chó đang lạc hoặc đang gửi: không có bong bóng lời nói
+  if (typeof dogAway === "function" && dogAway()) return;
+  if (inBR) return;   // chủ đang ở phòng ngủ: không thấy chó   // chó đang lạc hoặc đang gửi: không có bong bóng lời nói
   if (restMode && !force) return;
   bark(Math.random()<0.5 ? 1 : 2);
   const b = $("bubble");
@@ -2127,11 +2130,15 @@ function feedBowl(type="ga", amt=MEAL_GAIN){
   const S = prof.stats;
   if (restMode){ restMode = false; updateRestBtn(); }
   if (S.hunger <= 2){ bowlFull = false; bubble("No căng rồi nè", 1800, true); dog.faceCam = true; setState("look", 1500); return; }
-  bowlFull = true; prof.food = type;
-  walkTo(room.bowlStand, false, ()=>{
+  prof.food = type;
+  const eat = () => { bowlFull = true; walkTo(room.bowlStand, false, ()=>{
     dog.lookAt = room.bowl;
     setState("eat", 1500 + amt*30, {afterEat:"happy", meal:true, mealAmt: amt, mealType: type});
-  });
+  }); };
+  if (!ownerHome()){ eat(); return; }
+  // Sếp 10/11: chủ đi tới bát, cúi xuống đổ đồ ăn, chó chạy theo ngồi chờ rồi mới ăn
+  bowlFull = false; waitNear(room.bowl, "Ăn hả? Gâu gâu!");
+  ownerDo(spotNear(room.bowl), room.bowl, "pour", 1300, eat);
 }
 
 function playToy(type){
@@ -2145,7 +2152,12 @@ function playToy(type){
   excite();
   dog.path = []; dog.then = null;
   const f = fwd();
-  if (type==="ball"){
+  if (type==="ball" && ownerHome()){   // Sếp 10/11: chủ ở nhà thì chủ ném bóng, chó nhặt về đưa chủ
+    play.owner = true;
+    toy = {type, p: new THREE.Vector3(), v: new THREE.Vector3(), held: false, inHand: true}; ownerHand(toy.p);
+    ownerDo(besideDog(1.1), dog.pos, "none", 150, () => { if (!play || !toy) return; hm.hold = "play"; dog.faceCam = false; dog.lookAt = {x: hm.x, z: hm.z};
+      gesture("bow", ()=>{ if (play && toy) setState("play", 300, {afterPlay: "throw"}); }); });
+  } else if (type==="ball"){
     toy = {type, p: new THREE.Vector3(dog.pos.x + f.x*0.35, 0.07, dog.pos.z + f.z*0.35), v: new THREE.Vector3(), held:false};
     dog.faceCam = true; gesture("bow", ()=>{ if (play && toy) setState("play", 500, {afterPlay: "throw"}); });
   } else {
@@ -2161,6 +2173,12 @@ function playToy(type){
 const fwd = () => ({x: Math.sin(dog.heading), z: Math.cos(dog.heading)});
 function throwBall(){
   if (!play || !toy) return;
+  if (play.owner && hm){   // chủ vung tay ném; bóng rời tay ở giữa động tác (ownerThrowTick)
+    if (!toy.inHand){ toy.inHand = true; }
+    let tg = null; for (let i = 0; i < 12 && !tg; i++){ const q = randomFreePoint(); if (Math.hypot(q.x - hm.x, q.z - hm.z) > 1.6) tg = q; }
+    hm.throwAt = tSec; hm.throwTo = tg || randomFreePoint(); dog.lookAt = {x: hm.x, z: hm.z}; setState("play", 4000, {afterPlay: null});
+    return;
+  }
   const target = randomFreePoint();
   const T = 0.9;
   toy.held = false;
@@ -2221,6 +2239,7 @@ function tapToy(){   // bấm vào đồ chơi đang nằm trên sàn
 }
 function stopPlay(silent=false){
   if (!play) return;
+  if (hm){ hm.hold = null; hm.throwAt = null; }
   const mins = (performance.now() - play.start)/60000;
   play = null; toy = null;
   dog.path = []; dog.then = null; dog.afterPlay = null;
@@ -2246,7 +2265,10 @@ function drinkWater(){
   if (restMode){ restMode=false; updateRestBtn(); }
   const S = prof.stats;
   if ((S.thirst||0) <= 5){ bubble("Chưa khát", 1500, true); dog.faceCam = true; setState("look", 1500); return; }
-  walkTo(room.waterStand, false, ()=>{ dog.lookAt = room.water; setState("eat", 2500, {afterEat:"happy", drink:true}); });
+  const drink = () => { waterFull = true; walkTo(room.waterStand, false, ()=>{ dog.lookAt = room.water; setState("eat", 2500, {afterEat:"happy", drink:true}); }); };
+  if (!ownerHome()){ drink(); return; }
+  waterFull = false; waitNear(room.water, "Nước! Gâu!");
+  ownerDo(spotNear(room.water), room.water, "pour", 1200, drink);
 }
 function exercise(){
   closeRing();
@@ -2337,7 +2359,7 @@ function zoomies(){   // chạy vòng vòng quanh thảm khi vui quá
 function needLick(kind){   // tới bát, liếm bát trống vài cái, rồi quay ra xin chủ
   const food = kind === "food", spot = food ? room.bowlStand : room.waterStand, bowl = food ? room.bowl : room.water;
   if (dog.onChair){ walkTo(perchLaunch(dog.onChair)); return; }
-  const lick = () => { dog.lookAt = bowl; setState("eat", 2400, {lick: kind, afterEat: "hungry"}); };
+  const lick = () => { dog.lookAt = bowl; if (!food) waterFull = false; setState("eat", 2400, {lick: kind, afterEat: "hungry"}); };
   if (Math.hypot(dog.pos.x - spot.x, dog.pos.z - spot.z) > 0.25) walkTo(spot, false, lick); else lick();
 }
 function idleBrainCore(now){
@@ -2562,11 +2584,13 @@ function frame(now){
         if (toy.p.y > 0.12 || toy.v.length() > 0.3){ walkTo({x: toy.p.x + toy.v.x*0.4, z: toy.p.z + toy.v.z*0.4}, true, chase); return; }
         if (Math.hypot(toy.p.x - dog.pos.x, toy.p.z - dog.pos.z) > 0.5){ walkTo({x: toy.p.x, z: toy.p.z}, true, chase); return; }
         toy.held = true;
-        walkTo(nearestFree({x: -0.15 + rnd(-0.5,0.5), z: 0.6 + rnd(-0.3,0.4)}), false, ()=>{
+        const back = play.owner && hm ? nearestFree({x: hm.x + Math.sin(hm.h)*0.55, z: hm.z + Math.cos(hm.h)*0.55}) : nearestFree({x: -0.15 + rnd(-0.5,0.5), z: 0.6 + rnd(-0.3,0.4)});
+        walkTo(back, false, ()=>{
           if (!play) return;
           toy.held = false; toy.v.set(0, 0.6, 0);
           playRoundReward(); persist();
-          dog.faceCam = true;
+          if (play.owner && hm){ dog.faceCam = false; dog.lookAt = {x: hm.x, z: hm.z}; setTimeout(() => { if (play && toy && !toy.held) toy.inHand = true; }, 500); }   // chủ nhặt bóng lên
+          else dog.faceCam = true;
           setState("play", 1100, {afterPlay: "throw"});
         });
       };
@@ -2680,7 +2704,8 @@ function frame(now){
 
   // đồ chơi
   if (toy){
-    if (toy.held && dog.mouth3){ toy.p.copy(dog.mouth3); toy.v.set(0,0,0); }
+    if (toy.inHand){ ownerHand(toy.p); toy.v.set(0, 0, 0); }
+    else if (toy.held && dog.mouth3){ toy.p.copy(dog.mouth3); toy.v.set(0,0,0); }
     else if (toy.type==="bone" && dog.state==="chew" && dog.mouth3 && !toy.spin){   // xương nằm dưới miệng, giữa hai chân trước
       const f = fwd(); toy.p.set(dog.mouth3.x + f.x*0.03, Math.max(dog.y + 0.035, dog.mouth3.y - 0.03), dog.mouth3.z + f.z*0.03); toy.v.set(0,0,0);
     }
@@ -2696,7 +2721,7 @@ function frame(now){
   if (play) $("stopPlayTime").textContent = fmtTime(performance.now() - play.start);
 
   prof.resting = dog.state === "sleep";
-  tickRest(dt); tickDevices(); tickOutdoor(dt); tickOwnerHome(dt); tickRide(dt); tickAway(); tickWork(); netTick(dt);
+  tickRest(dt); tickDevices(); tickOutdoor(dt); tickOwnerHome(dt); tickRide(dt); tickBedroom(dt); tickAway(); tickWork(); netTick(dt);
   tickStats(); tickMesses();
   liveApply = true; applyTime(prof, Date.now()); liveApply = false;
   if (prof.messes.length !== messMeshes.length) buildMesses();
@@ -2742,7 +2767,7 @@ function render(now){
     else m.rotation.set(0, 0.6, 0);
   }
   // bát, nước, đồng hồ, cửa sổ theo giờ
-  room.food.visible = bowlFull;
+  room.food.visible = bowlFull; if (room.waterTop) room.waterTop.visible = waterFull;
   const wl = 1 - clamp((prof.stats.thirst||0)/100, 0, 1);
   room.waterTop.visible = wl > 0.05; room.waterTop.position.y = 0.05 + 0.035*wl;
   const gt = new Date(gameNow(prof)), hr = gt.getHours() + gt.getMinutes()/60;
@@ -2898,8 +2923,11 @@ function tapTV(){
   prof.tv = ((prof.tv || 0) + 1) % TV_CH.length; persist(); applyDevices();
   sfx("chime");
   hint(prof.tv ? `📺 Kênh ${prof.tv}: ${TV_CH[prof.tv]}. Bấm TV lần nữa để đổi kênh` : "📺 Đã tắt TV", 2600);
-  if (!prof.tv || restMode || dog.state === "sleep" || play) return;
+  if (!prof.tv){ if (hm && hm.sit) standUpHome(); return; }
+  if (ownerHome() && !(hm && hm.sit)) ownerSitSofa();   // Sếp 10/11: mở TV thì chủ ngồi sofa xem, chó lên ngồi cạnh
+  if (restMode || dog.state === "sleep" || play) return;
   dog.faceCam = false; dog.lookAt = {x: room.L.tv.x, z: room.L.tv.z};
+  if (ownerHome() && !dog.onChair){ setTimeout(()=>goPerch("sofa", false), 700); return; }
   if (prof.tv === 3) setTimeout(()=>{ if (!isMoving()) gesture("tilt"); if (Math.random() < 0.6) bark(1); }, 500);
   else if (!dog.onChair && Math.random() < 0.6) setTimeout(()=>goPerch("sofa", false), 700);   // chó lên sofa ngồi xem
 }
@@ -3820,6 +3848,9 @@ function ownerPose(P){
     for (const L of P.legs) if (L.hip){ L.hip.rotation.x = lerp(L.hip.rotation.x, -1.42, sit); L.knee.rotation.x = lerp(L.knee.rotation.x, 1.38, sit); }
     for (const A of P.arms) A.arm.rotation.x = lerp(A.arm.rotation.x, -0.55, sit);
   }
+  if (P.reach){ const k = P.reach; for (const A of P.arms){ A.arm.rotation.x = lerp(A.arm.rotation.x, -1.15, k); A.arm.rotation.z = lerp(A.arm.rotation.z, A.s*0.04, k); } }
+  if (P.throwK != null){ const A = P.arms.find(a => a.s > 0), k = P.throwK;   // ném bóng: vung tay ra sau qua đầu rồi quăng tới trước
+    A.arm.rotation.x = k < 0.45 ? lerp(-0.3, -3.0, sstep(0, 0.45, k)) : lerp(-3.0, -0.9, sstep(0.45, 0.75, k)); A.arm.rotation.z = 0.12; }
   if (P.rig){ P.rig.position.y = Math.abs(Math.cos(ph))*0.02*w + (1 - w)*Math.sin(tSec*2.1)*0.003;
     P.rig.rotation.x = 0.07*w + (P.bow || 0); P.rig.rotation.z = Math.sin(ph)*0.025*w; }
 }
@@ -4070,8 +4101,9 @@ function endWork(early){
 function refreshWork(){
   const on = atWork(), bar = $("workBar"), lv = leaving();
   if (bar) bar.classList.toggle("show", on);
-  $("toolbar").style.display = on || outdoor || lv ? "none" : "";
-  $("btnMap").style.display = on || lv ? "none" : "";
+  $("toolbar").style.display = on || outdoor || lv || inBR ? "none" : "";
+  $("btnMap").style.display = on || lv || inBR ? "none" : "";
+  const bb = $("btnBedroom"); if (bb){ bb.textContent = inBR ? "🛋️ P. khách" : "🛏️ P. ngủ"; bb.style.display = on || outdoor || lv ? "none" : ""; }
   if (on) tickWorkBar(true);
 }
 let workBarAt = 0;
@@ -4137,6 +4169,7 @@ function homeStep(dt, sp){   // chủ đi theo hm.path; trả về true nếu đ
 }
 function turnP(o, h, k){ let dh = h - o.h; while (dh > Math.PI) dh -= 2*Math.PI; while (dh < -Math.PI) dh += 2*Math.PI; o.h += dh*Math.min(1, k); }
 function tickOwnerHome(dt){
+  if (inBR){ if (hm) hm.shown = false; return; }   // chủ đang ở phòng ngủ (tickBedroom lo)
   const on = !!prof && !outdoor && !atWork() && !ride && !QS.get("noowner");
   if (!on){ if (ownerIn) ownerIn.root.visible = false; if (hm) hm.shown = false; return; }
   const O = ensureOwnerIn(); O.root.visible = true;
@@ -4147,6 +4180,9 @@ function tickOwnerHome(dt){
   }
   if (hm.freeze) return;
   if (leave) tickLeave(dt);
+  else if (hm.task){ if (hm.task.t0 != null){ const T = hm.task; turnP(hm, Math.atan2(T.face.x - hm.x, T.face.z - hm.z), dt*8);
+      if (tSec - T.t0 > T.ms/1000){ hm.task = null; hm.next = tSec + rnd(6, 10); T.done(); } } }
+  else if (hm.sit || hm.hold){ if (hm.hold === "play" && !play) hm.hold = null; if (hm.hold && dog.pos) turnP(hm, Math.atan2(dog.pos.x - hm.x, dog.pos.z - hm.z), dt*4); }
   else if (!hm.path.length){
     if (!withOwnerGrid(() => isFree(hm))){ const f = ownerSpot(hm); hm.x = f.x; hm.z = f.z; }
     turnP(hm, Math.atan2(dog.pos.x - hm.x, dog.pos.z - hm.z), dt*3);   // đứng thì quay về phía chó
@@ -4159,20 +4195,80 @@ function tickOwnerHome(dt){
   }
   const moving = homeStep(dt, leave && leave.stage === "toDoor" ? 1.05 : 0.9);
   O.wave = lerp(O.wave || 0, leave && leave.stage === "bye" ? 1 : 0, Math.min(1, dt*6));
-  O.bow = lerp(O.bow || 0, leave && leave.stage === "bye" && leave.asleep ? 0.18 : 0, Math.min(1, dt*5));
+  const pouring = hm.task && hm.task.t0 != null && hm.task.act === "pour";
+  O.bow = lerp(O.bow || 0, pouring ? 0.55 : leave && leave.stage === "bye" && leave.asleep ? 0.18 : 0, Math.min(1, dt*5));
+  O.reach = lerp(O.reach || 0, pouring ? 1 : 0, Math.min(1, dt*6));
+  O.sit = lerp(O.sit || 0, hm.sit && !hm.path.length ? 1 : 0, Math.min(1, dt*5));
+  ownerThrowTick(O);
   personAnim(O, hm.x, hm.z, hm.h, moving, dt, 0);
+  if (O.sit > 0.01 && (hm.sit || hm.lastSit)){ const S = hm.sit || hm.lastSit, w = O.sit; let dh = S.h - hm.h; while (dh > Math.PI) dh -= 2*Math.PI; while (dh < -Math.PI) dh += 2*Math.PI;
+    O.root.position.set(lerp(hm.x, S.x, w), lerp(0, S.y, w), lerp(hm.z, S.z, w)); O.root.rotation.y = hm.h + dh*w; }
+}
+// ---- chủ ở nhà làm việc với chó (Sếp 10/11): đổ đồ ăn, nước; ném bóng; ngồi sofa xem TV; đi tới chỗ người chơi chọn ----
+var waterFull = true;
+function ownerHome(){ return !!prof && !outdoor && !atWork() && !leaving() && !inBR && !!hm && hm.shown && !!ownerIn && ownerIn.root.visible && !QS.get("noowner"); }
+function spotNear(p, r = 0.62){   // chỗ chủ đứng cạnh một món đồ của chó (bát), không chắn chỗ chó ăn
+  const c = {x: -p.x, z: -p.z}, L = Math.hypot(c.x, c.z) || 1, a0 = Math.atan2(c.x/L, c.z/L);
+  for (const da of [0.9, -0.9, 1.5, -1.5, 0.4, -0.4, 2.2, -2.2]){ const q = {x: p.x + Math.sin(a0 + da)*r, z: p.z + Math.cos(a0 + da)*r};
+    if (q.x > ROOM.x0 + 0.3 && q.x < ROOM.x1 - 0.3 && q.z > ROOM.z0 + 0.3 && q.z < ROOM.z1 - 0.3 && withOwnerGrid(() => isFree(q))) return q; }
+  return ownerSpot({x: p.x*0.7, z: p.z*0.7});
+}
+function ownerDo(target, face, act, ms, done){   // chủ đi tới target, quay về phía face, làm động tác act trong ms, rồi done()
+  if (!hm) { done(); return; }
+  standUpHome(); hm.hold = null;
+  const T = {face: {x: face.x, z: face.z}, act, ms, done, t0: null}; hm.task = T;
+  homeWalk(target, () => { T.t0 = tSec; if (act === "pour") sfx("crunch"); });
+  if (!hm.path.length && T.t0 == null){ T.t0 = tSec; }
+}
+function waitNear(p, msg){   // chó chạy tới gần bát, ngồi vẫy đuôi chờ chủ đổ
+  if (dogAsleep() || dog.onChair || dog.jump) return;
+  excite(); bubble(msg, 1600, true);
+  const L = Math.hypot(p.x, p.z) || 1, q = nearestFree({x: p.x - p.x/L*0.85, z: p.z - p.z/L*0.85});
+  walkTo(q, true, () => { dog.faceCam = false; dog.lookAt = {x: p.x, z: p.z}; setState("sit", 2500); });
+}
+function ownerGo(w){ if (!ownerHome() || !w) return; standUpHome(); hm.task = null; hm.hold = null; homeWalk(ownerSpot(w)); hm.next = tSec + 25; showMarker(new THREE.Vector3(w.x, 0, w.z), ""); }
+function sofaSeat(){   // đệm sofa còn trống (chó ngồi đệm kia)
+  const it = room.L.sofa, a = angOf(it), P = room.perch.sofa;
+  const seats = [-0.5, 0.5].map(lx => localToRoom(it, lx, 0.08)), seat = seats.sort((u, v) => Math.hypot(v.x - P.x, v.z - P.z) - Math.hypot(u.x - P.x, u.z - P.z))[0];
+  const lx = Math.abs(localToRoom(it, -0.5, 0.08).x - seat.x) < 1e-6 && Math.abs(localToRoom(it, -0.5, 0.08).z - seat.z) < 1e-6 ? -0.5 : 0.5;
+  return {x: seat.x, z: seat.z, y: 0.14, h: a, stand: localToRoom(it, lx, 0.72)};
+}
+function ownerSitSofa(){
+  const S = sofaSeat(); hm.task = null; hm.hold = null;
+  homeWalk(S.stand, () => { hm.sit = S; hm.lastSit = S; });
+  hint("📺 Chủ ngồi sofa xem TV cùng chó", 2200);
+}
+function standUpHome(){ if (hm && hm.sit){ const S = hm.sit; hm.sit = null; hm.x = S.stand.x; hm.z = S.stand.z; } }
+const _hv = new THREE.Vector3();
+function ownerHand(v){   // vị trí bàn tay phải của chủ trong phòng
+  if (!ownerIn){ v.set(0, 0.6, 0); return v; }
+  const A = ownerIn.arms.find(a => a.s > 0), hand = A.arm.children[A.arm.children.length - 1];
+  ownerIn.root.updateMatrixWorld(true); hand.getWorldPosition(v); return v;
+}
+function ownerThrowTick(O){
+  if (!hm || hm.throwAt == null){ O.throwK = null; return; }
+  const k = (tSec - hm.throwAt)/0.75; O.throwK = Math.min(1, k);
+  if (hm.throwTo) turnP(hm, Math.atan2(hm.throwTo.x - hm.x, hm.throwTo.z - hm.z), 0.25);
+  if (k >= 0.6 && toy && toy.inHand && play){   // bóng rời tay
+    const tg = hm.throwTo, T = 0.85; toy.inHand = false; ownerHand(toy.p);
+    toy.v.set((tg.x - toy.p.x)/T, (0.07 - toy.p.y)/T + 4.9*T, (tg.z - toy.p.z)/T); sfx("whoosh");
+    dog.lookAt = tg; setState("play", 350, {afterPlay: "chase"});
+  }
+  if (k >= 1){ hm.throwAt = null; hm.throwTo = null; O.throwK = null; }
 }
 function autoWork(){   // đã nhận việc: tới giờ ca thì chủ tự đi làm
   if (!AUTO_WORK_ON || !prof || !prof.job || leaving()) return;
   const j = jobOf(prof.job), t = gameNow(prof), h = gameHourOf(t), td = todayStr(t);
   if (h < j.from || h >= j.to - 0.25 || inSleepHours(t, prof)) return;
   if (prof.workDay && prof.workDay.d === td && prof.workDay.k === j.k) return;
+  if (inBR){ exitBedroom(); return; }   // đang ở phòng ngủ: chủ ra phòng khách trước
   if (outdoor){ if (autoWork.hinted !== td){ autoWork.hinted = td; hint(`⏰ Tới giờ đi làm ${j.n} rồi! Bấm 🏠 Về nhà để chủ chào ${prof.dog.name} rồi đi làm`, 5000); } return; }
   if (document.querySelector('[id^="ov"].show') || !hm || !hm.shown || tSec - hm.since < 4) return;   // đang mở bảng, hoặc vừa vào phòng: đợi chút
   goWork(j.k, true);
 }
 function startLeave(j, done){
-  closeRing(); closeFoodMenu(); closeBedMenu(); stopPlay(true);
+  closeRing(); closeFoodMenu(); closeBedMenu(); stopPlay(true); if (inBR) exitBedroom(true);
+  if (hm){ standUpHome(); hm.task = null; hm.hold = null; }
   if (!hm || !hm.shown) tickOwnerHome(0);
   const away = dogAway(), asleep = !away && dogAsleep();
   leave = {j, done, stage: "toDog", t: tSec, away, asleep};
@@ -4262,6 +4358,138 @@ function endRide(){
   camYaw = R.cam.yaw; camPitch = R.cam.pitch; camZoom = R.cam.zoom;
   if (!R.L.away && !dogAsleep()){ const c = room.door.inside; dog.pos = nearestFree({x: c.x*0.7, z: c.z*0.7}); dog.path = []; dog.heading = Math.atan2(c.x - dog.pos.x, c.z - dog.pos.z); setState("sit", 4000); }
   R.L.done();
+}
+/* ---------- PHÒNG NGỦ CỦA CHỦ, CÓ BÀN HỌC (Sếp 10/11) ----------
+   Dựng riêng ở một chỗ xa trong cảnh (BR). Nút 🛏️ P. ngủ trên thanh trên cùng để vào, 🛋️ P. khách hoặc bấm cửa để ra.
+   Trong phòng: bấm sàn thì chủ đi tới, bấm bàn học thì chủ ngồi học (học đủ 30 giây được xu, tối đa 10 xu/ngày),
+   bấm giường thì chủ nằm nghỉ. Chó ở lại phòng khách. */
+const BR = {x: -60, z: -20, w: 5, d: 4};
+var inBR = false, br = {x: 0, z: 0, h: 0, path: [], then: null, sit: null, lie: false, act: null}, brG = null, brWalls = [], brGrid = null, brCam = null;
+const BR_GRID = 0.1, BGX = Math.round(BR.w/BR_GRID), BGZ = Math.round(BR.d/BR_GRID);
+const BR_DESK_SEAT = {x: 1.3, z: -1.0, y: 0.06, h: Math.PI, stand: {x: 1.3, z: -0.45}};
+const BR_BED_LIE = {x: -1.92, z: -0.42, y: 0.68, stand: {x: -1.1, z: -0.7}};
+const BR_DOOR = {x: -2.1, z: 1.2};
+function buildBedroom(){
+  const g = new THREE.Group(); g.position.set(BR.x, 0, BR.z); scene.add(g); brG = g;
+  const bx = (w, h, d, c, x, y, z, kind) => { const m = rbox(w, h, d, Math.min(w, h, d)*0.25, c); m.position.set(x, y, z); g.add(m); if (kind) tagBR(m, kind); m.castShadow = true; m.receiveShadow = true; return m; };
+  const tagBR = (m, kind) => m.traverse(o => { if (o.isMesh){ o.userData.kind = kind; pickables.push(o); } });
+  const W = BR.w/2, D = BR.d/2;
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(BR.w, 0.06, BR.d), mat("#E6CDA3")); floor.position.y = -0.03; floor.receiveShadow = true; g.add(floor); tagBR(floor, "brFloor");
+  for (let i = -2; i <= 2; i++){ const ln = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.005, BR.d), mat("#D4B98C")); ln.position.set(i, 0.002, 0); g.add(ln); }
+  // tường: 4 bức, bức nào quay về phía camera thì thấp xuống (giống phòng khách)
+  const wallC = "#CFE3F2", WH2 = 2.6, T = 0.12;
+  for (const [w, x, z, len, nx, nz] of [["B", 0, -D - T/2, BR.w + 2*T, 0, 1], ["F", 0, D + T/2, BR.w + 2*T, 0, -1], ["L", -W - T/2, 0, BR.d, 1, 0], ["R", W + T/2, 0, BR.d, -1, 0]]){
+    const along = Math.abs(nz) > 0, full = new THREE.Mesh(new THREE.BoxGeometry(along ? len : T, WH2, along ? T : len), mat(wallC)); full.position.set(x, WH2/2, z); full.receiveShadow = true; g.add(full);
+    const stub = new THREE.Mesh(new THREE.BoxGeometry(along ? len : T, 0.24, along ? T : len), mat(wallC)); stub.position.set(x, 0.12, z); g.add(stub);
+    brWalls.push({w, full, stub, n: [nx, nz]});
+  }
+  // cửa sổ trên tường sau, tranh, kệ sách trên tường trái
+  bx(1.2, 0.9, 0.06, "#FFFFFF", 1.3, 1.65, -D + 0.01); bx(1.06, 0.76, 0.04, "#BFE3F7", 1.3, 1.65, -D + 0.04); bx(0.04, 0.76, 0.05, "#FFFFFF", 1.3, 1.65, -D + 0.05);
+  bx(0.03, 0.5, 0.7, "#F2C94C", -W + 0.02, 1.7, -0.1); bx(0.035, 0.4, 0.6, "#7DBB6E", -W + 0.03, 1.7, -0.1);
+  // giường
+  bx(1.15, 0.32, 2.05, "#B98552", -1.9, 0.16, -0.95, "brBed"); bx(1.05, 0.2, 1.95, "#FFFFFF", -1.9, 0.42, -0.95, "brBed");
+  bx(1.08, 0.08, 1.25, "#7AA7E0", -1.9, 0.54, -0.55, "brBed"); bx(0.7, 0.14, 0.38, "#FDF6E7", -1.9, 0.6, -1.65, "brBed");
+  bx(1.15, 0.75, 0.1, "#B98552", -1.9, 0.38, -1.98, "brBed");
+  // bàn học, ghế, đèn bàn, sách, vở
+  bx(1.3, 0.05, 0.62, "#C89B6D", 1.3, 0.75, -1.65, "brDesk");
+  for (const [x, z] of [[0.7, -1.4], [1.9, -1.4], [0.7, -1.9], [1.9, -1.9]]) bx(0.05, 0.75, 0.05, "#8A6440", x, 0.375, z, "brDesk");
+  bx(0.4, 0.4, 0.55, "#B08158", 1.75, 0.5, -1.65, "brDesk");
+  bx(0.42, 0.04, 0.42, "#E07A5F", 1.3, 0.45, -1.0, "brDesk"); bx(0.42, 0.42, 0.04, "#E07A5F", 1.3, 0.68, -0.8, "brDesk");
+  for (const [x, z] of [[1.12, -1.18], [1.48, -1.18], [1.12, -0.82], [1.48, -0.82]]) bx(0.035, 0.45, 0.035, "#555", x, 0.225, z, "brDesk");
+  bx(0.08, 0.35, 0.08, "#555", 0.8, 0.95, -1.8, "brDesk"); const shade = cyl(0.04, 0.13, 0.12, "#FFD15C"); shade.position.set(0.8, 1.14, -1.8); g.add(shade); tagBR(shade, "brDesk"); brG.userData.lampShade = shade;
+  bx(0.32, 0.03, 0.24, "#FFFFFF", 1.25, 0.79, -1.55, "brDesk"); bx(0.3, 0.02, 0.22, "#4C8FE0", 1.62, 0.79, -1.7, "brDesk");
+  for (let i = 0; i < 4; i++) bx(0.05, 0.24, 0.17, ["#E5533D","#7DBB6E","#FFD15C","#4C8FE0"][i], 1.75 + i*0.06, 0.89, -1.85, "brDesk");
+  // tủ quần áo, thảm tròn, cửa
+  bx(1.1, 2.0, 0.58, "#D9B48A", -0.6, 1.0, -D + 0.32); bx(0.02, 1.8, 0.02, "#8A6440", -0.6, 1.0, -D + 0.62);
+  const rug = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.012, 32), mat("#F4B6C2")); rug.position.set(0.1, 0.006, 0.35); rug.receiveShadow = true; g.add(rug); tagBR(rug, "brFloor");
+  bx(0.06, 2.05, 0.95, "#A8743F", -W + 0.03, 1.02, 1.2, "brDoor"); bx(0.08, 0.06, 0.06, "#F2C94C", -W + 0.07, 1.0, 0.9, "brDoor");
+  // lưới đi lại cho chủ (tránh giường, bàn, tủ, tường)
+  brGrid = new Uint8Array(BGX*BGZ);
+  const obs = [[-1.9, -0.95, 1.15, 2.05], [1.3, -1.65, 1.35, 0.66], [-0.6, -D + 0.32, 1.15, 0.62]], r = 0.24;
+  for (let i = 0; i < BGX; i++) for (let j = 0; j < BGZ; j++){ const x = -W + (i + 0.5)*BR_GRID, z = -D + (j + 0.5)*BR_GRID;
+    let b = x < -W + r || x > W - r || z < -D + r || z > D - r;
+    for (const [cx, cz, w, d] of obs) if (Math.abs(x - cx) < w/2 + r && Math.abs(z - cz) < d/2 + r) b = true;
+    brGrid[i*BGZ + j] = b ? 1 : 0; }
+  g.visible = false;
+}
+const brCell = p => [clamp(Math.floor((p.x + BR.w/2)/BR_GRID), 0, BGX - 1), clamp(Math.floor((p.z + BR.d/2)/BR_GRID), 0, BGZ - 1)];
+const brCellPt = (i, j) => ({x: -BR.w/2 + (i + 0.5)*BR_GRID, z: -BR.d/2 + (j + 0.5)*BR_GRID});
+const brFree = p => { const [i, j] = brCell(p); return !brGrid[i*BGZ + j]; };
+function brNearest(p){ if (brFree(p)) return {x: p.x, z: p.z}; let best = null, bd = 1e9;
+  for (let i = 0; i < BGX; i++) for (let j = 0; j < BGZ; j++) if (!brGrid[i*BGZ + j]){ const q = brCellPt(i, j), d = (q.x - p.x)**2 + (q.z - p.z)**2; if (d < bd){ bd = d; best = q; } }
+  return best || {x: 0, z: 0}; }
+function brLine(a, b){ const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.ceil(d/(BR_GRID*0.5)); for (let k = 1; k < n; k++){ if (!brFree({x: lerp(a.x, b.x, k/n), z: lerp(a.z, b.z, k/n)})) return false; } return true; }
+function brPath(from, to){   // A* nhỏ trên lưới phòng ngủ, rồi làm thẳng đường
+  to = brNearest(to); const st = brFree(from) ? from : brNearest(from);
+  if (brLine(st, to)) return [to];
+  const [si, sj] = brCell(st), [ti, tj] = brCell(to), N = BGX*BGZ, gS = new Float32Array(N).fill(1e9), came = new Int32Array(N).fill(-1), done = new Uint8Array(N), open = [si*BGZ + sj]; gS[si*BGZ + sj] = 0;
+  while (open.length){ let bi = 0, bf = 1e9; for (let k = 0; k < open.length; k++){ const c = open[k], f = gS[c] + Math.hypot(Math.floor(c/BGZ) - ti, c%BGZ - tj); if (f < bf){ bf = f; bi = k; } }
+    const c = open.splice(bi, 1)[0]; if (done[c]) continue; done[c] = 1; const ci = Math.floor(c/BGZ), cj = c%BGZ; if (ci === ti && cj === tj) break;
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++){ if (!di && !dj) continue; const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= BGX || nj >= BGZ) continue;
+      const n = ni*BGZ + nj; if (brGrid[n] || done[n]) continue; const ng = gS[c] + (di && dj ? 1.414 : 1); if (ng < gS[n]){ gS[n] = ng; came[n] = c; open.push(n); } } }
+  if (came[ti*BGZ + tj] < 0) return [to];
+  const pts = []; let c = ti*BGZ + tj; while (c >= 0 && c !== si*BGZ + sj){ pts.unshift(brCellPt(Math.floor(c/BGZ), c%BGZ)); c = came[c]; } pts[pts.length - 1] = to;
+  const out = []; let cur = st, k = 0; while (k < pts.length){ let far = k; for (let m = pts.length - 1; m > k; m--) if (brLine(cur, pts[m])){ far = m; break; } out.push(pts[far]); cur = pts[far]; k = far + 1; }
+  return out;
+}
+function brWalk(to, then = null){ brGetUp(); br.act = null; br.path = brPath(br, to); br.then = then; if (!br.path.length && then){ br.then = null; then(); } }
+function brGetUp(){ if (br.sit){ const S = br.sit; br.sit = null; br.x = S.stand.x; br.z = S.stand.z; } if (br.lie){ br.lie = false; br.x = BR_BED_LIE.stand.x; br.z = BR_BED_LIE.stand.z; } finishStudy(); }
+function enterBedroom(){
+  if (!prof || outdoor || atWork() || leaving() || inBR) return;
+  closeRing(); closeFoodMenu(); closeBedMenu(); stopPlay(true); standUpHome();
+  fade(() => {
+    if (!brG) buildBedroom();
+    inBR = true; brG.visible = true; ensureOwnerIn(); ownerIn.root.visible = true; ownerIn._lx = undefined;
+    br = {x: BR_DOOR.x + 0.35, z: BR_DOOR.z, h: Math.PI/2, path: [], then: null, sit: null, lie: false, act: null};
+    brCam = {yaw: camYaw, pitch: camPitch, zoom: camZoom}; camYaw = 0.55; camPitch = Math.asin(0.62); camZoom = W < H ? 1.0 : 0.85; setCamFree(false);
+    $("bubble").classList.remove("show"); refreshWork();
+    hint("🛏️ Phòng ngủ. Bấm sàn để đi, bấm bàn học để học bài, bấm giường để nằm nghỉ, bấm cửa để về phòng khách", 5000);
+  });
+}
+function exitBedroom(now = false){
+  if (!inBR) return;
+  const go = () => { brGetUp(); inBR = false; if (brG) brG.visible = false; if (ownerIn) ownerIn.root.visible = false;
+    if (brCam){ camYaw = brCam.yaw; camPitch = brCam.pitch; camZoom = brCam.zoom; } ownerAtDoor = true; if (hm) hm.shown = false; refreshWork(); };
+  if (now) go(); else fade(go);
+}
+function tapBedroom(hit){
+  const kind = hit ? hit.object.userData.kind : null;
+  if (kind === "brDoor") return brWalk({x: BR_DOOR.x + 0.3, z: BR_DOOR.z}, () => exitBedroom());
+  if (kind === "brDesk") return brWalk(BR_DESK_SEAT.stand, startStudy);
+  if (kind === "brBed") return brWalk(BR_BED_LIE.stand, () => { br.lie = true; hint(inSleepHours(gameNow(prof), prof) ? "😴 Chủ đi ngủ. Bấm xuống sàn để dậy" : "🛌 Chủ nằm nghỉ. Bấm xuống sàn để dậy", 3000); });
+  if (kind === "brFloor" && hit){ const p = hit.point; brWalk({x: p.x - BR.x, z: p.z - BR.z}); showMarker(new THREE.Vector3(p.x, 0, p.z), ""); return; }
+  hint("Bấm sàn để đi, bấm bàn học, giường hoặc cửa", 2000);
+}
+const STUDY_SEC = 30, STUDY_COINS = 2, STUDY_MAX = 10;
+function startStudy(){
+  br.sit = BR_DESK_SEAT; br.act = {t0: tSec, paid: 0};
+  if (brG && brG.userData.lampShade) brG.userData.lampShade.material.emissive && brG.userData.lampShade.material.emissive.set("#FFC93C");
+  hint(`📚 Chủ ngồi học bài. Học đủ ${STUDY_SEC} giây được 🪙 ${STUDY_COINS} xu (tối đa ${STUDY_MAX} xu mỗi ngày)`, 3500);
+}
+function studyTick(){
+  const A = br.act; if (!A || !br.sit) return;
+  if (tSec - A.t0 >= STUDY_SEC*(A.paid + 1)){ A.paid++;
+    const td = todayStr(gameNow(prof)); if (!prof.study || prof.study.d !== td) prof.study = {d: td, coins: 0};
+    if (prof.study.coins < STUDY_MAX){ prof.study.coins += STUDY_COINS; addCoins(STUDY_COINS); persist(); hint(`📚 Học xong một bài! 🪙 +${STUDY_COINS} xu (hôm nay ${prof.study.coins}/${STUDY_MAX})`, 2600); }
+    else hint("📚 Hôm nay học đủ rồi, nghỉ chơi với chó thôi!", 2600); }
+}
+function finishStudy(){ br.act = null; if (brG && brG.userData.lampShade && brG.userData.lampShade.material.emissive) brG.userData.lampShade.material.emissive.set("#000000"); }
+function tickBedroom(dt){
+  if (!inBR || !brG) return;
+  const O = ensureOwnerIn(); O.root.visible = true;
+  const cd = camDir(); for (const w of brWalls){ const facing = cd.x*w.n[0] + cd.z*w.n[1] < -0.25; w.full.visible = !facing; w.stub.visible = facing; }
+  let moving = false;
+  if (br.path.length){ const wp = br.path[0], dx = wp.x - br.x, dz = wp.z - br.z, d = Math.hypot(dx, dz);
+    if (d < 0.04){ br.path.shift(); if (!br.path.length && br.then){ const t = br.then; br.then = null; t(); } }
+    else { const st = Math.min(d, 0.95*dt); br.x += dx/d*st; br.z += dz/d*st; turnP(br, Math.atan2(dx, dz), dt*9); moving = true; } }
+  studyTick();
+  O.sit = lerp(O.sit || 0, br.sit ? 1 : 0, Math.min(1, dt*5)); O.reach = lerp(O.reach || 0, br.act ? 0.55 : 0, Math.min(1, dt*4)); O.bow = lerp(O.bow || 0, br.act ? 0.12 : 0, Math.min(1, dt*4)); O.throwK = null;
+  O.root.rotation.order = "YXZ";
+  if (br.lie){ O.sit = 0; O.w = 0; ownerPose(O); O.root.position.set(BR.x + BR_BED_LIE.x, BR_BED_LIE.y, BR.z + BR_BED_LIE.z); O.root.rotation.set(-Math.PI/2, 0, 0); return; }
+  O.root.rotation.x = 0;
+  personAnim(O, BR.x + br.x, BR.z + br.z, br.h, moving, dt, 0);
+  if (O.sit > 0.01){ const S = br.sit || BR_DESK_SEAT, w = O.sit; let dh = S.h - br.h; while (dh > Math.PI) dh -= 2*Math.PI; while (dh < -Math.PI) dh += 2*Math.PI;
+    O.root.position.set(BR.x + lerp(br.x, S.x, w), lerp(0, S.y, w), BR.z + lerp(br.z, S.z, w)); O.root.rotation.y = br.h + dh*w; }
 }
 function workHint(){ hint(`Bạn đang đi làm, ${prof.dog.name} ở nhà một mình. Hết ca mới chơi với chó được (hoặc bấm 🏠 Về sớm)`, 3200); }
 function travelTo(k){
@@ -4388,6 +4616,7 @@ function openRing(x, y, world){
   const ring = $("ring");
   const left = prof.treats.left;
   const items = [["come","👋","Lại đây"],["sit","🪑","Ngồi"],["stand","🐕","Đứng"],["lie","💤","Nằm"],["sofa","🛋️","Lên sofa"],["treat","🍪",`Thưởng (${left})`]];
+  if (world && ownerHome()) items.push(["owner","🧍","Chủ tới đây"]);   // Sếp 10/11: điều khiển được người chủ
   ring.innerHTML = `<div class="tapDot"></div>` + items.map(([k,ic,n])=>`<button class="ringBtn" data-k="${k}" ${k==="treat"&&left<=0?"disabled":""}><span class="ic">${ic}</span>${n}</button>`).join("");
   placeRing();
   requestAnimationFrame(()=>ring.querySelectorAll(".ringBtn").forEach(b=>b.classList.add("show")));
@@ -4395,6 +4624,7 @@ function openRing(x, y, world){
   ring.querySelectorAll(".ringBtn").forEach(b=>b.addEventListener("click", e=>{
     e.stopPropagation();
     const k = b.dataset.k;
+    if (k==="owner"){ closeRing(); ownerGo(ringWorld); return; }
     if (k==="treat") giveTreat(); else if (k==="sofa") goPerch("sofa", true); else doCommand(k, ringWorld);
   }));
 }
@@ -4404,7 +4634,7 @@ function placeRing(){
   const btns = ring.querySelectorAll(".ringBtn");
   const r = 106;
   const cx = clamp(ringX, r + 34, W - r - 34), cy = clamp(ringY - 10, r + 40, H);
-  const angs = btns.length > 5 ? [-178, -142, -106, -70, -34, 2] : [-175, -132, -90, -48, -5];
+  const angs = btns.length > 6 ? [-180, -150, -120, -90, -60, -30, 0] : btns.length > 5 ? [-178, -142, -106, -70, -34, 2] : [-175, -132, -90, -48, -5];
   btns.forEach((b,i)=>{ const a = angs[i]*Math.PI/180; b.style.left = (cx + Math.cos(a)*r) + "px"; b.style.top = (cy + Math.sin(a)*r) + "px"; });
 }
 function closeRing(){
@@ -4465,6 +4695,7 @@ canvas.addEventListener("pointerleave", e=>{ if (!ptrs.size) rubbing = null; });
 canvas.addEventListener("wheel", e=>{ e.preventDefault(); camZoom = clamp(camZoom*Math.exp(e.deltaY*0.0012), ZOOM_MIN, ZOOM_MAX); }, {passive: false});
 function tapAt(x, y, hit = pickAt(x, y)){
   if (leaving()) return;
+  if (inBR){ tapBedroom(hit); return; }
   const kind = hit ? hit.object.userData.kind : null;
   if (outdoor){ tapOutdoor(x, y, hit); return; }
   if (atWork()){ closeRing(); workHint(); return; }
@@ -5605,6 +5836,7 @@ $("oTreat").onclick = ()=>{ if (dogAway()){ awayHint(); return; } giveTreat(); }
 $("oCoins").onclick = ()=>toast(`Bạn có 🪙 ${coins()} xu. Đi dạo 10 m được 2 xu, cho chó đi vệ sinh ngoài cỏ được 2 xu, lần đi dạo đầu mỗi ngày được 10 xu`, 5000);
 $("toolbar").addEventListener("click", e=>{ if (prof && dogAway()){ e.stopPropagation(); awayHint(); } }, true);
 $("workHome").onclick = ()=>{ if (atWork() && confirm("Về sớm? Bạn chỉ nhận xu cho phần ca đã làm.")) endWork(true); };
+$("btnBedroom").onclick = ()=>{ if (!prof) return; if (inBR) exitBedroom(); else enterBedroom(); };
 $("btnRoom").onclick = ()=>{ if (prof){ renderRoomSheet(); $("ovRoom").classList.add("show"); } };
 // sơ đồ nhìn từ trên xuống của một bố cục, tô theo bộ màu
 function roomSVG(L, P){
@@ -6086,6 +6318,41 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     ownerWalk({x: S0.stand.x + 1, z: S0.stand.z}); ok("bấm xuống đất: chủ đứng dậy đi tiếp", !outdoor.sit);
     const C0 = seatSpot({object: chairM}); ok("ghế bàn dù: chỗ ngồi gần ghế, chỗ đứng trước ghế", Math.hypot(C0.stand.x - C0.x, C0.stand.z - C0.z) > 0.5);
     setOutdoor(false); setState("idle", 0); dog.path = []; }
+  // CHỦ LÀM CÙNG CHÓ, ĐIỀU KHIỂN CHỦ, PHÒNG NGỦ (Sếp 10/11)
+  { const fade0 = fade; fade = m => m(); fresh(); prof.work = null; prof.workDay = null; prof.job = null; restMode = false; setState("idle", 0); dog.path = []; dog.onChair = false; stopPlay(true);
+    const run = (sec, cond) => { for (let i = 0; i < sec/0.033 && !(cond && cond()); i++){ tSec += 0.033; tickOwnerHome(0.033); tickBedroom(0.033);
+      if (dog.path.length){ const e = dog.path[dog.path.length - 1]; dog.pos = {x: e.x, z: e.z}; dog.path = []; const t = dog.then; dog.then = null; if (t) t(); } } };
+    hm = null; ownerAtDoor = false; tickOwnerHome(0.033); hm.since = tSec - 10;
+    prof.stats.hunger = 60; bowlFull = false; feedBowl("ga", 30);
+    ok("cho ăn: chủ đi tới bát đổ, bát chưa đầy ngay", hm.task && hm.task.act === "pour" && !bowlFull);
+    run(15, () => !hm.task); ok("chủ đổ xong: bát có đồ ăn, chó tới ăn", bowlFull && dog.state === "eat" && dog.meal);
+    ok("chủ đứng cạnh bát, không đứng lên bát", Math.hypot(hm.x - room.bowl.x, hm.z - room.bowl.z) > 0.4 && Math.hypot(hm.x - room.bowl.x, hm.z - room.bowl.z) < 1.2, Math.hypot(hm.x - room.bowl.x, hm.z - room.bowl.z).toFixed(2));
+    setState("idle", 0); dog.meal = false; prof.stats.thirst = 60; waterFull = true; drinkWater();
+    ok("cho uống: chủ đi đổ nước", hm.task && !waterFull); run(15, () => !hm.task); ok("đổ nước xong: bát có nước, chó uống", waterFull && dog.state === "eat" && dog.drink);
+    setState("idle", 0); dog.drink = false; dog.pos = nearestFree({x: 0, z: 0.4}); playToy("ball");
+    ok("bấm bóng khi chủ ở nhà: chủ cầm bóng", play && play.owner && toy && toy.inHand);
+    run(10, () => hm.hold === "play"); setState("play", 1, {afterPlay: "throw"}); dog.until = 0; throwBall();
+    run(3, () => toy && !toy.inHand); ok("chủ vung tay ném bóng đi", toy && !toy.inHand && toy.v.length() > 1 && dog.afterPlay === "chase");
+    stopPlay(true); ok("thôi chơi: chủ hết cầm bóng", !hm.hold && !toy);
+    prof.tv = 0; tapTV(); ok("mở TV khi chủ ở nhà: chủ đi tới sofa", hm.path.length > 0 || !!hm.sit); run(15, () => !!hm.sit);
+    ok("chủ ngồi sofa xem TV", !!hm.sit); for (let i = 0; i < 40; i++){ tSec += 0.033; tickOwnerHome(0.033); }
+    ok("ngồi sofa: gập gối, ngồi trên đệm", ownerIn.sit > 0.9 && ownerIn.legs[0].knee.rotation.x > 1.1 && Math.abs(ownerIn.root.position.y - 0.14) < 0.03);
+    const SS = sofaSeat(), PP = room.perch.sofa; ok("chủ ngồi đệm khác chó", Math.hypot(SS.x - PP.x, SS.z - PP.z) > 0.6);
+    while (prof.tv) tapTV(); ok("tắt TV: chủ đứng dậy", !hm.sit);
+    openRing(100, 100, {x: 1, z: 0.5}); ok("vòng lệnh có nút Chủ tới đây", !!$("ring").querySelector('[data-k="owner"]'));
+    $("ring").querySelector('[data-k="owner"]').click(); run(10, () => !hm.path.length);
+    ok("bấm Chủ tới đây: chủ đi tới chỗ đó", Math.hypot(hm.x - 1, hm.z - 0.5) < 0.45, hm.x.toFixed(2) + "," + hm.z.toFixed(2));
+    enterBedroom(); ok("vào phòng ngủ: thấy phòng, thanh công cụ ẩn, nút đổi thành P. khách", inBR && brG.visible && $("toolbar").style.display === "none" && $("btnBedroom").textContent.includes("khách"));
+    ok("phòng ngủ có giường, bàn học, cửa bấm được", ["brBed", "brDesk", "brDoor", "brFloor"].every(k => pickables.some(m => m.userData.kind === k)));
+    const bp = brPath({x: -1.2, z: 1.2}, BR_DESK_SEAT.stand); ok("phòng ngủ: đi từ giường tới bàn học không xuyên đồ", bp.length > 0 && bp.every((q, i) => brLine(i ? bp[i - 1] : {x: -1.2, z: 1.2}, q)));
+    tapBedroom({object: pickables.find(m => m.userData.kind === "brDesk")}); run(15, () => !!br.sit);
+    ok("bấm bàn học: chủ ngồi học", !!br.sit && !!br.act); const c0 = coins(); prof.study = null; br.act.t0 = tSec - STUDY_SEC - 0.1; studyTick();
+    ok("học đủ giờ: được xu", coins() === c0 + STUDY_COINS);
+    tapBedroom({object: pickables.find(m => m.userData.kind === "brBed")}); run(15, () => br.lie); tickBedroom(0.033);
+    ok("bấm giường: chủ nằm trên giường", br.lie && ownerIn.root.position.y > 0.5);
+    tapBedroom({object: pickables.find(m => m.userData.kind === "brDoor")}); run(15, () => !inBR);
+    ok("bấm cửa: về phòng khách, chủ hiện ở phòng khách", !inBR && !brG.visible && $("toolbar").style.display === ""); tickOwnerHome(0.033); ok("về phòng khách: chủ đứng ở phòng khách", ownerIn.root.visible && hm.shown);
+    fade = fade0; setState("idle", 0); dog.path = []; prof.stats.hunger = 20; prof.stats.thirst = 20; }
   // BƯỚC 4: kết bạn (10/11) — phần trên máy, không gọi máy chủ
   { const me = "uMe", you = "uYou", t = 123, sv = fbUser, card = {name: "Bạn A", dog: "Mực"};
     const a = upAsk(me, you, card, t);
@@ -6178,6 +6445,14 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   if (QS.get("hour")){ const d = new Date(); d.setHours(+QS.get("hour"), 0, 0, 0); p.clock = d.getTime(); }
   if (QS.get("tv")){ p.tv = +QS.get("tv"); applyDevices(); }
   if (QS.get("lamp")){ p.lamp = true; applyDevices(); }
+  if (QS.get("br") || QS.get("own")) setTimeout(()=>{   // chụp thử: &br=room|desk|bed, &own=pour|tv|throw
+    const step = (sec, cond) => { for (let i = 0; i < sec/0.033 && !(cond && cond()); i++){ tSec += 0.033; tickOwnerHome(0.033); tickBedroom(0.033); } };
+    fade = m => m(); tickOwnerHome(0.033); hm.since = -99; const b = QS.get("br"), o = QS.get("own");
+    if (b){ enterBedroom(); if (b === "desk") tapBedroom({object: pickables.find(m => m.userData.kind === "brDesk")}); if (b === "bed") tapBedroom({object: pickables.find(m => m.userData.kind === "brBed")}); step(15, () => !br.path.length); step(2); }
+    if (o === "pour"){ prof.stats.hunger = 60; feedBowl("ga", 30); step(15, () => hm.task && hm.task.t0 != null); step(0.6); hm.task.t0 = 1e9; }
+    if (o === "tv"){ tapTV(); step(15, () => !!hm.sit); step(2); dog.onChair = "sofa"; dog.pos = {x: room.perch.sofa.x, z: room.perch.sofa.z}; dog.y = room.perch.sofa.y; setState("sit", 60000); dog.faceCam = false; dog.lookAt = {x: room.L.tv.x, z: room.L.tv.z}; }
+    if (o === "throw"){ playToy("ball"); step(10, () => hm.hold === "play"); throwBall(); step(+QS.get("lt") || 0.3); hm.throwAt = -1e9; hm.freeze = true; }
+    if (b || o === "pour" || o === "tv") hm.freeze = !b; }, 400);
   if (QS.get("ui") === "pad") setTimeout(()=>{ prof.bowel = 60; prof.bladder = 30; openPadMenu(); }, 400);
   if (QS.get("clip")) setTimeout(()=>{ const T = obstacles[1]; dog.pos = {x: T.cx + T.hw + 0.12, z: T.cz}; dog.heading = Math.atan2(-T.c, T.s); dog.faceCam = false; setState("sit", 60000); dog.next = 1e15; }, 400);
   if (QS.get("lv")) setTimeout(()=>{   // chụp thử: &lv=walk|bye|ride (&lt=giây) — dừng hình ở bước đi, lúc chào chó, cảnh xe đón
