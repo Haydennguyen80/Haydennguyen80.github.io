@@ -153,6 +153,12 @@ textarea{width:100%;min-height:70px;font-size:12px;border-radius:10px;border:2px
 #ovRoom{background:rgba(20,80,90,.12)}
 #outBar{display:none;background:var(--c1d);grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
 #outBar.show{display:grid}
+#workBar{display:none;background:#5B4A8B;color:#fff;align-items:center;gap:10px;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));font-size:14px;line-height:1.35}
+#workBar.show{display:flex}
+#btnFriends.hot{background:#E5533D;color:#fff;animation:blinkA 1.2s steps(2) infinite}
+#workBar #workTxt{flex:1;min-width:0}
+#workBar .small{color:#E6DEFF}
+#workBar button{flex:none;background:#fff;color:#5B4A8B;border:0;border-radius:14px;padding:10px 12px;font-weight:800;font-size:14px}
 label.chk{display:flex;gap:10px;align-items:flex-start;margin-top:10px;font-size:15px;line-height:1.35;cursor:pointer}
 label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E6F78}
 #ovGate{z-index:60}
@@ -191,6 +197,7 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
     <span class="badge" id="tbClock" title="Giờ trong game (1 giờ thật = 1 ngày)">🕐 --:--</span>
     <span class="badge" id="tbCoins">🪙 100</span>
     <span class="badge" id="tbLevel">Cấp 1</span>
+    <button class="tb-btn" id="btnFriends" style="display:none" title="Bạn bè">👥</button>
     <button class="tb-btn" id="btnRoom">🏠 Phòng</button>
     <button class="tb-btn" id="btnProfiles">Đổi hồ sơ</button>
   </div>
@@ -221,6 +228,7 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
     <button id="oTicket" style="display:none"><span class="ic">🎟️</span>Vé học</button>
     <button id="oCoins"><span class="ic">🪙</span>xu</button>
   </div>
+  <div id="workBar"><div id="workTxt"></div><button id="workHome">🏠 Về sớm</button></div>
   <div id="toolbar">
     <button id="tCall"><span class="ic">📣</span><span id="tCallLbl">Gọi tên</span></button>
     <button id="tGym"><span class="ic">🏃</span>Tập</button>
@@ -242,6 +250,7 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
 <div class="overlay" id="ovShop"><div class="sheet" id="shopSheet"></div></div>
 <div class="overlay" id="ovOffice"><div class="sheet" id="officeSheet"></div></div>
 <div class="overlay" id="ovMap"><div class="sheet" id="mapSheet"></div></div>
+<div class="overlay" id="ovFriends"><div class="sheet" id="friendsSheet"></div></div>
 <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
 
 <script>
@@ -824,7 +833,7 @@ function stepTime(p, now, sp = SPEED){
     S.hunger = Math.min(S.hunger, 15); S.thirst = Math.min(S.thirst || 0, 15); S.clean = 100; S.energy = Math.max(S.energy ?? 80, 85);
     S.sick = Math.max(0, (S.sick || 0) - dtH*6); p.bladder = 0; p.messes = []; return;
   }
-  if (p.sitting && from < p.sitting.until && !liveApply){   // nhân viên tới nhà chăm chó lúc chủ vắng
+  if (p.sitting && from < p.sitting.until && (!liveApply || p.work)){   // nhân viên tới nhà chăm chó lúc chủ vắng (tắt game hoặc đang đi làm)
     S.hunger = Math.min(S.hunger, 15); S.thirst = Math.min(S.thirst || 0, 15); S.clean = Math.max(S.clean, 90); S.energy = Math.max(S.energy ?? 80, 80);
     S.fit = Math.max(S.fit ?? 50, 60); S.happy = Math.max(S.happy, 60); S.sick = Math.max(0, (S.sick || 0) - dtH*6); p.bladder = 0; return;
   }
@@ -2632,7 +2641,7 @@ function frame(now){
   if (play) $("stopPlayTime").textContent = fmtTime(performance.now() - play.start);
 
   prof.resting = dog.state === "sleep";
-  tickRest(dt); tickDevices(); tickOutdoor(dt); tickAway(); netTick(dt);
+  tickRest(dt); tickDevices(); tickOutdoor(dt); tickAway(); tickWork(); netTick(dt);
   tickStats(); tickMesses();
   liveApply = true; applyTime(prof, Date.now()); liveApply = false;
   if (prof.messes.length !== messMeshes.length) buildMesses();
@@ -3405,6 +3414,7 @@ function dogAsleep(){ return restMode || dog.state === "sleep" || dog.state === 
 function sleepBlock(){ toast(`${prof.dog.name} đang ngủ 😴. Bấm nệm → ⏰ Gọi dậy rồi mới dắt đi dạo nha`, 4000); }
 function goOutside(){
   if (!prof || outdoor) return;
+  if (atWork()){ workHint(); return; }
   if (!dogAway() && dogAsleep()){ sleepBlock(); return; }
   if (prof.boarding && dogAway()){ toast(`${prof.dog.name} đang ở ${COMPANY}. Ra công ty đón về nha`); }
   else if (!prof.lost && (prof.stats.energy ?? 80) < ALERT.red){ toast("Chó mệt quá rồi. Cho chó ngủ trước rồi đi dạo nha"); return; }
@@ -3444,7 +3454,7 @@ function setOutdoor(on){
     if (leash) leash.visible = false;
     dog.path = []; dog.then = null; dog.jump = null; dog.pos = nearestFree(room.door.inside); dog.y = 0; setState("happy", 1200);
     buildProfileRoom(true);
-    $("toolbar").style.display = ""; $("outBar").classList.remove("show");
+    $("toolbar").style.display = ""; $("outBar").classList.remove("show"); refreshWork();
     sun.position.set(-2.2, 5.5, 3.2); sun.target.position.set(0, 0, 0);
     persist();
   }
@@ -3877,24 +3887,93 @@ function openMap(){
   closeRing(); closeFoodMenu(); closeBedMenu();
   const el = $("mapSheet");
   el.innerHTML = `<h2>🗺️ Bản đồ khu phố</h2><div class="sub">Chấm đỏ là chỗ bạn đang đứng. Bấm vào một nơi để tới ngay. Muốn có xu thì tự đi bộ (10 m được 2 xu).</div>
-    ${mapSVG()}<div class="row" style="margin-top:10px"><button class="btn gold" id="mapJobs">💼 Việc làm</button>${PLACES.map(pl => `<button class="btn ghost" data-go="${pl.k}">${pl.ic} ${pl.n}</button>`).join("")}</div>
+    ${mapSVG()}<div class="row" style="margin-top:10px"><button class="btn gold" id="mapJobs">💼 Việc làm</button><button class="btn gold" id="mapFr">👥 Bạn bè</button>${PLACES.map(pl => `<button class="btn ghost" data-go="${pl.k}">${pl.ic} ${pl.n}</button>`).join("")}</div>
     <div class="row" style="margin-top:10px"><button class="btn ghost" id="mapClose">Đóng</button></div>`;
   el.querySelectorAll("[data-go]").forEach(b => b.onclick = ()=>travelTo(b.dataset.go));
   $("mapClose").onclick = ()=>$("ovMap").classList.remove("show");
   $("mapJobs").onclick = openJobs;
+  $("mapFr").onclick = () => { $("ovMap").classList.remove("show"); openFriends(); };
   $("ovMap").classList.add("show");
 }
-function openJobs(){   // bước A: danh sách nghề (bước B "Đi làm" làm sau khi Sếp xem)
-  const el = $("mapSheet"), fh = h => String(h).padStart(2, "0") + "h";
-  el.innerHTML = `<h2>💼 Việc làm</h2><div class="sub">Giờ ca là giờ trong game (1 giờ game = ${String(60/GAME_SPEED).replace(".", ",")} phút thật). Lương là số xu tạm, sẽ chỉnh sau.</div>
-    <div class="jobs">${JOBS.map(j => `<div class="svc"><div class="svcT"><span class="ic">${j.ic}</span><div><b>${j.n}</b>
+function openJobs(){   // bước A: danh sách nghề; bước B (10/11): nút Đi làm trong giờ ca
+  const el = $("mapSheet"), fh = h => String(h).padStart(2, "0") + "h", W0 = prof && prof.work;
+  const now = prof ? gameNow(prof) : Date.now();
+  el.innerHTML = `<h2>💼 Việc làm</h2><div class="sub">Bây giờ là <b>${fmtClock(now)}</b> trong game (1 giờ game = ${String(60/GAME_SPEED).replace(".", ",")} phút thật). Lương là số xu tạm, sẽ chỉnh sau.</div>
+    ${W0 ? `<div class="lock">💼 Bạn đang làm <b>${esc(jobOf(W0.k).n)}</b>, hết ca lúc ${fmtClock(W0.until)}.</div>` : ""}
+    <div class="jobs">${JOBS.map(j => { const why = prof ? jobBlock(j) : "Chưa có hồ sơ", late = !why && gameHourOf(now) >= j.from + 1;
+      return `<div class="svc"><div class="svcT"><span class="ic">${j.ic}</span><div><b>${j.n}</b>
       <div class="small">📍 ${j.where}, ${STREETS[j.st]}</div>
-      <div class="small">🕐 Ca ${fh(j.from)} – ${fh(j.to)} (khoảng ${String(+jobRealMin(j).toFixed(1)).replace(".", ",")} phút thật) · 🪙 ${j.pay} xu/ca</div></div></div></div>`).join("")}</div>
-    <div class="small" style="margin-top:8px">Sắp có: tới giờ ca thì bấm "Đi làm".</div>
+      <div class="small">🕐 Ca ${fh(j.from)} – ${fh(j.to)} (khoảng ${String(+jobRealMin(j).toFixed(1)).replace(".", ",")} phút thật) · 🪙 ${j.pay} xu/ca</div></div></div>
+      ${why ? `<div class="small" style="color:#8a6d3b">⛔ ${esc(why)}</div>` : `<button class="btn gold" data-job="${j.k}">🏃 Đi làm${late ? ` (vào muộn: 🪙 ${jobPay(j, now)} xu)` : ""}</button>`}</div>`; }).join("")}</div>
     <div class="row" style="margin-top:10px"><button class="btn ghost" id="jobsBack">← Bản đồ</button></div>`;
+  el.querySelectorAll("[data-job]").forEach(b => b.onclick = () => goWork(b.dataset.job));
   $("jobsBack").onclick = openMap;
   $("ovMap").classList.add("show");
 }
+/* ---------- BƯỚC B: ĐI LÀM (Sếp duyệt 09/11, làm 10/11) ----------
+   Tới giờ ca thì bấm Đi làm: chủ rời nhà, chó ở nhà một mình (chỉ số giảm như lúc vắng chủ), hết ca nhận xu.
+   Không cho đi: ngoài giờ ca, trong giờ ngủ, chó đang ngủ, chó đi lạc. Có thuê "trông giữ tại nhà" của K&K thì chó không tụt chỉ số.
+   Vào ca muộn thì lương tính theo số giờ còn lại của ca; về sớm thì nhận theo số giờ đã làm. */
+const jobOf = k => JOBS.find(j => j.k === k) || JOBS[0];
+const gameHourOf = t => { const d = new Date(t); return d.getHours() + d.getMinutes()/60; };
+const fmtClock = t => { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+function shiftEnd(j, t){ const d = new Date(t); d.setHours(j.to, 0, 0, 0); return d.getTime(); }
+function jobPay(j, t){ return Math.max(1, Math.round(j.pay*clamp((shiftEnd(j, t) - t)/((j.to - j.from)*3600000), 0, 1))); }
+const atWork = () => !!(prof && prof.work);
+function jobBlock(j){   // lý do chưa được đi làm ca này, hoặc null
+  const P = prof, t = gameNow(P), h = gameHourOf(t), fh = x => String(x).padStart(2, "0") + "h", c = sleepCfg(P);
+  if (P.work) return "Bạn đang đi làm rồi";
+  if (inSleepHours(t, P)) return `Đang là giờ ngủ (${fmtHr(c.at)} – ${fmtHr(c.wake)}). Ngủ dậy rồi đi làm nha`;
+  if (h < j.from) return `Chưa tới giờ. Ca bắt đầu lúc ${fh(j.from)}`;
+  if (h >= j.to - 0.25) return `Ca hôm nay đã hết. Ngày mai ${fh(j.from)} đi làm nha`;
+  if (P.workDay && P.workDay.d === todayStr(t) && P.workDay.k === j.k) return "Hôm nay bạn đã làm ca này rồi";
+  if (P.lost) return `${P.dog.name} đang đi lạc. Tìm chó về trước đã`;
+  if (!dogAway() && dogAsleep()) return `${P.dog.name} đang ngủ 😴. Đợi chó dậy rồi mới đi làm`;
+  if (outdoor && (trainBusy() || outdoor.free)) return outdoor.free ? `${P.dog.name} đang chạy chơi. Gọi chó về trước đã` : "Chó đang học ở khu huấn luyện, đợi học xong";
+  return null;
+}
+function goWork(k){
+  const j = jobOf(k), why = jobBlock(j); if (why){ toast(why, 3500); return; }
+  $("ovMap").classList.remove("show"); closeRing(); closeFoodMenu(); closeBedMenu(); stopPlay(true);
+  const begin = () => {
+    const t = gameNow(prof);
+    prof.work = {k: j.k, start: t, until: shiftEnd(j, t), pay: jobPay(j, t)};
+    prof.workDay = {d: todayStr(t), k: j.k};
+    dog.path = []; dog.then = null; dog.faceCam = true; bubble("Chủ đi làm hả? Em ở nhà ngoan nha", 2200, true);
+    persist(); refreshWork();
+    toast(`💼 Bạn đi làm ${j.n} tới ${fmtClock(prof.work.until)}. ${prof.dog.name} ở nhà một mình${sitting() ? ", có nhân viên K&K trông" : ""}`, 4500);
+  };
+  if (outdoor){ if (outdoor.swim) stopSwim(false); outdoor.train = null; fade(() => { setOutdoor(false); begin(); }); }
+  else begin();
+}
+function endWork(early){
+  const W0 = prof && prof.work; if (!W0) return;
+  const t = Math.min(gameNow(prof), W0.until), span = Math.max(1, W0.until - W0.start);
+  const pay = early ? Math.round(W0.pay*clamp((t - W0.start)/span, 0, 1)) : W0.pay;
+  prof.work = null; if (pay > 0) addCoins(pay);
+  refreshWork(); persist();
+  if (!dogAway()){ dog.pos = nearestFree(room.door.inside); reunite(early ? "Chủ về sớm! Gâu gâu!" : "Chủ đi làm về rồi! Gâu gâu!"); }
+  toast(early ? `Bạn về sớm. Nhận 🪙 ${pay} xu cho phần đã làm` : `Hết ca! Bạn nhận 🪙 ${pay} xu 🎉`, 4500);
+}
+function refreshWork(){
+  const on = atWork(), bar = $("workBar");
+  if (bar) bar.classList.toggle("show", on);
+  $("toolbar").style.display = on || outdoor ? "none" : "";
+  $("btnMap").style.display = on ? "none" : "";
+  if (on) tickWorkBar(true);
+}
+let workBarAt = 0;
+function tickWorkBar(force){
+  const W0 = prof && prof.work; if (!W0) return;
+  const now = performance.now(); if (!force && now - workBarAt < 500) return; workBarAt = now;
+  const j = jobOf(W0.k), left = Math.max(0, W0.until - gameNow(prof)), realMin = left/GAME_SPEED/60000;
+  $("workTxt").innerHTML = `💼 <b>Đang đi làm: ${esc(j.n)}</b> · ${esc(j.where)}<br><span class="small">Hết ca lúc ${fmtClock(W0.until)} (còn khoảng ${realMin < 1 ? "dưới 1" : Math.ceil(realMin)} phút) · 🪙 ${W0.pay} xu · ${esc(prof.dog.name)} ở nhà ${sitting() ? "có K&K trông" : "một mình"}</span>`;
+}
+function tickWork(){
+  if (!atWork()) return;
+  if (gameNow(prof) >= prof.work.until) endWork(false); else tickWorkBar(false);
+}
+function workHint(){ hint(`Bạn đang đi làm, ${prof.dog.name} ở nhà một mình. Hết ca mới chơi với chó được (hoặc bấm 🏠 Về sớm)`, 3200); }
 function travelTo(k){
   $("ovMap").classList.remove("show");
   const pl = PLACES.find(x => x.k === k); if (!pl) return;
@@ -4097,6 +4176,7 @@ canvas.addEventListener("wheel", e=>{ e.preventDefault(); camZoom = clamp(camZoo
 function tapAt(x, y, hit = pickAt(x, y)){
   const kind = hit ? hit.object.userData.kind : null;
   if (outdoor){ tapOutdoor(x, y, hit); return; }
+  if (atWork()){ closeRing(); workHint(); return; }
   if (dogAway() && kind !== "door"){ closeRing(); awayHint(); return; }
   if (kind==="dog"){ closeRing(); petDog(); rubbing = {x, y, d: 0}; return; }
   if (kind==="bowl"){ closeRing(); openFoodMenu(); return; }
@@ -4438,7 +4518,7 @@ function fbInit(){
     for (const m of ["app", "auth", "database"]) await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${m}-compat.js`);
     firebase.initializeApp(FB_CONFIG); fb = firebase;
     fb.auth().getRedirectResult().catch(e => { if (e.code !== "auth/operation-not-supported-in-this-environment") toast("Chưa đăng nhập được (" + (e.code || e.message) + ")"); });
-    fb.auth().onAuthStateChanged(u => { fbUser = u; fbAuthKnown = true; if (u){ fbSaveMe(); try { localStorage.setItem(FB_FLAG, "1"); } catch(e){} } renderAccount(); refreshGate();
+    fb.auth().onAuthStateChanged(u => { fbUser = u; fbAuthKnown = true; if (u){ fbSaveMe(); frOn(); try { localStorage.setItem(FB_FLAG, "1"); } catch(e){} } else frOff(); renderAccount(); refreshGate();
       if (draft && draft.step === "acct" && $("ovCreate").classList.contains("show")) renderCreate(); });
     return fb;
   })();
@@ -4456,12 +4536,13 @@ async function fbLogin(){
 }
 async function fbDeleteAccount(){
   if (!fb || !fbUser) return;
-  if (!confirm("Xóa tài khoản Poppy?\n\nMọi dữ liệu của bạn trên máy chủ (hồ sơ, bản sao lưu chó, giờ chơi) sẽ bị xóa vĩnh viễn.")) return;
+  if (!confirm("Xóa tài khoản Poppy?\n\nMọi dữ liệu của bạn trên máy chủ (hồ sơ, bản sao lưu chó, giờ chơi, bạn bè) sẽ bị xóa vĩnh viễn.")) return;
   if (!confirm("Bạn chắc chắn chứ? Xóa rồi không lấy lại được.")) return;
   const uid = fbUser.uid, now = Date.now(), up = {[`users/${uid}`]: null, [`saves/${uid}`]: null, [`park/${uid}`]: null};
   for (let i = 0; i < 400; i++) up[`activity/${dayKey(now - i*86400000)}/${uid}`] = null;
   try {
     if (NET.joined) netLeave();
+    Object.assign(up, await frWipeUpdate(uid)); frOff();   // bạn bè, lời mời, danh sách chặn: xóa ở cả hai phía
     await fb.database().ref().update(up);
     try { await fbUser.delete(); }
     catch(e){ if (e.code !== "auth/requires-recent-login") throw e; await fbUser.reauthenticateWithPopup(new fb.auth.GoogleAuthProvider()); await fb.auth().currentUser.delete(); }
@@ -4471,7 +4552,7 @@ async function fbDeleteAccount(){
   if (wipeLocal) save.profiles = []; else save.profiles.forEach(x => { delete x.terms; });
   save.current = null; persist(); location.reload();
 }
-async function fbLogout(){ try { localStorage.removeItem(FB_FLAG); } catch(e){} if (NET.joined) netLeave(); if (fb) await fb.auth().signOut(); fbUser = null; renderAccount(); toast("Đã đăng xuất"); }
+async function fbLogout(){ try { localStorage.removeItem(FB_FLAG); } catch(e){} if (NET.joined) netLeave(); frOff(); if (fb) await fb.auth().signOut(); fbUser = null; renderAccount(); frBadge(); toast("Đã đăng xuất"); }
 function fbSaveMe(){
   if (!fb || !fbUser || !prof) return;
   const ref = fb.database().ref("users/" + fbUser.uid), up = {name: String(prof.owner || "Bạn").slice(0, 30), dog: String(prof.dog.name).slice(0, 30), breed: String(prof.dog.breed).slice(0, 20), lastSeen: Date.now()};
@@ -4497,10 +4578,12 @@ function renderAccount(){
   const el = $("acctBox"); if (!el) return;
   el.innerHTML = fbUser
     ? `<div class="small">🌐 <b>Đã đăng nhập</b> để chơi cùng bạn bè. Bạn bè sẽ thấy: <b>${esc(prof ? prof.owner : "")}</b> và chó <b>${esc(prof ? prof.dog.name : "")}</b> (không thấy email).</div>
-       <div class="row" style="margin-top:8px"><button class="btn ghost" id="acOut">Đăng xuất</button><button class="btn ghost" id="acDel" style="color:#B4341A;border-color:#E9B8A8">🗑️ Xóa tài khoản</button></div>`
+       <div class="row" style="margin-top:8px"><button class="btn gold" id="acFr">👥 Bạn bè</button><button class="btn ghost" id="acOut">Đăng xuất</button><button class="btn ghost" id="acDel" style="color:#B4341A;border-color:#E9B8A8">🗑️ Xóa tài khoản</button></div>`
     : `<div class="small">🌐 <b>Chơi cùng bạn bè</b>: đăng nhập để gặp bạn ở công viên. Bạn bè chỉ thấy tên nhân vật và tên chó, không thấy email.</div>
        <div class="row" style="margin-top:8px"><button class="btn gold" id="acIn">Đăng nhập bằng Google</button></div>`;
   const a = $("acIn"), b = $("acOut"), c = $("acDel"); if (a) a.onclick = fbLogin; if (b) b.onclick = fbLogout; if (c) c.onclick = fbDeleteAccount;
+  const f = $("acFr"); if (f) f.onclick = () => { $("ovProfiles").classList.remove("show"); openFriends(); };
+  frBadge();
 }
 { let flag = false; try { flag = !!localStorage.getItem(FB_FLAG); } catch(e){} if (!TESTING && (GATE_ON || flag)) fbInit().catch(() => {}); }   // bắt buộc tài khoản: luôn nạp; chưa bắt buộc: chỉ khi đã đăng nhập trước đó
 
@@ -4548,7 +4631,7 @@ function nameTag(text){
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: tex, depthTest: false, transparent: true})); sp.scale.set(2.2, 0.41, 1); sp.renderOrder = 8; return sp;
 }
 function peerUpsert(id, v){
-  if (!v || typeof v.x !== "number" || !BREEDS[v.breed]) return;
+  if (!v || typeof v.x !== "number" || !BREEDS[v.breed] || FR.blocks[id]) return;   // người mình đã chặn: không hiện
   let P = NET.peers[id];
   if (!P){
     const own = buildOwner3D({hair: v.hair, shirt: /^#[0-9A-Fa-f]{3,8}$/.test(v.shirt || "") ? v.shirt : "#4C8FE0", pants: v.pants}); own.root.scale.setScalar(1.3); scene.add(own.root);
@@ -4581,9 +4664,136 @@ function tickPeers(dt){
     P.tag.position.set(c.x, -0.16 + 1.75, c.z);
   }
 }
+/* ---------- BƯỚC 4: KẾT BẠN (Sếp duyệt 09/11, làm 10/11) ----------
+   Bấm người chơi khác ở công viên → Kết bạn / Chặn / Báo cáo. Người kia Đồng ý hoặc Từ chối (phải đồng ý mới thành bạn).
+   Dữ liệu: friendReq/<người nhận>/<người gửi>, friendSent/<người gửi>/<người nhận>, friends/<uid>/<bạn>, blocks/<uid>/<người bị chặn>,
+   reports/<mã> (chỉ Sếp đọc). Chỉ lưu tên nhân vật và tên chó, không email. Xóa tài khoản thì xóa hết phần này. */
+const REPORT_REASONS = ["Nói lời không hay", "Làm phiền, quấy rối", "Tên hoặc hình không phù hợp", "Lý do khác"];
+const FR = {on: false, uid: null, refs: [], req: {}, friends: {}, blocks: {}, sent: {}, seenReq: null, view: null};
+const frDB = () => fb.database();
+const myCard = () => ({name: String((prof && prof.owner) || "Bạn").slice(0, 30), dog: String(prof ? prof.dog.name : "Chó").slice(0, 30)});
+const cut = v => String(v || "").slice(0, 30);
+function frOn(){
+  if (!fb || !fbUser || (FR.on && FR.uid === fbUser.uid)) return;
+  frOff(); FR.on = true; FR.uid = fbUser.uid; FR.seenReq = null;
+  const watch = (path, key) => { const r = frDB().ref(path + "/" + FR.uid); r.on("value", sn => { FR[key] = sn.val() || {}; frChanged(key); }, e => console.warn("bạn bè:", path, e)); FR.refs.push(r); };
+  watch("friendReq", "req"); watch("friends", "friends"); watch("blocks", "blocks"); watch("friendSent", "sent");
+}
+function frOff(){ for (const r of FR.refs) r.off(); Object.assign(FR, {on: false, uid: null, refs: [], req: {}, friends: {}, blocks: {}, sent: {}, seenReq: null}); frBadge(); }
+function frChanged(key){
+  if (key === "req"){
+    const ids = Object.keys(FR.req);
+    if (FR.seenReq) for (const id of ids) if (!FR.seenReq.has(id)) toast(`👥 ${FR.req[id].name} (chó ${FR.req[id].dog}) muốn kết bạn với bạn. Bấm 👥 ở trên để trả lời`, 5000);
+    FR.seenReq = new Set(ids);
+  }
+  if (key === "blocks") for (const id of Object.keys(FR.blocks)) peerRemove(id);
+  frBadge();
+  if ($("ovFriends").classList.contains("show")) FR.view ? showPeer(FR.view) : (FR.reporting ? null : openFriends());
+}
+function frBadge(){
+  const b = $("btnFriends"); if (!b) return;
+  const n = Object.keys(FR.req).length;
+  b.style.display = fbUser ? "" : "none"; b.textContent = n ? `👥 ${n}` : "👥"; b.classList.toggle("hot", n > 0);
+}
+function frRel(id){ return FR.blocks[id] ? "blocked" : FR.friends[id] ? "friend" : FR.req[id] ? "asked" : FR.sent[id] ? "sent" : "none"; }
+async function frRun(up, okMsg){
+  if (!fb || !fbUser){ toast("Cần đăng nhập để kết bạn"); return false; }
+  try { await frDB().ref().update(up); if (okMsg) toast(okMsg, 3500); return true; }
+  catch(e){ toast("Chưa làm được (" + (e.code || e.message) + "). Thử lại nha", 4000); return false; }
+}
+// các gói cập nhật (tách riêng để tự kiểm tra được)
+function upAsk(me, id, card, now){ return {[`friendReq/${id}/${me}`]: Object.assign(myCard(), {t: now}), [`friendSent/${me}/${id}`]: {name: cut(card.name), dog: cut(card.dog), t: now}}; }
+function upAccept(me, id, r, now){ return {[`friends/${me}/${id}`]: {name: cut(r.name) || "Bạn", dog: cut(r.dog), t: now}, [`friends/${id}/${me}`]: Object.assign(myCard(), {t: now}), [`friendReq/${me}/${id}`]: null, [`friendSent/${id}/${me}`]: null}; }
+function upBlock(me, id, card, now){ return {[`blocks/${me}/${id}`]: {name: cut(card.name) || "Người chơi", dog: cut(card.dog), t: now},
+  [`friends/${me}/${id}`]: null, [`friends/${id}/${me}`]: null, [`friendReq/${me}/${id}`]: null, [`friendReq/${id}/${me}`]: null, [`friendSent/${me}/${id}`]: null, [`friendSent/${id}/${me}`]: null}; }
+function frAsk(id, card){ return frRun(upAsk(fbUser.uid, id, card, Date.now()), `Đã gửi lời mời kết bạn tới ${card.name}. Chờ bạn ấy đồng ý nha`); }
+function frCancel(id){ const me = fbUser.uid; return frRun({[`friendReq/${id}/${me}`]: null, [`friendSent/${me}/${id}`]: null}, "Đã hủy lời mời"); }
+function frAccept(id){ const r = FR.req[id] || {}; return frRun(upAccept(fbUser.uid, id, r, Date.now()), `🎉 ${r.name || "Bạn ấy"} và bạn đã là bạn bè`); }
+function frDecline(id){ const me = fbUser.uid; return frRun({[`friendReq/${me}/${id}`]: null, [`friendSent/${id}/${me}`]: null}, "Đã từ chối lời mời"); }
+function frUnfriend(id){
+  const f = FR.friends[id] || {}; if (!confirm(`Xóa ${f.name || "bạn này"} khỏi danh sách bạn bè?`)) return;
+  const me = fbUser.uid; return frRun({[`friends/${me}/${id}`]: null, [`friends/${id}/${me}`]: null}, "Đã xóa bạn");
+}
+function frBlock(id, card){
+  if (!confirm(`Chặn ${card.name}?\n\nBạn sẽ không thấy người này ở công viên nữa, người này không gửi lời mời kết bạn cho bạn được. Nếu đang là bạn bè thì sẽ hết là bạn.`)) return;
+  return frRun(upBlock(fbUser.uid, id, card, Date.now()), `Đã chặn ${card.name}`).then(ok => { if (ok){ peerRemove(id); openFriends(); } });
+}
+function frUnblock(id){ return frRun({[`blocks/${fbUser.uid}/${id}`]: null}, "Đã bỏ chặn"); }
+function frReport(id, card){
+  const el = $("friendsSheet"); FR.view = null; FR.reporting = true;
+  el.innerHTML = `<h2>🚩 Báo cáo ${esc(card.name)}</h2><div class="sub">Chủ game sẽ xem báo cáo. Người bị báo cáo không biết ai báo.</div>
+    <div class="svcList">${REPORT_REASONS.map((r, i) => `<button class="btn ghost" data-r="${i}" style="text-align:left">${esc(r)}</button>`).join("")}</div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" id="frBack">← Quay lại</button></div>`;
+  el.querySelectorAll("[data-r]").forEach(b => b.onclick = async () => {
+    const key = frDB().ref("reports").push().key;
+    const ok = await frRun({[`reports/${key}`]: {from: fbUser.uid, about: id, aboutName: cut(card.name) || "Người chơi", aboutDog: cut(card.dog), reason: REPORT_REASONS[+b.dataset.r], t: Date.now()}},
+      "Đã gửi báo cáo. Cảm ơn bạn 💛");
+    FR.reporting = false;
+    if (ok && !FR.blocks[id] && confirm(`Bạn có muốn chặn luôn ${card.name} không?`)) frBlock(id, card); else showPeer(id);
+  });
+  $("frBack").onclick = () => { FR.reporting = false; showPeer(id); };
+}
+function peerCard(id){
+  const P = NET.peers[id], v = P && P.v, f = FR.friends[id] || FR.req[id] || FR.sent[id] || FR.blocks[id] || {};
+  return {name: (v && v.name) || f.name || "Người chơi", dog: (v && v.dog) || f.dog || "", breed: v && v.breed, here: !!(P && Date.now() - v.t < NET_STALE_MS)};
+}
 function showPeer(id){
-  const P = NET.peers[id]; if (!P) return;
-  toast(`👋 ${P.v.name} và chó ${P.v.dog} đang chơi ở công viên. Kết bạn: sắp có (bước 4)`, 4000);
+  if (!id) return;
+  closeRing(); FR.view = id; FR.reporting = false;
+  const c = peerCard(id), rel = fbUser ? frRel(id) : "login", el = $("friendsSheet");
+  const head = `<h2>👋 ${esc(c.name)}</h2><div class="sub">${c.dog ? `Chó <b>${esc(c.dog)}</b>${c.breed && BREEDS[c.breed] ? ` (${BREEDS[c.breed].name})` : ""}` : ""}${c.here ? " · 🟢 đang ở công viên" : ""}</div>`;
+  const main = {
+    login: `<div class="lock">Đăng nhập để kết bạn.</div>`,
+    none: `<button class="btn gold" id="frAdd">➕ Kết bạn</button>`,
+    sent: `<div class="lock">⏳ Đã gửi lời mời. Chờ ${esc(c.name)} đồng ý.</div><div class="row" style="margin-top:8px"><button class="btn ghost" id="frCancel">Hủy lời mời</button></div>`,
+    asked: `<div class="lock">${esc(c.name)} muốn kết bạn với bạn.</div><div class="row" style="margin-top:8px"><button class="btn gold" id="frYes">✅ Đồng ý</button><button class="btn ghost" id="frNo">Từ chối</button></div>`,
+    friend: `<div class="lock">💛 Hai bạn là bạn bè.</div><div class="row" style="margin-top:8px"><button class="btn ghost" id="frDel">Xóa bạn</button></div>`,
+    blocked: `<div class="lock">🚫 Bạn đã chặn người này.</div><div class="row" style="margin-top:8px"><button class="btn ghost" id="frUnb">Bỏ chặn</button></div>`}[rel];
+  el.innerHTML = head + main + `<div class="row" style="margin-top:14px;padding-top:10px;border-top:2px dashed #E5DCC8">
+      ${rel !== "blocked" && rel !== "login" ? `<button class="btn ghost" id="frBlk">🚫 Chặn</button>` : ""}${rel !== "login" ? `<button class="btn ghost" id="frRep">🚩 Báo cáo</button>` : ""}
+      <button class="btn ghost" id="frList">👥 Bạn bè</button><button class="btn ghost" id="frClose">Đóng</button></div>`;
+  const on = (k, f) => { const b = $(k); if (b) b.onclick = f; };
+  on("frAdd", () => frAsk(id, c)); on("frCancel", () => frCancel(id)); on("frYes", () => frAccept(id)); on("frNo", () => frDecline(id));
+  on("frDel", () => frUnfriend(id)); on("frUnb", () => frUnblock(id)); on("frBlk", () => frBlock(id, c)); on("frRep", () => frReport(id, c));
+  on("frList", openFriends); on("frClose", closeFriends);
+  $("ovFriends").classList.add("show");
+}
+function closeFriends(){ FR.view = null; FR.reporting = false; $("ovFriends").classList.remove("show"); }
+function openFriends(){
+  closeRing(); FR.view = null; FR.reporting = false;
+  const el = $("friendsSheet"), here = id => NET.peers[id] && Date.now() - NET.peers[id].v.t < NET_STALE_MS;
+  const row = (id, v, btns) => `<div class="svc" style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0;cursor:pointer" data-peer="${esc(id)}"><b>${esc(v.name || "Người chơi")}</b>
+      <div class="small">${v.dog ? "🐶 " + esc(v.dog) : ""}${here(id) ? " · 🟢 đang ở công viên" : ""}</div></div>${btns}</div>`;
+  const sec = (t, items, empty) => `<h3 style="margin:14px 0 6px">${t}</h3>${items.length ? `<div class="svcList">${items.join("")}</div>` : `<div class="small">${empty}</div>`}`;
+  if (!fbUser){
+    el.innerHTML = `<h2>👥 Bạn bè</h2><div class="lock">Đăng nhập để kết bạn (Đổi hồ sơ → Đăng nhập bằng Google).</div><div class="row" style="margin-top:10px"><button class="btn ghost" id="frClose">Đóng</button></div>`;
+  } else {
+    const E = o => Object.entries(o).sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
+    el.innerHTML = `<h2>👥 Bạn bè</h2><div class="sub">Gặp ai ở công viên thì bấm vào nhân vật của bạn ấy để kết bạn. Phải được đồng ý mới thành bạn.</div>
+      ${sec("Lời mời kết bạn", E(FR.req).map(([id, v]) => row(id, v, `<button class="btn gold" data-yes="${esc(id)}">Đồng ý</button><button class="btn ghost" data-no="${esc(id)}">Từ chối</button>`)), "Chưa có lời mời nào.")}
+      ${sec("Bạn bè", E(FR.friends).map(([id, v]) => row(id, v, `<button class="btn ghost" data-del="${esc(id)}">Xóa</button>`)), "Chưa có bạn nào. Ra công viên làm quen nha!")}
+      ${E(FR.sent).filter(([id]) => !FR.friends[id]).length ? sec("Đang chờ trả lời", E(FR.sent).filter(([id]) => !FR.friends[id]).map(([id, v]) => row(id, v, `<button class="btn ghost" data-cancel="${esc(id)}">Hủy</button>`)), "") : ""}
+      ${Object.keys(FR.blocks).length ? sec("Đã chặn", E(FR.blocks).map(([id, v]) => row(id, v, `<button class="btn ghost" data-unb="${esc(id)}">Bỏ chặn</button>`)), "") : ""}
+      <div class="row" style="margin-top:14px"><button class="btn ghost" id="frClose">Đóng</button></div>`;
+    const all = (attr, f) => el.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => f(b.getAttribute("data-" + attr)));
+    all("yes", frAccept); all("no", frDecline); all("del", frUnfriend); all("cancel", frCancel); all("unb", frUnblock); all("peer", showPeer);
+  }
+  $("frClose").onclick = closeFriends;
+  $("ovFriends").classList.add("show");
+}
+// xóa tài khoản: gỡ hết dữ liệu bạn bè ở cả hai phía
+async function frWipeUpdate(uid){
+  const up = {}, get = async p => { try { return (await frDB().ref(p + "/" + uid).get()).val() || {}; } catch(e){ return {}; } };
+  const [friends, req, sent] = await Promise.all([get("friends"), get("friendReq"), get("friendSent")]);
+  return frWipeFrom(uid, friends, req, sent);
+}
+function frWipeFrom(uid, friends, req, sent){
+  const up = {};
+  for (const id of Object.keys(friends || {})){ up[`friends/${uid}/${id}`] = null; up[`friends/${id}/${uid}`] = null; }
+  for (const id of Object.keys(req || {})) up[`friendReq/${uid}/${id}`] = null;
+  for (const id of Object.keys(sent || {})) up[`friendReq/${id}/${uid}`] = null;
+  up[`friendSent/${uid}`] = null; up[`blocks/${uid}`] = null;
+  return up;
 }
 
 function showProfiles(){
@@ -4637,6 +4847,7 @@ function startProfile(id){
   buildProfileRoom(true);
   buildDog3D(prof.dog);
   if (fbUser) fbSaveMe();   // đổi hồ sơ: bạn bè thấy đúng tên nhân vật và chó đang chơi
+  refreshWork();
   acctTick.terms = acctTick.age = false; setTimeout(refreshGate, 0);
   for (const m of prof.messes){ const f = nearestFree(m); m.x = f.x; m.z = f.z; }
   dog.pos = nearestFree({x: -0.2, z: 0.7}); dog.heading = 0; dog.path = []; dog.then = null; dog.lookAt = null; dog.faceCam = true; dog.y = 0; dog.onChair = false; dog.jump = null; dog.pendingPerch = null;
@@ -5070,6 +5281,7 @@ $("btnProfiles").onclick = showProfiles;
 $("btnFollow").onclick = ()=>setCamFree(false);
 $("oHome").onclick = goHome;
 $("btnMap").onclick = openMap;
+$("btnFriends").onclick = openFriends;
 $("oCall").onclick = callDogOut;
 $("oStop").onclick = ()=>stopSwim(false);
 $("oFree").onclick = freeDog;
@@ -5077,6 +5289,7 @@ $("oTicket").onclick = openTraining;
 $("oTreat").onclick = ()=>{ if (dogAway()){ awayHint(); return; } giveTreat(); };
 $("oCoins").onclick = ()=>toast(`Bạn có 🪙 ${coins()} xu. Đi dạo 10 m được 2 xu, cho chó đi vệ sinh ngoài cỏ được 2 xu, lần đi dạo đầu mỗi ngày được 10 xu`, 5000);
 $("toolbar").addEventListener("click", e=>{ if (prof && dogAway()){ e.stopPropagation(); awayHint(); } }, true);
+$("workHome").onclick = ()=>{ if (atWork() && confirm("Về sớm? Bạn chỉ nhận xu cho phần ca đã làm.")) endWork(true); };
 $("btnRoom").onclick = ()=>{ if (prof){ renderRoomSheet(); $("ovRoom").classList.add("show"); } };
 // sơ đồ nhìn từ trên xuống của một bố cục, tô theo bộ màu
 function roomSVG(L, P){
@@ -5466,6 +5679,57 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     const run = h => { fresh(); prof.sitting = null; prof.stats.energy = 40; prof.stats.hunger = 20; prof.last = at(h); applyTime(prof, at(h) + 2*3600000); prof.clock = 0; return {e: prof.stats.energy, hu: prof.stats.hunger}; };
     const nR = run(23), dR = run(12);
     ok("tắt app lúc giờ ngủ: năng lượng hồi, đói chậm hơn ban ngày", nR.e > 40 && dR.e < 40 && nR.hu - 20 < (dR.hu - 20)*0.6, JSON.stringify([nR, dR])); }
+  // BƯỚC B: Đi làm (10/11)
+  { const at = (h, m = 0) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.getTime(); }, J = k => jobOf(k);
+    const fade0 = fade; fade = m => m(); fresh(); prof.sitting = null; prof.boarding = null; prof.lost = null; prof.work = null; prof.workDay = null; prof.coins = 100; restMode = false; setState("idle", 0);
+    prof.clock = at(7); ok("trước giờ ca: không đi làm được", /Chưa tới giờ/.test(jobBlock(J("office")) || ""));
+    prof.clock = at(23); ok("trong giờ ngủ: không đi làm được", /giờ ngủ/.test(jobBlock(J("waiter")) || ""));
+    prof.clock = at(13); ok("ca đã hết: không đi làm được", /đã hết/.test(jobBlock(J("shipper")) || ""));
+    prof.clock = at(13); restMode = true; dog.state = "sleep"; ok("chó đang ngủ: không đi làm được, có báo", /đang ngủ/.test(jobBlock(J("office")) || "")); restMode = false; setState("idle", 0);
+    prof.clock = at(6); openJobs(); ok("đúng giờ ca thì có nút Đi làm", !!$("mapSheet").querySelector('[data-job="shipper"]') && !$("mapSheet").querySelector('[data-job="office"]'));
+    $("mapSheet").querySelector('[data-job="shipper"]').click();
+    ok("bấm Đi làm: đang đi làm, hết ca 12:00, lương đủ 40 xu", atWork() && prof.work.k === "shipper" && fmtClock(prof.work.until) === "12:00" && prof.work.pay === 40);
+    ok("đang đi làm: thanh Đi làm hiện, thanh công cụ ẩn", $("workBar").classList.contains("show") && $("toolbar").style.display === "none" && $("workTxt").innerText.includes("Shipper"));
+    closeRing(); tapAt(5, 5, null); ok("đang đi làm: bấm vào phòng không mở menu lệnh", !ringOpen);
+    goOutside(); ok("đang đi làm: không ra ngoài được", !outdoor);
+    ok("đang đi làm: không nhận ca khác", /đang đi làm/.test(jobBlock(J("pharm")) || ""));
+    prof.stats.hunger = 10; prof.last = Date.now() - 1000; for (let i = 0; i < 150; i++){ liveApply = true; applyTime(prof, prof.last + 1000); liveApply = false; }
+    ok("đi làm không thuê trông: chó vẫn đói dần như lúc vắng chủ", prof.stats.hunger > 15, prof.stats.hunger.toFixed(1));
+    prof.sitting = {until: gameNow(prof) + 86400000}; prof.stats.hunger = 10; prof.stats.fit = 30;
+    for (let i = 0; i < 150; i++){ liveApply = true; applyTime(prof, prof.last + 1000); liveApply = false; }
+    ok("có thuê trông giữ tại nhà K&K: đi làm chó không tụt chỉ số", prof.stats.hunger <= 15 && prof.stats.fit >= 60); prof.sitting = null;
+    prof.work.until = gameNow(prof) - 1; tickWork();
+    ok("hết ca: nhận 40 xu, về nhà, thanh công cụ hiện lại", !atWork() && coins() === 140 && !$("workBar").classList.contains("show") && $("toolbar").style.display === "");
+    ok("làm xong ca rồi: hôm nay không làm lại ca đó", /đã làm ca này/.test(jobBlock(J("shipper")) || ""));
+    prof.clock = at(11); prof.workDay = null; ok("vào ca muộn (11h, ca 6h–12h): lương theo giờ còn lại", jobPay(J("shipper"), at(11)) === 7);
+    prof.clock = at(9); prof.coins = 0; goWork("office"); prof.clock = prof.work.start + (prof.work.until - prof.work.start)/2; endWork(true);
+    ok("về sớm nửa ca: nhận nửa lương", !atWork() && coins() === Math.round(jobPay(J("office"), at(9))/2), coins());
+    prof.clock = at(16); setOutdoor(true); travelTo("park"); prof.workDay = null; goWork("waiter");
+    ok("đang ở ngoài bấm Đi làm: dắt chó về nhà rồi đi làm", !outdoor && atWork() && prof.work.k === "waiter"); endWork(true);
+    ok("giờ ngủ 22h–6h lúc đang chơi kéo dài 20 phút thật", (24 - 22 + 6)*60/GAME_SPEED === 20);
+    prof.work = null; prof.workDay = null; prof.clock = 0; prof.coins = 100; refreshWork(); fade = fade0; $("ovMap").classList.remove("show"); setState("idle", 0); dog.path = []; }
+  // BƯỚC 4: kết bạn (10/11) — phần trên máy, không gọi máy chủ
+  { const me = "uMe", you = "uYou", t = 123, sv = fbUser, card = {name: "Bạn A", dog: "Mực"};
+    const a = upAsk(me, you, card, t);
+    ok("kết bạn: gửi lời mời vào hộp của người nhận, ghi lại ở danh sách đã gửi", a[`friendReq/${you}/${me}`] && a[`friendReq/${you}/${me}`].t === t && a[`friendSent/${me}/${you}`].name === "Bạn A");
+    ok("lời mời chỉ có tên nhân vật và tên chó, không email", Object.keys(a[`friendReq/${you}/${me}`]).sort().join() === "dog,name,t");
+    const c = upAccept(me, you, {name: "Bạn A", dog: "Mực"}, t);
+    ok("đồng ý: thành bạn ở cả hai phía, xóa lời mời", c[`friends/${me}/${you}`] && c[`friends/${you}/${me}`] && c[`friendReq/${me}/${you}`] === null && c[`friendSent/${you}/${me}`] === null);
+    const b = upBlock(me, you, card, t);
+    ok("chặn: hết là bạn ở cả hai phía, xóa mọi lời mời", b[`blocks/${me}/${you}`] && [`friends/${me}/${you}`, `friends/${you}/${me}`, `friendReq/${me}/${you}`, `friendReq/${you}/${me}`].every(k => b[k] === null));
+    const w = frWipeFrom(me, {f1: {}}, {r1: {}}, {s1: {}});
+    ok("xóa tài khoản: xóa bạn bè ở cả hai phía, lời mời đã nhận và đã gửi, danh sách chặn", w[`friends/${me}/f1`] === null && w[`friends/f1/${me}`] === null && w[`friendReq/${me}/r1`] === null && w[`friendReq/s1/${me}`] === null && w[`blocks/${me}`] === null);
+    fbUser = {uid: me}; Object.assign(FR, {req: {}, friends: {}, blocks: {}, sent: {}});
+    showPeer(you); ok("người lạ: có nút Kết bạn, Chặn, Báo cáo", !!$("frAdd") && !!$("frBlk") && !!$("frRep") && $("ovFriends").classList.contains("show"));
+    FR.sent = {[you]: card}; showPeer(you); ok("đã gửi lời mời: chờ đồng ý, hủy được", !$("frAdd") && !!$("frCancel"));
+    FR.sent = {}; FR.req = {[you]: Object.assign({t}, card)}; showPeer(you); ok("được mời: có nút Đồng ý và Từ chối", !!$("frYes") && !!$("frNo"));
+    openFriends(); ok("danh sách bạn bè: hiện lời mời đang chờ", $("friendsSheet").innerText.includes("Bạn A") && !!$("friendsSheet").querySelector("[data-yes]"));
+    frBadge(); ok("có lời mời: nút 👥 trên cùng báo số", $("btnFriends").textContent === "👥 1" && $("btnFriends").style.display === "");
+    FR.req = {}; FR.friends = {[you]: Object.assign({t}, card)}; showPeer(you); ok("đã là bạn: có nút Xóa bạn", !!$("frDel"));
+    FR.friends = {}; FR.blocks = {[you]: Object.assign({t}, card)}; showPeer(you); ok("đã chặn: có nút Bỏ chặn, không còn Kết bạn", !!$("frUnb") && !$("frAdd"));
+    frReport(you, card); ok("báo cáo: có 4 lý do để chọn", $("friendsSheet").querySelectorAll("[data-r]").length === 4);
+    peerUpsert(you, {name: "Bạn A", dog: "Mực", breed: "pom", x: 40, z: 0, dx: 40, dz: 0, t: Date.now()}); ok("người đã chặn không hiện ở công viên", !NET.peers[you]);
+    closeFriends(); Object.assign(FR, {req: {}, friends: {}, blocks: {}, sent: {}}); fbUser = sv; frBadge(); ok("chưa đăng nhập: không hiện nút 👥", $("btnFriends").style.display === "none"); }
   // cổng xác nhận tuổi (Sếp chốt 09/11: từ 13 tuổi trở lên)
   { try { localStorage.removeItem(AGE_KEY); } catch(e){}
     openCreate(false); ok("tạo hồ sơ mới: hỏi tháng, năm sinh trước (câu hỏi trung lập)", $("createSheet").innerText.includes("Bạn sinh tháng nào") && !!$("cYr"));

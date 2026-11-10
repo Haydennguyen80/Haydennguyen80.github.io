@@ -123,6 +123,119 @@
           ".validate": false
         }
       }
+    },
+    "friendReq": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".validate": "newData.hasChildren(['name','dog','t'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+          },
+          "dog": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "t": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          },
+          ".write": "auth != null && ((auth.uid === $from && $from !== $to && (!newData.exists() || (!data.exists() && !root.child('blocks/' + $to + '/' + $from).exists() && !root.child('friends/' + $to + '/' + $from).exists() && root.child('users/' + $from).exists()))) || (auth.uid === $to && !newData.exists()))"
+        }
+      }
+    },
+    "friendSent": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "$to": {
+          ".validate": "newData.hasChildren(['name','dog','t'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+          },
+          "dog": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "t": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          },
+          ".write": "auth != null && auth.uid === $to && !newData.exists()"
+        }
+      }
+    },
+    "friends": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$other": {
+          ".validate": "newData.hasChildren(['name','dog','t'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+          },
+          "dog": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "t": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          },
+          ".write": "auth != null && $uid !== $other && (auth.uid === $uid || auth.uid === $other) && (!newData.exists() || (auth.uid === $uid && root.child('friendReq/' + $uid + '/' + $other).exists()) || (auth.uid === $other && root.child('friendReq/' + $other + '/' + $uid).exists()))"
+        }
+      }
+    },
+    "blocks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "$other": {
+          ".validate": "newData.hasChildren(['name','t']) && $other !== $uid",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "dog": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "t": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          },
+          "$x": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "reports": {
+      ".read": "auth != null && auth.uid === 'gHUDp3jCTYUfy5RiPuCdpv5Dwz02'",
+      "$id": {
+        ".write": "auth != null && ((!data.exists() && newData.child('from').val() === auth.uid) || (auth.uid === 'gHUDp3jCTYUfy5RiPuCdpv5Dwz02' && !newData.exists()))",
+        ".validate": "newData.hasChildren(['from','about','aboutName','reason','t'])",
+        "from": {
+          ".validate": "newData.isString()"
+        },
+        "about": {
+          ".validate": "newData.isString() && newData.val().length <= 128 && newData.val() !== auth.uid"
+        },
+        "aboutName": {
+          ".validate": "newData.isString() && newData.val().length <= 30"
+        },
+        "aboutDog": {
+          ".validate": "newData.isString() && newData.val().length <= 30"
+        },
+        "reason": {
+          ".validate": "newData.isString() && newData.val().length <= 60"
+        },
+        "t": {
+          ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+        },
+        "$x": {
+          ".validate": false
+        }
+      }
     }
   }
 }

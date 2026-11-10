@@ -67,6 +67,7 @@ details summary{cursor:pointer;color:var(--ink2);font-weight:600;margin-top:8px}
         <details><summary>Xem dạng bảng</summary><div class="tblwrap" id="tblNew"></div></details>
       </div>
       <div class="card"><h2>Danh sách tài khoản</h2><div class="tblwrap" id="tblUsers"></div></div>
+      <div class="card"><h2>🚩 Báo cáo người chơi</h2><div class="sub" style="margin:0 0 8px">Người chơi bấm 🚩 Báo cáo trên nhân vật người khác ở công viên. Người bị báo cáo không biết ai báo.</div><div class="tblwrap" id="tblReports"></div></div>
     </div>
   </section>
 </main>
@@ -103,8 +104,8 @@ async function init(){
 }
 async function load(){
   const db = fb.database(), from = dayKey(Date.now() - 29*DAY);
-  const [u, a, pk] = await Promise.all([db.ref("users").get(), db.ref("activity").orderByKey().startAt(from).get(), db.ref("park").get().catch(() => null)]);
-  render({users: u.val() || {}, activity: a.val() || {}, park: (pk && pk.val()) || {}});
+  const [u, a, pk, rp] = await Promise.all([db.ref("users").get(), db.ref("activity").orderByKey().startAt(from).get(), db.ref("park").get().catch(() => null), db.ref("reports").get().catch(() => null)]);
+  render({users: u.val() || {}, activity: a.val() || {}, park: (pk && pk.val()) || {}, reports: (rp && rp.val()) || {}});
 }
 
 function compute(D){
@@ -146,6 +147,9 @@ function render(D){
   $("tblNew").innerHTML = table(["Ngày", "Tài khoản mới"], S.newPer.slice().reverse().map(d => [fmtDay(d.k), d.v]), [1]);
   const us = S.users.slice().sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
   $("tblUsers").innerHTML = us.length ? table(["Nhân vật", "Chó", "Ngày đăng ký", "Lần cuối vào", "Tổng giờ chơi"], us.map(x => [esc(x.name), esc(x.dog), fmtDate(x.created), ago(x.lastSeen), fmtDur(x.playSec)]), [4]) : '<div class="sub">Chưa có tài khoản nào.</div>';
+  const nameOf = id => (D.users[id] && D.users[id].name) || "(đã xóa tài khoản)";
+  const rs = Object.values(D.reports || {}).sort((a, b) => (b.t || 0) - (a.t || 0));
+  $("tblReports").innerHTML = rs.length ? table(["Lúc", "Người bị báo cáo", "Chó", "Lý do", "Người báo"], rs.map(r => [fmtDate(r.t) + " " + new Date(r.t).toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"}), esc(r.aboutName), esc(r.aboutDog || ""), esc(r.reason), esc(nameOf(r.from))])) : '<div class="sub">Chưa có báo cáo nào.</div>';
 }
 function table(head, rows, numCols = []){
   return `<table><thead><tr>${head.map((h, i) => `<th class="${numCols.includes(i) ? "n" : ""}">${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${numCols.includes(i) ? "n" : ""}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
@@ -176,7 +180,7 @@ function demoData(){   // ?demo=1: số liệu giả để xem bố cục, khôn
   const now = Date.now(), users = {}, activity = {}, names = ["Aiden","Ryan","Hayden","Bảo","Linh","Minh","Khôi","Khang","An","Vy","Nam","Thư"], dogs = ["Bo","Mochi","TIti","Mực","Lu","Na"];
   names.forEach((n, i) => { const c = now - (35 - i*3)*DAY; users["u"+i] = {name: n, dog: dogs[i % dogs.length], breed: "pom", created: c, lastSeen: i % 4 === 3 ? c + DAY : now - i*3600000, playSec: 3600*(2 + i*1.5)}; });
   for (let d = 0; d < 30; d++){ const k = dayKey(now - d*DAY); activity[k] = {}; names.forEach((n, i) => { if (i % 4 !== 3 && (d + i) % 3 !== 0 && now - d*DAY > users["u"+i].created) activity[k]["u"+i] = 600 + ((d*7 + i*13) % 40)*60; }); }
-  return {users, activity, park: {u0: {t: now}}};
+  return {users, activity, park: {u0: {t: now}}, reports: {r1: {from: "u1", about: "u5", aboutName: "Minh", aboutDog: "Lu", reason: "Làm phiền, quấy rối", t: now - 5*3600000}}};
 }
 init().catch(e => { $("who").textContent = "Không tải được: " + e.message; });
 </script>
