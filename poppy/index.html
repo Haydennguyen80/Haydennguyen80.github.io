@@ -59,6 +59,8 @@ h1,h2,h3,.lora{font-family:"Baloo 2",Nunito,sans-serif;font-weight:800}
 #stopPlay span{font-weight:600;opacity:.8;margin-left:4px}
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--c1d);color:var(--c2l);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:60;max-width:90%;text-align:center}
 #toast.show{opacity:1}
+#updBar{position:fixed;left:50%;top:10px;transform:translateX(-50%);background:#2E8B57;color:#fff;padding:10px 16px;border-radius:14px;font-size:15px;font-weight:800;z-index:80;box-shadow:0 4px 14px rgba(0,0,0,.25);display:none;cursor:pointer;max-width:92%;text-align:center}
+#updBar.show{display:block}
 .overlay{position:fixed;inset:0;background:rgba(20,80,90,.55);display:none;align-items:flex-end;justify-content:center;z-index:40}
 .overlay.show{display:flex}
 @media(min-width:700px){.overlay{align-items:center}}
@@ -257,6 +259,7 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
   </div>
 </div>
 <div id="toast"></div>
+<div id="updBar">🎁 Có bản mới của Poppy. Bấm để cập nhật</div>
 
 <!-- Tạo chó / hồ sơ -->
 <div class="overlay" id="ovCreate"><div class="sheet" id="createSheet"></div></div>
@@ -7006,6 +7009,25 @@ document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("pointerdown
   if (e.target===o && o.id!=="ovCreate" && o.id!=="ovGate"){ stopCam(); o.classList.remove("show"); if (o.id === "ovShop" && curStore !== "train") leaveStore(); }
 }));
 document.addEventListener("visibilitychange", ()=>{ if (prof){ prof.last = Date.now(); persist(); } });
+// ---------- tự cập nhật (Sếp 15/11): game tự hỏi có bản mới không, mỗi 5 phút và mỗi lần quay lại game ----------
+// BUILD do tools/build-id.py ghi, khớp với version.json. Có bản mới: lưu dữ liệu, hiện thanh "Có bản mới"; quay lại game lần sau thì tự cập nhật.
+const BUILD = "84c916f31a";
+var updNew = null, updLast = 0;
+function updOff(){ return location.protocol === "file:" || QS.get("selftest") || BUILD === "dev"; }
+async function checkUpdate(){
+  if (updOff() || updNew) return; updLast = Date.now();
+  try { const r = await fetch("version.json?t=" + Date.now(), {cache: "no-store"}); if (!r.ok) return; const j = await r.json();
+    if (j && j.build && j.build !== BUILD){ updNew = j.build; $("updBar").classList.add("show"); } } catch (e){}
+}
+function doUpdate(){
+  if (!updNew) return;
+  try { if (prof){ prof.last = Date.now(); } persist(); } catch (e){}
+  const q = new URLSearchParams(location.search); q.set("v", updNew);   // đổi địa chỉ để trình duyệt tải bản mới, không lấy bản cũ trong bộ nhớ đệm
+  location.replace(location.pathname + "?" + q.toString() + location.hash);
+}
+$("updBar").onclick = doUpdate;
+document.addEventListener("visibilitychange", () => { if (document.hidden) return; if (updNew) doUpdate(); else if (Date.now() - updLast > 60000) checkUpdate(); });
+setInterval(checkUpdate, 5*60*1000); setTimeout(checkUpdate, 20000);
 
 /* ---------- khởi động ---------- */
 window.addEventListener("error", e=>{ const d=document.createElement("div"); d.style.cssText="position:fixed;left:0;right:0;top:0;background:#b00;color:#fff;font:12px monospace;padding:4px;z-index:99"; d.textContent="LỖI: "+e.message+" @"+e.lineno; document.body.appendChild(d); });
