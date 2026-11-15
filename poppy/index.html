@@ -2351,6 +2351,7 @@ function closetOwned(){   // Sếp 15/11: đồ mua ở siêu thị cất trong 
     (mine.some(it => it.toy) ? part("🎾 Đồ chơi đã mua", mine.filter(it => it.toy), "") : "") +
     part("🧸 Gấu bông", mine.filter(it => it.plush), "Chưa có gấu bông. Mua ở quầy Gấu bông trong siêu thị") +
     (mine.some(it => it.bed) ? part("🛏️ Nệm", mine.filter(it => it.bed), "") : "") +
+    (mine.some(it => it.outfit) ? part("👔 Đồ đôi chủ và chó (bấm để thay đồ)", mine.filter(it => it.outfit), "") : "") +
     (mine.some(it => it.deco) ? part("🎃 Đồ trang trí (bấm để bày hoặc cất)", mine.filter(it => it.deco), "") : "");
 }
 function openCloset(){
@@ -3904,6 +3905,7 @@ function useKeep(it, fresh){   // đồ để dành (quần áo, đồ chơi, g�
     if (!outdoor && !inBR){ $("ovCloset").classList.remove("show"); playToy(it.toy); return; }
     happyUp(prof.stats, fresh ? 5 : 2); loved(); dog.faceCam = true; gesture("bow"); bubble(`${it.ic} Chơi với em đi!`, 1600, true); if (fresh) toast(`${it.ic} Đã mua ${it.n.toLowerCase()}. Về nhà bấm 🧺 Tủ đồ để chơi`, 3500); }
   else if (it.plush){ cuddlePlush(it); if (fresh) toast(`${it.ic} Đã mua ${it.n.toLowerCase()}, cất trong 🧺 Tủ đồ`, 3000); }
+  else if (it.outfit) wearOutfit(it);
   else if (it.deco){ if (!prof.deco) prof.deco = {}; const on = prof.deco[it.deco] !== it.k; prof.deco[it.deco] = on ? it.k : null; applyDeco(); persist();
     toast(on ? `${it.ic} Đã bày ${it.n.toLowerCase()} ${it.deco === "table" ? "lên bàn phòng khách" : "lên cửa phòng ngủ"}${outdoor || inBR ? ". Về nhà sẽ thấy" : ""}` : `Đã cất ${it.n.toLowerCase()} vào kho`, 3000); }
   else if (it.bed){ useBed(it); toast(`${it.ic} ${fresh ? "Đã mua" : "Dùng"} ${it.n.toLowerCase()}. ${outdoor ? "Về nhà sẽ thấy nệm mới" : "Nệm đã đổi"} 🛏️`, 3500); if (!outdoor && !inBR) buildProfileRoom(false); }
@@ -3979,6 +3981,22 @@ const SEASON_ALL = [
   {season: "autumn", k: "hat_beret", ic: "🧢", n: "Mũ nồi đỏ", p: 18, wear: "hat", col: "#B0473A", cap: 1},
   {season: "autumn", k: "dc_leaves", ic: "🍂", n: "Giỏ lá thu để bàn", p: 15, deco: "table", shape: "basket", cols: ["#C8553D", "#E07A2E", "#F2B630", "#8A5A3B"]},
   {season: "autumn", k: "dc_wreath_au", ic: "🍁", n: "Vòng lá phong, treo cửa", p: 18, deco: "wall", shape: "wreath", cols: ["#8A5A3B", "#E07A2E", "#C8553D"]}];
+// Bộ đồ đôi (Sếp 15/11 qua Bơ): chủ mặc bộ nào thì chó tự mặc bộ hợp với chủ (dog: món đồ của chó đi kèm bộ, không cần mua riêng)
+const OUTFITS = [
+  {k: "of_sport", ic: "🏃", n: "Bộ thể thao đỏ (chủ và chó)", p: 45, outfit: {shirt: "#E5533D", pants: "#2B2B2B", ohat: "cap", capc: "#2B2B2B"}, dog: ["sh_red", "hat_cap"]},
+  {k: "of_sailor", ic: "⚓", n: "Bộ thủy thủ sọc xanh (chủ và chó)", p: 45, outfit: {shirt: "#FFFFFF", stripe: "#3C7DD9", pants: "#2F4FA8"}, dog: ["sh_blue"]},
+  {k: "of_rain", ic: "☔", n: "Bộ áo mưa vàng đi dạo (chủ và chó)", p: 50, outfit: {shirt: "#FFD15C", pants: "#3E5679"}, dog: ["sh_rain"]},
+  {k: "of_wool", ic: "🧶", n: "Bộ len xanh lá ấm áp (chủ và chó)", p: 50, outfit: {shirt: "#5DB36A", stripe: "#FFF4D6", pants: "#8A5A3B"}, dog: ["sh_wool", "nk_scarf"]},
+  {k: "of_hero", ic: "🦸", n: "Bộ siêu nhân (chủ và chó)", p: 60, outfit: {shirt: "#2F4FA8", cape: "#E5533D", pants: "#2F4FA8"}, dog: ["sh_hero"]},
+  {k: "of_party", ic: "🥳", n: "Bộ đi tiệc tím (chủ và chó)", p: 55, outfit: {shirt: "#C38BEB", pants: "#2B2B2B"}, dog: ["hat_party", "nk_bow"]}];
+const SEASON_OUTFITS = [
+  {season: "thanks", k: "of_thanks", ic: "🦃", n: "Bộ Lễ Tạ Ơn (chủ và chó)", p: 60, outfit: {shirt: "#E07A2E", stripe: "#7A4A2A", pants: "#5A3A28", ohat: "pilgrim"}, dog: ["sh_pumpkin", "hat_pilgrim"]},
+  {season: "xmas", k: "of_xmas", ic: "🎅", n: "Bộ ông già Noel (chủ và chó)", p: 60, outfit: {shirt: "#D93B3B", stripe: "#FFFFFF", pants: "#D93B3B", ohat: "santa"}, dog: ["sh_santa", "hat_santa"]},
+  {season: "tet", k: "of_tet", ic: "🧧", n: "Bộ áo dài Tết (chủ và chó)", p: 65, outfit: {shirt: "#D93B3B", stripe: "#FFD15C", pants: "#FFFFFF", skirt: 1, ohat: "nonla"}, dog: ["sh_aodai", "hat_nonla"]},
+  {season: "spring", k: "of_spring", ic: "🌸", n: "Bộ hoa mùa xuân (chủ và chó)", p: 55, outfit: {shirt: "#F7C6DA", stripe: "#FFFFFF", pants: "#7DBB6E", ohat: "flower"}, dog: ["sh_sakura", "hat_flower"]},
+  {season: "summer", k: "of_summer", ic: "🌺", n: "Bộ đi biển (chủ và chó)", p: 55, outfit: {shirt: "#2FB5C4", stripe: "#FFD15C", pants: "#FFF4D6", ohat: "straw"}, dog: ["sh_beach", "hat_straw"]},
+  {season: "autumn", k: "of_autumn", ic: "🍂", n: "Bộ caro mùa thu (chủ và chó)", p: 55, outfit: {shirt: "#B0473A", stripe: "#2B2B2B", pants: "#5A3A28", ohat: "cap", capc: "#B0473A"}, dog: ["sh_plaid", "hat_beret"]}];
+SEASON_ALL.push(...SEASON_OUTFITS);
 const SEASON_COLS = {thanks: ["#E07A2E", "#8A5A3B", "#F2B630", "#C8553D"], xmas: ["#D93B3B", "#2E8B57", "#FFFFFF", "#FFD15C"], tet: ["#D93B3B", "#FFD15C", "#F2A33A"],
   spring: ["#F7A8C4", "#FFFFFF", "#7DBB6E", "#FFD15C"], summer: ["#2FB5C4", "#FFD15C", "#E5533D", "#9FD3C7"], autumn: ["#C8553D", "#E07A2E", "#8A5A3B"]};
 const INTS = {
@@ -3995,6 +4013,7 @@ const SECS = {
     {k: "care",    n: "Tắm gội, làm đẹp", ic: "🧴", t: "gondola", x: 4,    z: -0.9, w: 5, d: 1.1, st: {x: 4, z: 0.5}},
     {k: "acc",     n: "Mũ, nơ, vòng cổ",  ic: "🎀", t: "wall",    x: -8.55, z: 2.4, w: 0.6, d: 3.4, st: {x: -7.3, z: 2.4}},
     {k: "beds",    n: "Nệm cho chó",      ic: "🛏️", t: "beds",    x: 7.8,  z: 2.4, w: 1.6, d: 3.6, st: {x: 6.3, z: 2.4}},
+    {k: "outfit",  n: "Đồ đôi chủ và chó", ic: "👔", t: "wall",  x: -8.55, z: -1.7, w: 0.6, d: 2.4, st: {x: -7.3, z: -1.7}},
     {k: "season",  n: "Đồ theo mùa",      ic: SEASONS[seasonNow()].ic, t: "gondola", x: -4.6, z: 3.4, w: 2.6, d: 1.0, st: {x: -4.6, z: 2.2}},
     {k: "cash",    n: "Quầy thu ngân",    ic: "💳", t: "cash",    x: 4.2,  z: 4.9, w: 2.6, d: 0.8, st: {x: 4.2, z: 3.8}, staff: {x: 4.2, z: 5.7}}],
   pharm: [
@@ -4011,7 +4030,7 @@ const RESTO_TABLES = [[-5, -1.3], [0, -1.3], [5, -1.3], [-5, 2.5], [5, 2.5]];
 const SEC_COLORS = {clothes: ["#E5533D","#3C7DD9","#FFD15C","#F7A8C4","#5DB36A","#2F4FA8"], toys: ["#E5533D","#FFD15C","#4C8FE0","#7DBB6E","#F2A33A","#C38BEB"],
   plush: ["#B5784A","#FFFFFF","#FFD15C","#7DBB6E","#F7A8C4","#C9A27A"], food: ["#C8553D","#F2A33A","#8A5A3B","#E9D7A6","#7DBB6E"], care: ["#9FD3C7","#F7A8C4","#FFFFFF","#B9D7F0","#D9C2F0"],
   acc: ["#E5533D","#F7A8C4","#FFD15C","#4C8FE0","#2B2B2B"], meds: ["#FFFFFF","#E5533D","#4C8FE0"], vita: ["#F2A33A","#FFD15C","#7DBB6E"], flea: ["#2E8B57","#9FD3C7","#FFFFFF"], first: ["#E5533D","#FFFFFF","#B9D7F0"]};
-SEC_COLORS.season = SEASON_COLS[seasonNow()];
+SEC_COLORS.season = SEASON_COLS[seasonNow()]; SEC_COLORS.outfit = ["#E5533D", "#3C7DD9", "#FFD15C", "#5DB36A", "#2F4FA8", "#C38BEB"];
 const intG = {};   // k -> {g, walls, doors, grid}
 var townGroup = null, parkGroup = null, townGridSave = null;
 function buildInterior(k){
@@ -4261,7 +4280,8 @@ STORES.resto.items = [
   {k: "pho", ic: "🍜", n: "Phở bò", p: 20, me: 1}, {k: "buncha", ic: "🥢", n: "Bún chả", p: 20, me: 1}, {k: "comtam", ic: "🍛", n: "Cơm tấm sườn", p: 22, me: 1},
   {k: "banhxeo", ic: "🥞", n: "Bánh xèo", p: 18, me: 1}, {k: "goicuon", ic: "🌯", n: "Gỏi cuốn", p: 14, me: 1}, {k: "rice", ic: "🍚", n: "Cơm gà xối mỡ", p: 20, me: 1},
   {k: "che", ic: "🍧", n: "Chè ba màu", p: 10, me: 1}, {k: "mia", ic: "🥤", n: "Nước mía", p: 6, me: 1}, {k: "tra", ic: "🍵", n: "Trà đá", p: 3, me: 1}];
-const isKeep = it => !!(it.wear || it.toy || it.plush || it.bed || it.deco);
+const isKeep = it => !!(it.wear || it.toy || it.plush || it.bed || it.deco || it.outfit);
+STORES.sec_outfit = {ic: "👔", n: "Đồ đôi chủ và chó", note: "Chủ mặc bộ nào thì chó tự mặc bộ hợp với chủ. Mua xong cất trong 🧺 Tủ đồ, bấm để thay đồ.", items: OUTFITS};
 STORES.sec_season = {ic: SEASONS[seasonNow()].ic, n: "Đồ theo mùa: " + SEASONS[seasonNow()].n, note: "Đồ theo mùa tự đổi theo ngày trên máy. Đồ đã mua vẫn giữ trong 🧺 Tủ đồ khi sang mùa khác.", items: SEASON_ALL.filter(it => it.season === seasonNow())};
 const KEEP_ITEMS = () => { const m = {}; for (const st of Object.values(STORES)) for (const it of st.items) if (isKeep(it)) m[it.k] = it; for (const it of SEASON_ALL) if (isKeep(it)) m[it.k] = it; return m; };
 const owns = k => !!(prof && prof.owned && prof.owned.includes(k));
@@ -4275,7 +4295,7 @@ function invAdd(k, d = 1){
   if (n > 0 && i < 0) prof.owned.push(k); else if (n === 0 && i >= 0) prof.owned.splice(i, 1);
   return n;
 }
-const inUse = it => !!((it.wear && prof.wear && prof.wear[it.wear] === it.k) || (it.bed && prof.bedKey === it.k) || (it.deco && prof.deco && prof.deco[it.deco] === it.k));
+const inUse = it => !!((it.outfit && prof.outfit === it.k) || (it.wear && prof.wear && prof.wear[it.wear] === it.k) || (it.bed && prof.bedKey === it.k) || (it.deco && prof.deco && prof.deco[it.deco] === it.k));
 function eatPantry(k){
   const it = ALL_ITEMS()[k]; if (!it || !it.pantry || invN(k) < 1) return false;
   if (dogAway()){ awayHint(); return false; }
@@ -4437,6 +4457,16 @@ function applyDeco(){   // đồ trang trí "đang dùng" mới hiện trong ph�
   const wl = all[D0.wall]; if (wl){ const g = mkDeco(wl); if (wl.shape === "flags") g.scale.setScalar(0.7);   // treo trên cánh cửa phòng ngủ, ngang tầm mắt (mở cửa thì đi theo cánh cửa)
     g.position.copy(WALLS.B.pos(L.brDoor.t, 1.24, 0.1)); g.rotation.y = wallRot("B"); const pv = room.brDoor && room.brDoor.pivot;
     if (pv){ const a0 = pv.rotation.y; pv.rotation.y = 0; roomGroup.add(g); roomGroup.updateMatrixWorld(true); pv.attach(g); pv.rotation.y = a0; } else roomGroup.add(g); decoMeshes.push(g); }
+}
+function wearOutfit(it){   // chủ thay đồ: chó mặc theo bộ; cởi ra thì chó mặc lại đồ cũ
+  const nm = prof.dog.name, all = KEEP_ITEMS(), on = prof.outfit !== it.k;
+  if (on){ if (!prof.outfit) prof.wearBefore = Object.assign({}, prof.wear || {}); prof.outfit = it.k;
+    const w = Object.assign({}, prof.wearBefore || {}); for (const k of it.dog || []){ const d = all[k]; if (d && d.wear) w[d.wear] = k; } prof.wear = w; }
+  else { prof.outfit = null; prof.wear = Object.assign({}, prof.wearBefore || {}); prof.wearBefore = null; }
+  applyWear(); if (outdoor && ownerOut) ensureOwnerOut(); if (inBR || ownerIn) ensureOwnerIn(); persist();
+  if (!dogAway()){ dog.faceCam = true; gesture(on ? "wiggle" : "shake"); }
+  toast(on ? `${it.ic} Chủ mặc ${it.n.replace(/ \(chủ và chó\)/, "").replace(/^Bộ/, "bộ")}, ${nm} mặc đồ đôi với chủ!` : `Đã cởi bộ đồ đôi, ${nm} mặc lại đồ cũ`, 3000);
+  if (on) happyUp(prof.stats, 2);
 }
 function wearItem(it){ if (!prof.wear) prof.wear = {}; prof.wear[it.wear] = prof.wear[it.wear] === it.k ? null : it.k; applyWear(); persist(); return !!prof.wear[it.wear]; }
 function useBed(it){ prof.bedLook = it.bed; prof.bedKey = it.k; roomKey = ""; persist(); }
@@ -5058,18 +5088,19 @@ function tickWork(){
 var ownerIn = null, ownerInKey = "", hm = null, leave = null, ride = null, shuttle = null, ownerAtDoor = false;   // var: updateCamera/refreshWork có thể chạy trước dòng này lúc khởi động
 var LEAVE_ANIM = !QS.get("selftest"), AUTO_WORK_ON = !QS.get("selftest") && !QS.get("noauto");
 function leaving(){ return !!(leave || ride); }
-const lookKey = () => JSON.stringify(prof.ownerLook || {});
+function ownerLookNow(){ const it = prof && prof.outfit && KEEP_ITEMS()[prof.outfit]; return it ? Object.assign({}, prof.ownerLook || {}, it.outfit) : (prof ? prof.ownerLook : null); }   // chủ đang mặc bộ đồ nào
+const lookKey = () => JSON.stringify(ownerLookNow() || {});
 function ensureOwnerIn(){
   const key = lookKey(); if (ownerIn && ownerInKey === key) return ownerIn;
   if (ownerIn) scene.remove(ownerIn.root);
-  ownerIn = buildOwner3D(prof.ownerLook); ownerIn.root.scale.setScalar(1.3); scene.add(ownerIn.root); ownerInKey = key;
+  ownerIn = buildOwner3D(ownerLookNow()); ownerIn.root.scale.setScalar(1.3); scene.add(ownerIn.root); ownerInKey = key;
   ownerIn.root.traverse(m => { if (m.isMesh) m.castShadow = true; });
   return ownerIn;
 }
 var ownerOutKey = "";
 function ensureOwnerOut(){
   const key = lookKey(); if (ownerOut && ownerOutKey === key) return ownerOut;
-  const old = ownerOut; ownerOut = buildOwner3D(prof.ownerLook); ownerOut.root.scale.setScalar(1.3); scene.add(ownerOut.root); ownerOutKey = key;
+  const old = ownerOut; ownerOut = buildOwner3D(ownerLookNow()); ownerOut.root.scale.setScalar(1.3); scene.add(ownerOut.root); ownerOutKey = key;
   if (old){ ownerOut.root.visible = old.root.visible; scene.remove(old.root); }
   return ownerOut;
 }
@@ -5870,6 +5901,9 @@ function buildOwner3D(o){
     const ck = sph(0.026, "#F2A0A0"); ck.scale.set(0.03, 0.018, 0.012); ck.position.set(s*0.1, 0.77, 0.135); root.add(ck);
   }
   const body = rbox(0.3, 0.32, 0.2, 0.08, o.shirt); body.position.y = 0.49; root.add(body);
+  if (o.stripe) for (const y of [0.42, 0.5, 0.58]){ const st = rbox(0.305, 0.028, 0.205, 0.01, o.stripe); st.position.y = y; root.add(st); }   // đồ của chủ (Sếp 15/11): sọc, áo choàng, mũ
+  if (o.cape){ const cp = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.42), new THREE.MeshStandardMaterial({color: o.cape, side: THREE.DoubleSide, roughness: 0.8})); cp.position.set(0, 0.45, -0.115); cp.rotation.x = 0.08; root.add(cp); }
+  if (o.skirt){ const sk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 0.2, 18, 1, true), new THREE.MeshStandardMaterial({color: o.shirt, side: THREE.DoubleSide, roughness: 0.8})); sk.position.y = 0.3; root.add(sk); }
   const head = sph(1, skin); head.scale.set(0.17, 0.165, 0.16); head.position.y = 0.8; root.add(head);
   const capG = new THREE.SphereGeometry(1, 22, 14, 0, Math.PI*2, 0, Math.PI*0.52);
   const cap = mesh(capG, mat(hairC)); cap.scale.set(0.182, 0.18, 0.175); cap.position.set(0, 0.805, -0.008); cap.rotation.x = -0.38; root.add(cap);
@@ -5889,6 +5923,12 @@ function buildOwner3D(o){
   } else {   // tóc ngắn: thêm mái lệch
     const fr = sph(1, hairC); fr.scale.set(0.11, 0.04, 0.05); fr.rotation.z = 0.25; add(fr, 0.03, 0.93, 0.11);
   }
+  if (o.ohat === "santa"){ const c = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.26, 16), mat("#D93B3B")); c.position.set(0, 1.02, -0.02); c.rotation.z = 0.3; root.add(c); const bd = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.03, 8, 20), mat("#FFFFFF")); bd.rotation.x = Math.PI/2; bd.position.set(0, 0.9, -0.01); root.add(bd); add(sph(0.035, "#FFFFFF"), -0.08, 1.13, -0.02); }
+  else if (o.ohat === "pilgrim"){ const c = cyl(0.12, 0.13, 0.17, "#2B2B2B"); c.position.set(0, 1.0, -0.01); root.add(c); const r = cyl(0.21, 0.21, 0.015, "#2B2B2B"); r.position.set(0, 0.92, -0.01); root.add(r); const b = rbox(0.06, 0.05, 0.01, 0.005, "#FFD15C"); b.position.set(0, 0.95, 0.125); root.add(b); }
+  else if (o.ohat === "nonla"){ const c = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.16, 24), mat("#E9D7A6")); c.position.set(0, 0.99, 0); root.add(c); }
+  else if (o.ohat === "straw"){ const r = cyl(0.27, 0.27, 0.015, "#E9C77A"); r.position.set(0, 0.93, 0); root.add(r); const c = cyl(0.13, 0.14, 0.09, "#E9C77A"); c.position.set(0, 0.98, 0); root.add(c); const b = cyl(0.142, 0.142, 0.03, "#F25C9A"); b.position.set(0, 0.95, 0); root.add(b); }
+  else if (o.ohat === "flower"){ for (let n = 0; n < 9; n++){ const a = n/9*Math.PI*2; add(sph(0.03, ["#F7A8C4", "#FFFFFF", "#FFD15C"][n % 3]), Math.cos(a)*0.15, 0.92, Math.sin(a)*0.14); } }
+  else if (o.ohat === "cap"){ const c = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 8, 0, Math.PI*2, 0, Math.PI/2), mat(o.capc || "#E5533D")); c.position.set(0, 0.86, 0); root.add(c); const br = rbox(0.18, 0.015, 0.12, 0.006, o.capc || "#E5533D"); br.position.set(0, 0.87, 0.17); root.add(br); }
   const rig = new THREE.Group(); while (root.children.length) rig.add(root.children[0]); root.add(rig);
   return {root, rig, legs, arms};
 }
@@ -7011,7 +7051,7 @@ document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("pointerdown
 document.addEventListener("visibilitychange", ()=>{ if (prof){ prof.last = Date.now(); persist(); } });
 // ---------- tự cập nhật (Sếp 15/11): game tự hỏi có bản mới không, mỗi 5 phút và mỗi lần quay lại game ----------
 // BUILD do tools/build-id.py ghi, khớp với version.json. Có bản mới: lưu dữ liệu, hiện thanh "Có bản mới"; quay lại game lần sau thì tự cập nhật.
-const BUILD = "84c916f31a";
+const BUILD = "ba65b0eb79";
 var updNew = null, updLast = 0;
 function updOff(){ return location.protocol === "file:" || QS.get("selftest") || BUILD === "dev"; }
 async function checkUpdate(){
@@ -7622,6 +7662,17 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
       ok("bày đồ trang trí: hiện trên bàn và trên tường phòng khách, kho ghi đang dùng", prof.deco.table === tb.k && prof.deco.wall === wl.k && decoMeshes.length === 2 && storeHtml().includes("đang dùng"));
       useKeep(KEEP_ITEMS()[tb.k], false); ok("bấm lại: cất đồ trang trí, vẫn còn trong kho", !prof.deco.table && decoMeshes.length === 1 && invN(tb.k) === 1);
       useKeep(KEEP_ITEMS()[wl.k], false); }
+    { curStore = "sec_outfit"; prof.coins = Math.max(coins(), 300); const w0 = Object.assign({}, prof.wear || {}); prof.wear = {neck: "nk_bow"}; applyWear();
+      buyItem("of_hero"); ok("mua đồ đôi: cất kho, chủ chưa thay", invN("of_hero") === 1 && !prof.outfit);
+      useKeep(KEEP_ITEMS().of_hero, false); const lk = ownerLookNow();
+      ok("chủ mặc bộ siêu nhân: áo chủ đổi màu, có áo choàng, chó tự mặc áo siêu nhân, vẫn giữ nơ cũ", prof.outfit === "of_hero" && lk.shirt === "#2F4FA8" && lk.cape && prof.wear.shirt === "sh_hero" && prof.wear.neck === "nk_bow");
+      ok("đồ đôi hiện 'đang dùng' trong tủ kho", storeHtml().includes("đang dùng"));
+      useKeep(KEEP_ITEMS().of_hero, false); ok("cởi bộ đồ đôi: chủ mặc lại đồ cũ, chó mặc lại đồ cũ", !prof.outfit && ownerLookNow().shirt === prof.ownerLook.shirt && !prof.wear.shirt && prof.wear.neck === "nk_bow");
+      let bad = ""; for (const it of OUTFITS.concat(SEASON_OUTFITS)){ try { const o3 = buildOwner3D(Object.assign({}, prof.ownerLook, it.outfit)); if (!o3.rig.children.length) bad += it.k; } catch (e){ bad += it.k + "!" + e.message + " "; }
+        for (const k of it.dog) if (!KEEP_ITEMS()[k] || !KEEP_ITEMS()[k].wear) bad += it.k + ">" + k + " "; }
+      ok("mọi bộ đồ đôi dựng được người chủ và có đồ chó đi kèm" + (bad ? ": lỗi " + bad : ""), !bad);
+      ok("siêu thị có quầy Đồ đôi chủ và chó, quầy theo mùa có bộ đồ đôi của mùa", SECS.shop.some(x => x.k === "outfit") && STORES.sec_season.items.some(it => it.outfit));
+      prof.wear = w0; applyWear(); }
     ok("tủ kho tổng liệt kê đồ đã mua, có số lượng", ["Áo thun đỏ","x2","Gấu bông nâu","Hạt cho chó"].every(t => storeHtml().includes(t)));
     ok("mua nệm, gấu bông, đồ chơi: có trong tủ đồ", prof.bedKey === "bd_pink" && owns("pl_bear") && owns("ty_disc") && closetOwned().includes("Gấu bông nâu") && closetOwned().includes("Đĩa ném"));
     $("ovShop").classList.remove("show"); const tr0 = prof.treats.left = 50; prof.giftDay = null; cashier(); ok("quầy thu ngân: quà 5 viên bánh thưởng mỗi ngày một lần", prof.treats.left === tr0 + 5); cashier(); ok("quà chỉ một lần mỗi ngày", prof.treats.left === tr0 + 5);
@@ -7696,6 +7747,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   startProfile(p.id);
   if (QS.get("yaw")) camYaw = +QS.get("yaw")*Math.PI/180;
   if (QS.get("deco") && prof){ prof.deco = {}; for (const k of QS.get("deco").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.deco){ invAdd(k); prof.deco[it.deco] = k; } } applyDeco(); }   // thử: &deco=dc_pumpkin,dc_wreath_th
+  if (QS.get("outfit") && prof){ const it = KEEP_ITEMS()[QS.get("outfit")]; if (it && it.outfit){ invAdd(it.k); setTimeout(() => wearOutfit(it), 600); } }   // thử: &outfit=of_thanks
   if (QS.get("dwear") && prof){ prof.wear = {}; for (const k of QS.get("dwear").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.wear){ invAdd(k); prof.wear[it.wear] = k; } } setTimeout(applyWear, 500); }   // thử: &dwear=sh_pumpkin,hat_pilgrim
   if (QS.get("pitch")) camPitch = +QS.get("pitch")*Math.PI/180;
   if (QS.get("zoom")) camZoom = +QS.get("zoom");
