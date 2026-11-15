@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Máy In Thanh Huy</title>
+<link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@700&display=swap" rel="stylesheet">
+<meta name="robots" content="noindex">
+<style>
+  :root { --nen: #F9F4E9; --the: rgba(255,255,255,.78); --chu: #0B1B40; --phu: #5d6678; --vien: #e4d9c2; --chinh: #17326A; --tot: #2e7d4f; --xau: #b3412e; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--nen); color: var(--chu); font: 17px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .khung { max-width: 480px; margin: 0 auto; padding: 18px 16px 40px; }
+  h1 { font-size: 24px; margin: 0; color: var(--chinh); font-family: Lora, Georgia, serif; }
+  .dau { display: flex; align-items: center; gap: 12px; margin: 4px 0 2px; }
+  .dau img { width: 52px; height: 52px; }
+  .dau small { display: block; color: #8A5F3B; font-size: 12px; letter-spacing: 2px; font-weight: 600; }
+  .chim { position: fixed; left: 50%; top: 50%; width: min(78vw, 440px); transform: translate(-50%, -50%); opacity: .11; pointer-events: none; z-index: 0; }
+  .khung { position: relative; z-index: 1; }
+  .phu { color: var(--phu); font-size: 15px; margin-bottom: 16px; }
+  .the { background: var(--the); border: 1px solid var(--vien); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .opin { width: 100%; font-size: 30px; letter-spacing: 10px; text-align: center; padding: 12px; border: 1px solid var(--vien); border-radius: 12px; }
+  .nut { width: 100%; border: 0; border-radius: 14px; background: var(--chinh); color: #fff; font-size: 19px; font-weight: 700; padding: 16px; margin-top: 12px; }
+  .nut:disabled { background: #9fadc8; }
+  .chonfile { display: block; border: 2px dashed var(--vien); border-radius: 14px; padding: 26px 12px; text-align: center; color: var(--phu); }
+  .chonfile b { color: var(--chinh); display: block; font-size: 19px; margin-bottom: 2px; }
+  .chonfile.co { border-style: solid; border-color: var(--chinh); color: var(--chu); background: rgba(232,204,148,.25); overflow-wrap: anywhere; }
+  input[type=file] { display: none; }
+  .hang { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0ece4; }
+  .hang:last-child { border-bottom: 0; }
+  .nhan { font-weight: 600; }
+  .nut2 { display: inline-grid; grid-auto-flow: column; background: #ebe6db; border-radius: 10px; padding: 3px; }
+  .nut2 button { border: 0; background: transparent; padding: 9px 14px; border-radius: 8px; font-size: 16px; color: var(--phu); }
+  .nut2 button.chon { background: var(--the); color: var(--chu); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .soban { display: inline-flex; align-items: center; gap: 4px; }
+  .soban button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--vien); background: var(--the); font-size: 22px; color: var(--chinh); }
+  .soban span { min-width: 36px; text-align: center; font-size: 21px; font-weight: 600; }
+  .otrang { width: 100%; margin-top: 8px; padding: 12px; font-size: 17px; border: 1px solid var(--vien); border-radius: 10px; }
+  .goiy { color: var(--phu); font-size: 14px; margin-top: 4px; }
+  .bao { margin-top: 12px; padding: 12px; border-radius: 12px; display: none; }
+  .bao.tot { display: block; background: #e7f4ec; color: #1d5a37; } .bao.xau { display: block; background: #fbe9e6; color: #8a2e1f; }
+  .ds div { padding: 6px 0; border-bottom: 1px solid #f0ece4; font-size: 15px; overflow-wrap: anywhere; }
+  .an { display: none; }
+  .lienhe { text-align: center; color: var(--phu); font-size: 14px; margin-top: 18px; }
+  .tacgia { text-align: center; color: var(--phu); font-size: 13px; margin-top: 26px; }
+</style>
+</head>
+<body>
+<img class="chim" src="logo.png" alt="">
+<div class="khung">
+  <div class="dau"><img src="logo.png" alt="Thanh Huy"><div><small>CẦM ĐỒ THANH HUY</small><h1>Máy In Thanh Huy</h1></div></div>
+  <div class="phu" id="chao">Gửi file từ điện thoại, máy in nhà Huy in giúp.</div>
+
+  <div id="manPin" class="the">
+    <div class="nhan" style="margin-bottom:8px">Nhập mã PIN</div>
+    <input class="opin" id="pin" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;color:var(--phu);font-size:15px"><input type="checkbox" id="nho" checked> Nhớ mã trên điện thoại này</label>
+    <button class="nut" onclick="dangNhap()">Vào</button>
+    <div class="bao" id="baoPin"></div>
+  </div>
+
+  <div id="manIn" class="an">
+    <div class="the">
+      <label class="chonfile" id="khungFile" for="file"><b>Bấm để chọn file</b><span id="tenFile">PDF, Word, Excel, ảnh</span></label>
+      <input type="file" id="file" accept=".pdf,.doc,.docx,.rtf,.txt,.xls,.xlsx,.csv,image/*" onchange="chonFile()">
+    </div>
+    <div class="the">
+      <div class="hang"><span class="nhan">Trang</span><span class="nut2"><button id="trTatCa" class="chon" onclick="chonTrang(false)">Tất cả</button><button id="trChon" onclick="chonTrang(true)">Chọn trang</button></span></div>
+      <div id="phanTrang" class="an" style="padding-bottom:10px"><input class="otrang" id="trang" inputmode="numeric" placeholder="VD: 1  hoặc  1-3  hoặc  1,3,5"><div class="goiy">Gạch ngang là "từ… đến…", dấu phẩy là "và".</div></div>
+      <div class="hang"><span class="nhan">Số bản</span><span class="soban"><button onclick="doiBan(-1)">−</button><span id="ban">1</span><button onclick="doiBan(1)">+</button></span></div>
+      <div class="hang"><span class="nhan">Hướng giấy</span><span class="nut2"><button id="hDoc" class="chon" onclick="chonHuong(false)">Dọc</button><button id="hNgang" onclick="chonHuong(true)">Ngang</button></span></div>
+    </div>
+    <button class="nut" id="nutIn" onclick="bamIn()" disabled>IN</button>
+    <div class="bao" id="bao"></div>
+    <div class="the" style="margin-top:14px"><div class="nhan" style="margin-bottom:6px">Lần in gần đây của bạn</div><div class="ds" id="ds">Chưa có.</div></div>
+    <div class="lienhe">Máy in đen trắng · Không in 2 mặt · <a href="#" onclick="doiMa();return false">Đổi mã PIN</a></div>
+  </div>
+  <div class="tacgia">Ứng dụng do Hayden Nguyen phát triển</div>
+</div>
+<script>
+  var PIN = '', fileDt = null, soBan = 1, ngang = false, coTrang = false, MAX = 10;
+  var API = 'https://script.google.com/macros/s/AKfycbzWSr-nUJDSC3avAKbyt2bp-K_noLMQFRAd09fUmM5m_GBVLxbCIFpEDS34NG0fhiXB/exec';
+  // gọi Apps Script: goi('dangNhap', pin).then(...)
+  function goi(fn, arg) {
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, arg: arg }) })
+      .then(function (r) { if (!r.ok) throw new Error('Mạng chập chờn, thử lại nhé.'); return r.json(); })
+      .then(function (j) { if (!j.ok) throw new Error(j.loi); return j.kq; })
+      .catch(function (e) { throw new Error(e && e.message && !/fetch|network/i.test(e.message) ? e.message : 'Không kết nối được. Kiểm tra mạng rồi thử lại.'); });
+  }
+  function $(id) { return document.getElementById(id); }
+  function bao(id, kieu, chu) { $(id).className = 'bao ' + kieu; $(id).textContent = chu; }
+  try { PIN = localStorage.getItem('pinInNho') || ''; } catch (e) {}
+  if (PIN) { $('pin').value = PIN; dangNhap(true); }
+  function dangNhap(tuDong) {
+    var p = $('pin').value.replace(/\D/g, '');
+    if (p.length !== 6) { bao('baoPin', 'xau', 'Mã PIN có 6 số.'); return; }
+    bao('baoPin', 'tot', 'Đang kiểm tra…');
+    goi('dangNhap', p).then(function (r) {
+      PIN = p; try { if ($('nho').checked || tuDong === true) localStorage.setItem('pinInNho', p); } catch (e) {}
+      $('manPin').classList.add('an'); $('manIn').classList.remove('an');
+      $('chao').textContent = 'Chào ' + r.ten + '! ' + (r.laptop ? '🟢 Máy in đang sẵn sàng.' : '🔴 Máy in nhà Huy đang tắt, file gửi sẽ chờ đến khi bật máy.');
+      taiDs();
+    }).catch(function (e) { if (/PIN/.test(e.message)) { try { localStorage.removeItem('pinInNho'); } catch (x) {} } bao('baoPin', 'xau', e.message); });
+  }
+  function doiMa() { try { localStorage.removeItem('pinInNho'); } catch (e) {} location.reload(); }
+  function chonFile() { fileDt = $('file').files[0] || null; $('khungFile').classList.toggle('co', !!fileDt); $('tenFile').textContent = fileDt ? fileDt.name : 'PDF, Word, Excel, ảnh'; $('nutIn').disabled = !fileDt; }
+  function chonTrang(c) { coTrang = c; $('trTatCa').classList.toggle('chon', !c); $('trChon').classList.toggle('chon', c); $('phanTrang').classList.toggle('an', !c); }
+  function chonHuong(n) { ngang = n; $('hDoc').classList.toggle('chon', !n); $('hNgang').classList.toggle('chon', n); }
+  function doiBan(k) { soBan = Math.max(1, Math.min(MAX, soBan + k)); $('ban').textContent = soBan; }
+  function loi(e) { $('nutIn').disabled = false; $('nutIn').textContent = 'IN'; bao('bao', 'xau', '⚠️ ' + (e && e.message ? e.message : e)); }
+  function bamIn() {
+    var tr = coTrang ? $('trang').value : '';
+    if (coTrang && !/^\s*[0-9]+(\s*-\s*[0-9]+)?(\s*,\s*[0-9]+(\s*-\s*[0-9]+)?)*\s*$/.test(tr)) { bao('bao', 'xau', '⚠️ Ghi số trang như: 1  hoặc  1-3  hoặc  1,3,5'); return; }
+    if (fileDt.size > 20 * 1024 * 1024) { loi('File lớn quá 20 MB.'); return; }
+    $('nutIn').disabled = true; $('nutIn').textContent = 'Đang gửi…'; $('bao').className = 'bao';
+    var r = new FileReader();
+    r.onload = function () {
+      goi('guiFile', { pin: PIN, ten: fileDt.name, mime: fileDt.type, data: String(r.result).split(',')[1], trang: tr, ban: soBan, ngang: ngang }).then(function (kq) {
+        $('nutIn').textContent = 'IN'; $('nutIn').disabled = false;
+        bao('bao', 'tot', kq.laptop ? '✅ Đã gửi. Khoảng nửa phút nữa máy in chạy.' : '✅ Đã gửi. Máy in đang tắt, khi Huy bật máy sẽ tự in.');
+        setTimeout(taiDs, 45000);
+      }).catch(loi);
+    };
+    r.onerror = function () { loi('Không đọc được file.'); };
+    r.readAsDataURL(fileDt);
+  }
+  function taiDs() {
+    goi('lanInCuaToi', PIN).then(function (ds) {
+      $('ds').innerHTML = ''; if (!ds.length) { $('ds').textContent = 'Chưa có.'; return; }
+      ds.forEach(function (s) { var d = document.createElement('div'); d.textContent = s; $('ds').appendChild(d); });
+    }).catch(function () {});
+  }
+</script>
+</body>
+</html>
