@@ -3168,8 +3168,8 @@ let townNight = null, occlHidden = false;
 function setTownNight(on){ if (townNight === on) return; townNight = on; WIN_MAT.emissiveIntensity = on ? 0.85 : 0; LAMP_MAT.emissiveIntensity = on ? 1.8 : 0.1; for (const g of LAMP_GLOWS) g.visible = on; }
 function finalizeOccl(){ scene.updateMatrixWorld(true); for (const o of OCCL) o.box = new THREE.Box3().setFromObject(o.obj).expandByScalar(0.12); }
 const _oRay = new THREE.Ray(), _oHit = new THREE.Vector3(), _oT = [new THREE.Vector3(), new THREE.Vector3()];
-function updateOccluders(){
-  if (!outdoor){ if (occlHidden){ for (const o of OCCL) o.obj.visible = true; occlHidden = false; } return; }
+function updateOccluders(instant){
+  if (!outdoor){ if (occlHidden){ for (const o of OCCL){ o.obj.visible = true; occlFade(o, 1, true); } occlHidden = false; } return; }
   occlHidden = true;
   const cam = camera.position; _oT[0].set(outdoor.x, 1.1, outdoor.z); _oT[1].set(dog.pos.x, 0.25, dog.pos.z);
   for (const o of OCCL){
@@ -3179,8 +3179,21 @@ function updateOccluders(){
       _oRay.origin.copy(cam); _oRay.direction.subVectors(t, cam); const len = _oRay.direction.length(); _oRay.direction.divideScalar(len);
       if (_oRay.intersectBox(o.box, _oHit) && cam.distanceTo(_oHit) < len){ hide = true; break; }
     }
-    o.obj.visible = !hide;
+    if (o.obj.userData.fadeOccl) occlFade(o, hide ? OCCL_FADE : 1, instant); else o.obj.visible = !hide;   // nhà: mờ đi; cây, cột, đèn: ẩn như cũ
   }
+}
+// Sếp 15/11: nhà hàng, siêu thị đi ngang qua bị ẩn -> giờ chỉ mờ đi (vẫn thấy nhà), hết che thì rõ lại
+const OCCL_FADE = 0.25;
+function occlFade(o, target, instant){
+  const cur = o.f ?? 1; if (cur === target) return;
+  const f = instant ? target : (Math.abs(target - cur) < 0.04 ? target : cur + (target - cur)*0.18); o.f = f;
+  const faded = f < 0.999; o.obj.userData.faded = target < 1;
+  o.obj.visible = true;
+  o.obj.traverse(m => { if (!m.isMesh && !m.isSprite) return; const u = m.userData;
+    if (m.isSprite) return;
+    if (faded){ if (!u.om) u.om = m.material; if (!u.fm){ u.fm = u.om.clone(); u.fm.transparent = true; u.fm.depthWrite = false; }
+      u.fm.opacity = (u.om.opacity ?? 1)*f; if (u.om.emissiveIntensity != null) u.fm.emissiveIntensity = u.om.emissiveIntensity; m.material = u.fm; }
+    else if (u.om) m.material = u.om; });
 }
 // dụng cụ dựng khu phố, dùng chung cho đường phố và công viên
 function townKit(root){
@@ -3203,7 +3216,7 @@ function townKit(root){
     const pool = new THREE.Sprite(new THREE.SpriteMaterial({map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.35})); pool.scale.set(4, 4, 1); pool.position.set(0, G + 0.3, 0.85); pool.visible = !!townNight; add(pool); LAMP_GLOWS.push(pool); });
   // nhà phố: mặt tiền quay về +z cục bộ, thân nhà lùi về -z; rot xoay cả căn (0: nhìn +z, π: nhìn -z, π/2: nhìn +x)
   const shophouse = (x, z, rot, w, floors, col, opt = {}) => group(g => {
-    g.position.set(x, 0, z); g.rotation.y = rot;
+    g.position.set(x, 0, z); g.rotation.y = rot; g.userData.fadeOccl = true;
     const fh = 2.9, H = floors*fh, d = opt.d || 8;
     box(w, H, d, col, 0, G + H/2, -d/2);
     box(w*0.8, 2.2, 0.06, opt.ground || "#8B9096", 0, G + 1.15, 0.02);
@@ -3216,8 +3229,35 @@ function townKit(root){
     if (opt.roof){ const r = M(new THREE.CylinderGeometry(0.01, w*0.62, 1.2, 4), "#C8553D"); r.rotation.y = Math.PI/4; r.scale.z = d/w*0.9; r.position.set(0, G + H + 0.6, -d/2); add(r); }
     else box(w, 0.35, 0.12, shade(col, -0.15), 0, G + H + 0.17, 0.02);
     if (opt.sign){ const sg = new THREE.Mesh(new THREE.PlaneGeometry(w*0.9, 0.8), new THREE.MeshBasicMaterial({map: signTex(opt.sign, opt.signBg || "#1E6F78", opt.signFg || "#FFFFFF", 768, 116)})); sg.position.set(0, G + 2.46, 0.07); /* thấp hơn ban công tầng 2 để dấu tiếng Việt không bị che */ if (opt.kind){ sg.userData.kind = opt.kind; pickables.push(sg); } add(sg); }
+    if (opt.kind) storeFront(w, H, floors, fh, col, opt);
     if (opt.kind) for (const m of g.children) if (m.isMesh && !m.userData.kind){ m.userData.kind = opt.kind; pickables.push(m); }
   });
+  // Sếp 15/11: mặt tiền cửa hàng đẹp hơn: cột hai bên, khung kính, khung biển, mái hiên sọc, chậu hoa hai bên cửa
+  const stripeTex = {};
+  const storeFront = (w, H, floors, fh, col, opt) => {
+    const ac = opt.signBg || "#1E6F78", dk = shade(col, -0.32), gw = w*0.8;
+    for (const sx of [-1, 1]){
+      box(0.32, H, 0.22, shade(col, -0.12), sx*(w/2 - 0.16), G + H/2, 0.09);   // cột hai bên
+      box(0.4, 0.28, 0.3, shade(col, -0.4), sx*(w/2 - 0.16), G + 0.14, 0.12);  // chân cột
+      for (const x of [1.3, gw/2 - 0.04]) box(0.08, 2.2, 0.08, "#4A5560", sx*x, G + 1.15, 0.07);   // khung kính, chừa cửa ở giữa
+      if (gw/2 - 1.3 > 1.2) box(0.06, 2.2, 0.06, "#4A5560", sx*(1.3 + (gw/2 - 1.3)/2), G + 1.15, 0.07);
+      // chậu hoa hai bên cửa
+      const px = sx*Math.min(1.75, gw/2 - 0.4);
+      box(0.55, 0.42, 0.55, "#7A5236", px, G + 0.21, 0.5); box(0.6, 0.06, 0.6, "#5E3E28", px, G + 0.44, 0.5);
+      const bush = M(SPHERE_LO, "#4F9450"); bush.scale.set(0.34, 0.3, 0.34); bush.position.set(px, G + 0.68, 0.5); add(bush);
+      for (const [dx, dz, c] of [[0.14, 0.18, "#FF7AA8"], [-0.16, 0.12, "#FFD24D"], [0.02, 0.26, "#FFFFFF"], [-0.05, -0.12, "#FF7AA8"]]){
+        const fl = M(SPHERE_LO, c); fl.scale.setScalar(0.07); fl.position.set(px + dx, G + 0.82, 0.5 + dz); add(fl); }
+    }
+    box(gw, 0.1, 0.09, "#4A5560", 0, G + 2.22, 0.07); box(gw, 0.08, 0.12, "#4A5560", 0, G + 0.06, 0.08);   // khung trên, dưới
+    box(w*0.94, 0.94, 0.05, dk, 0, G + 2.46, 0.035);   // khung biển
+    // mái hiên sọc trên cửa sổ các tầng trên
+    if (!stripeTex[ac]) stripeTex[ac] = canvasTex(256, 64, (c, W2, H2) => { const n = 10; for (let i = 0; i < n; i++){ c.fillStyle = i % 2 ? "#FFFFFF" : ac; c.fillRect(i*W2/n, 0, W2/n + 1, H2*0.78);
+      c.beginPath(); c.arc((i + 0.5)*W2/n, H2*0.78, W2/n/2, 0, Math.PI); c.fill(); } });
+    const aw = new THREE.MeshStandardMaterial({map: stripeTex[ac], transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9});
+    { const v = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.56), aw); v.position.set(0, G + fh + 0.36, 0.915); add(v); }   // lan can tầng 2 bọc vải sọc như mái hiên
+    for (let f = 1; f < floors; f++){ const y = G + f*fh;
+      const a = new THREE.Mesh(new THREE.PlaneGeometry(w*0.62, 0.75), aw); a.rotation.x = -0.75; a.position.set(0, y + 2.32, 0.3); add(a); }
+  };
   return {G, M, box, add, group, ground, tree, lamp, shophouse, setPar: p => { par = p; }};
 }
 
@@ -5600,7 +5640,7 @@ function pickAt(x, y){
   _ndc.set(x/W*2 - 1, -(y/H)*2 + 1);
   raycaster.setFromCamera(_ndc, camera);
   const hits = raycaster.intersectObjects(pickables, false);
-  const shown = o => { while (o){ if (!o.visible) return false; o = o.parent; } return true; };
+  const shown = o => { while (o){ if (!o.visible || o.userData.faded) return false; o = o.parent; } return true; };
   const mine = h => { const k = h.object.userData.kind || ""; return inBR ? k.startsWith("br") : !k.startsWith("br"); };   // phòng ngủ chỉ bấm đồ phòng ngủ, và ngược lại
   return hits.find(h => shown(h.object) && mine(h)) || null;
 }
@@ -7180,8 +7220,9 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     ok("quầy bánh rán có món bánh rán", STORES.fast.items.some(it => it.k === "donut"));
     camPitch = PITCH_OUT[0]; updateCamera(1); ok("ngoài trời nghiêng được khoảng 120 độ, nhìn lên trời không chui xuống đất", PITCH_OUT[1] - PITCH_OUT[0] > 115*Math.PI/180 && camera.position.y >= 0.59); camPitch = 0.8;
     { const off = OCCL.find(o => o.obj.children.some(m => m.userData.kind === "office")); outdoor.x = OFFICE.x; outdoor.z = 13.6; dog.pos = {x: 40.6, z: 13.6};
-      camera.position.set(OFFICE.x, 3, 27); updateOccluders(); const hid = !!off && !off.obj.visible;
-      camera.position.set(OFFICE.x, 3, 4); updateOccluders(); ok("toà nhà che người chủ thì tự ẩn, hết che thì hiện lại", hid && off.obj.visible); }
+      camera.position.set(OFFICE.x, 3, 27); updateOccluders(true); const hid = !!off && off.obj.visible && off.f < 0.5 && off.obj.userData.faded;
+      camera.position.set(OFFICE.x, 3, 4); updateOccluders(true); ok("toà nhà che người chủ thì mờ đi (không biến mất), hết che thì rõ lại", hid && off.obj.visible && off.f === 1 && !off.obj.userData.faded); }
+    ok("mặt tiền siêu thị, nhà thuốc, nhà hàng có chậu hoa và mái hiên", ["shop","pharm","resto"].every(k => { const o = OCCL.find(o => o.obj.children.some(m => m.userData.kind === k)); return o && o.obj.children.filter(m => m.geometry && m.geometry.type === "PlaneGeometry").length >= 2 && o.obj.children.length > 30; }));
     setTownNight(true); ok("ban đêm: đèn đường và cửa sổ nhà sáng", WIN_MAT.emissiveIntensity > 0.5 && LAMP_GLOWS.length > 20 && LAMP_GLOWS.every(g => g.visible)); setTownNight(false);
     setOutdoor(false); fade = fade0; setState("idle", 0); dog.path = []; }
   // giờ ngủ của chó (Sếp chốt 09/11)
