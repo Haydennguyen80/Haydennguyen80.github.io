@@ -2342,12 +2342,13 @@ function toggleRest(){
 function updateRestBtn(){ /* nút Nghỉ đã bỏ (07/11): bấm vào nệm để cho chó nghỉ */ }
 function closetOwned(){   // Sếp 15/11: đồ mua ở siêu thị cất trong tủ
   const all = KEEP_ITEMS(), mine = (prof.owned || []).map(k => all[k]).filter(Boolean), W0 = prof.wear || {};
-  const btn = it => { const on = (it.wear && W0[it.wear] === it.k) || (it.bed && prof.bedKey === it.k); return `<button class="item" data-own="${it.k}" ${on ? 'style="outline:3px solid #2E8B57"' : ""}><span class="ic">${it.ic}</span>${esc(it.n)}${on ? "<br><small>✅ Đang dùng</small>" : ""}</button>`; };
+  const btn = it => { const on = inUse(it); return `<button class="item" data-own="${it.k}" ${on ? 'style="outline:3px solid #2E8B57"' : ""}><span class="ic">${it.ic}</span>${esc(it.n)}${on ? "<br><small>✅ Đang dùng</small>" : ""}</button>`; };
   const part = (h, list, empty) => `<h3>${h}</h3>` + (list.length ? `<div class="items">${list.map(btn).join("")}</div>` : `<div class="empty">${empty}</div>`);
   return part("👕 Tủ quần áo, mũ, nơ", mine.filter(it => it.wear), "Chưa có đồ. Mua ở 🛒 siêu thị thú cưng (quầy Quần áo, quầy Mũ nơ)") +
     (mine.some(it => it.toy) ? part("🎾 Đồ chơi đã mua", mine.filter(it => it.toy), "") : "") +
     part("🧸 Gấu bông", mine.filter(it => it.plush), "Chưa có gấu bông. Mua ở quầy Gấu bông trong siêu thị") +
-    (mine.some(it => it.bed) ? part("🛏️ Nệm", mine.filter(it => it.bed), "") : "");
+    (mine.some(it => it.bed) ? part("🛏️ Nệm", mine.filter(it => it.bed), "") : "") +
+    (mine.some(it => it.deco) ? part("🎃 Đồ trang trí (bấm để bày hoặc cất)", mine.filter(it => it.deco), "") : "");
 }
 function openCloset(){
   closeRing(); closeFoodMenu();
@@ -3234,6 +3235,14 @@ function townKit(root){
   });
   // Sếp 15/11: mặt tiền cửa hàng đẹp hơn: cột hai bên, khung kính, khung biển, mái hiên sọc, chậu hoa hai bên cửa
   const stripeTex = {};
+  const seasonFront = (w, gw) => {   // đồ trang trí theo mùa trước cửa hàng (tự đổi theo tháng)
+    const sk = seasonNow();
+    for (const sx of [-1, 1]){ const px = sx*(Math.min(1.75, gw/2 - 0.4) + 0.62);
+      if (sk === "thanks" || sk === "autumn"){ box(0.55, 0.32, 0.38, "#E2C27A", px, G + 0.16, 0.55); for (const [dx, dz, r] of [[-0.12, 0.05, 0.16], [0.16, 0.0, 0.12]]){ const b = M(SPHERE_LO, "#E07A2E"); b.scale.set(r, r*0.75, r); b.position.set(px + dx, G + 0.32 + r*0.6, 0.55 + dz); add(b); } }
+      else if (sk === "xmas"){ for (let i = 0; i < 3; i++){ const c = M(new THREE.ConeGeometry(0.42 - i*0.1, 0.5, 10), "#2E7D4F"); c.position.set(px, G + 0.35 + i*0.3, 0.55); add(c); } const st = M(SPHERE_LO, "#FFD15C"); st.scale.setScalar(0.08); st.position.set(px, G + 1.3, 0.55); add(st); }
+      else if (sk === "tet"){ const l = M(SPHERE_LO, "#D93B3B"); l.scale.set(0.24, 0.2, 0.24); l.position.set(sx*(w/2 - 0.55), G + 2.55, 0.7); add(l); box(0.02, 0.32, 0.02, "#FFD15C", sx*(w/2 - 0.55), G + 2.85, 0.7); box(0.06, 0.16, 0.06, "#FFD15C", sx*(w/2 - 0.55), G + 2.3, 0.7); }
+      else if (sk === "spring"){ for (let i = 0; i < 5; i++){ const f = M(SPHERE_LO, i % 2 ? "#F7A8C4" : "#FFFFFF"); f.scale.setScalar(0.09); f.position.set(sx*Math.min(1.75, gw/2 - 0.4) + Math.cos(i*1.3)*0.18, G + 0.86, 0.5 + Math.sin(i*1.3)*0.18); add(f); } }
+    } };
   const storeFront = (w, H, floors, fh, col, opt) => {
     const ac = opt.signBg || "#1E6F78", dk = shade(col, -0.32), gw = w*0.8;
     for (const sx of [-1, 1]){
@@ -3250,6 +3259,7 @@ function townKit(root){
     }
     box(gw, 0.1, 0.09, "#4A5560", 0, G + 2.22, 0.07); box(gw, 0.08, 0.12, "#4A5560", 0, G + 0.06, 0.08);   // khung trên, dưới
     box(w*0.94, 0.94, 0.05, dk, 0, G + 2.46, 0.035);   // khung biển
+    seasonFront(w, gw);
     // mái hiên sọc trên cửa sổ các tầng trên
     if (!stripeTex[ac]) stripeTex[ac] = canvasTex(256, 64, (c, W2, H2) => { const n = 10; for (let i = 0; i < n; i++){ c.fillStyle = i % 2 ? "#FFFFFF" : ac; c.fillRect(i*W2/n, 0, W2/n + 1, H2*0.78);
       c.beginPath(); c.arc((i + 0.5)*W2/n, H2*0.78, W2/n/2, 0, Math.PI); c.fill(); } });
@@ -3844,7 +3854,7 @@ let curStore = "pet";
 function openStore(k){
   curStore = STORES[k] ? k : "pet"; const st = STORES[curStore], el = $("shopSheet");
   el.innerHTML = `<h2>${st.ic} ${st.n}</h2><div class="sub">Bạn đang có <b>🪙 ${coins()} xu</b>. Đi dạo, đi làm, cho chó đi vệ sinh đúng chỗ là có thêm xu.${st.note ? "<br>" + st.note : ""}</div>
-    ${(() => { const btn = it => { const keep = it.wear || it.toy || it.plush || it.bed, own = keep && owns(it.k), worn = !!(it.wear && prof.wear && prof.wear[it.wear] === it.k), used = !!(it.bed && prof.bedKey === it.k);
+    ${(() => { const btn = it => { const keep = isKeep(it), own = keep && owns(it.k), worn = !!(it.wear && prof.wear && prof.wear[it.wear] === it.k), used = !worn && inUse(it);
         const nk = (keep || it.pantry) ? invN(it.k) : 0, lab = it.soon ? "Sắp có" : `🪙 ${it.p} xu` + (nk ? ` · 📦 có ${nk}${worn ? ", đang mặc" : used ? ", đang dùng" : ""}` : "");
         return `<button class="item" data-k="${it.k}" ${it.soon ? "disabled" : ""} ${worn || used ? 'style="outline:3px solid #2E8B57"' : ""}><span class="ic">${it.ic}</span>${it.n}<br><small>${lab}</small></button>`; };
       const me = st.items.filter(it => it.me), pet = st.items.filter(it => !it.me);
@@ -3859,7 +3869,7 @@ function openStore(k){
 const openShop = () => openStore("pet");
 function buyItem(k){
   const it = (STORES[curStore] || STORES.pet).items.find(x => x.k === k); if (!it || it.soon) return;
-  const keep = it.wear || it.toy || it.plush || it.bed;
+  const keep = isKeep(it);
   if (it.dog && !it.pantry && dogAway()){ toast(`${prof.dog.name} đang không ở đây`); return; }
   if (coins() < it.p){ toast(`Chưa đủ xu. Cần 🪙 ${it.p}, bạn có ${coins()}. Đi dạo thêm để có xu nha`); return; }
   addCoins(-it.p);
@@ -3891,6 +3901,8 @@ function useKeep(it, fresh){   // đồ để dành (quần áo, đồ chơi, g�
     if (!outdoor && !inBR){ $("ovCloset").classList.remove("show"); playToy(it.toy); return; }
     happyUp(prof.stats, fresh ? 5 : 2); loved(); dog.faceCam = true; gesture("bow"); bubble(`${it.ic} Chơi với em đi!`, 1600, true); if (fresh) toast(`${it.ic} Đã mua ${it.n.toLowerCase()}. Về nhà bấm 🧺 Tủ đồ để chơi`, 3500); }
   else if (it.plush){ cuddlePlush(it); if (fresh) toast(`${it.ic} Đã mua ${it.n.toLowerCase()}, cất trong 🧺 Tủ đồ`, 3000); }
+  else if (it.deco){ if (!prof.deco) prof.deco = {}; const on = prof.deco[it.deco] !== it.k; prof.deco[it.deco] = on ? it.k : null; applyDeco(); persist();
+    toast(on ? `${it.ic} Đã bày ${it.n.toLowerCase()} ${it.deco === "table" ? "lên bàn phòng khách" : "lên cửa phòng ngủ"}${outdoor || inBR ? ". Về nhà sẽ thấy" : ""}` : `Đã cất ${it.n.toLowerCase()} vào kho`, 3000); }
   else if (it.bed){ useBed(it); toast(`${it.ic} ${fresh ? "Đã mua" : "Dùng"} ${it.n.toLowerCase()}. ${outdoor ? "Về nhà sẽ thấy nệm mới" : "Nệm đã đổi"} 🛏️`, 3500); if (!outdoor && !inBR) buildProfileRoom(false); }
 }
 function startLost(how){
@@ -3907,6 +3919,65 @@ function startLost(how){
    Nhà hàng: bấm ghế để ngồi, gọi món, đồ ăn bưng ra bàn, chủ ăn; món cho chó thì đặt bát dưới sàn cạnh chó.
    Mỗi toà dựng riêng ở xa khu phố (x 300, 400, 500), có lưới đi lại riêng; vào trong thì ẩn khu phố cho nhẹ máy.
    ====================================================================== */
+// ---------- MÙA TỰ ĐỘNG theo ngày trên máy (Sếp 15/11 qua Bơ): siêu thị có quầy Đồ theo mùa, phố có đồ trang trí theo mùa ----------
+const SEASONS = {
+  tet:    {n: "Tết", ic: "🧧", m: [1, 2]},          spring: {n: "Mùa xuân", ic: "🌸", m: [3, 4, 5]},
+  summer: {n: "Mùa hè", ic: "☀️", m: [6, 7, 8]},    autumn: {n: "Mùa thu", ic: "🍂", m: [9, 10]},
+  thanks: {n: "Lễ Tạ Ơn", ic: "🦃", m: [11]},       xmas:   {n: "Giáng Sinh", ic: "🎄", m: [12]}};
+const seasonOf = m => Object.keys(SEASONS).find(k => SEASONS[k].m.includes(m));
+const seasonNow = () => { const q = +QS.get("month"); return seasonOf(q >= 1 && q <= 12 ? q : new Date().getMonth() + 1); };
+const sFood = (hu, ha, th) => S => { if (hu) S.hunger = Math.max(0, S.hunger - hu); if (ha) S.happy = Math.min(happyCap(S.sick), S.happy + ha); if (th) S.thirst = Math.max(0, (S.thirst || 0) - th); };
+const SEASON_ALL = [
+  // Lễ Tạ Ơn (tháng 11)
+  {season: "thanks", k: "f_pie", ic: "🥧", n: "Bánh bí ngô cho chó", p: 10, pantry: 1, dog: sFood(25, 5)},
+  {season: "thanks", k: "f_turkey", ic: "🦃", n: "Gà tây luộc xé nhỏ", p: 12, pantry: 1, dog: sFood(40, 4)},
+  {season: "thanks", k: "sh_pumpkin", ic: "🎃", n: "Áo len màu bí ngô", p: 30, wear: "shirt", col: "#E07A2E", stripe: "#7A4A2A"},
+  {season: "thanks", k: "hat_pilgrim", ic: "🎩", n: "Mũ lễ Tạ Ơn khóa vàng", p: 25, wear: "hat", col: "#2B2B2B", brim: 1, band: "#FFD15C"},
+  {season: "thanks", k: "nk_maple", ic: "🍁", n: "Khăn quàng lá phong", p: 16, wear: "neck", col: "#C8553D", scarf: 1},
+  {season: "thanks", k: "dc_pumpkin", ic: "🎃", n: "Bí ngô để bàn", p: 18, deco: "table", shape: "pumpkin"},
+  {season: "thanks", k: "dc_wreath_th", ic: "🍂", n: "Vòng lá thu, treo cửa", p: 20, deco: "wall", shape: "wreath", cols: ["#8A5A3B", "#C8553D", "#E07A2E", "#F2B630"]},
+  // Giáng Sinh (tháng 12)
+  {season: "xmas", k: "f_ginger", ic: "🍪", n: "Bánh quy gừng cho chó", p: 8, pantry: 1, dog: sFood(10, 5)},
+  {season: "xmas", k: "f_xchicken", ic: "🍗", n: "Đùi gà nướng Giáng Sinh", p: 14, pantry: 1, dog: sFood(45, 4)},
+  {season: "xmas", k: "sh_santa", ic: "🎅", n: "Áo ông già Noel", p: 32, wear: "shirt", col: "#D93B3B", stripe: "#FFFFFF"},
+  {season: "xmas", k: "hat_santa", ic: "🎅", n: "Mũ Noel", p: 18, wear: "hat", col: "#D93B3B", santa: 1},
+  {season: "xmas", k: "nk_xbell", ic: "🔔", n: "Vòng cổ chuông Giáng Sinh", p: 14, wear: "neck", col: "#2E8B57", bell: 1},
+  {season: "xmas", k: "dc_xtree", ic: "🎄", n: "Cây thông nhỏ để bàn", p: 22, deco: "table", shape: "tree"},
+  {season: "xmas", k: "dc_wreath_x", ic: "🎄", n: "Vòng nguyệt quế, treo cửa", p: 20, deco: "wall", shape: "wreath", cols: ["#2E7D4F", "#D93B3B", "#FFD15C"]},
+  // Tết (tháng 1, 2)
+  {season: "tet", k: "f_tetpork", ic: "🍖", n: "Thịt luộc ngày Tết (không gia vị)", p: 12, pantry: 1, dog: sFood(40, 3)},
+  {season: "tet", k: "f_lixi", ic: "🧧", n: "Bánh thưởng hình bao lì xì", p: 8, pantry: 1, dog: sFood(10, 5)},
+  {season: "tet", k: "sh_aodai", ic: "👘", n: "Áo dài đỏ cho chó", p: 35, wear: "shirt", col: "#D93B3B", stripe: "#FFD15C", skirt: 1},
+  {season: "tet", k: "hat_nonla", ic: "👒", n: "Nón lá nhỏ", p: 20, wear: "hat", col: "#E9D7A6", nonla: 1},
+  {season: "tet", k: "nk_tetbow", ic: "🎀", n: "Nơ đỏ ngày Tết", p: 10, wear: "neck", col: "#D93B3B", bow: 1},
+  {season: "tet", k: "dc_mai", ic: "🌼", n: "Chậu mai vàng để bàn", p: 22, deco: "table", shape: "blossom", col: "#FFD15C"},
+  {season: "tet", k: "dc_lantern", ic: "🏮", n: "Đôi đèn lồng đỏ, treo cửa", p: 20, deco: "wall", shape: "lantern"},
+  // Mùa xuân (tháng 3, 4, 5)
+  {season: "spring", k: "f_berry", ic: "🍓", n: "Dâu tây cắt nhỏ", p: 7, pantry: 1, dog: sFood(8, 4)},
+  {season: "spring", k: "f_egg", ic: "🥚", n: "Trứng luộc", p: 8, pantry: 1, dog: sFood(20, 2)},
+  {season: "spring", k: "sh_sakura", ic: "🌸", n: "Áo hoa anh đào", p: 26, wear: "shirt", col: "#F7C6DA", stripe: "#FFFFFF"},
+  {season: "spring", k: "hat_flower", ic: "🌼", n: "Vòng hoa đội đầu", p: 18, wear: "hat", col: "#7DBB6E", flower: 1},
+  {season: "spring", k: "nk_spring", ic: "🎀", n: "Nơ xanh lá mùa xuân", p: 10, wear: "neck", col: "#5DB36A", bow: 1},
+  {season: "spring", k: "dc_vase", ic: "💐", n: "Bình hoa tươi để bàn", p: 16, deco: "table", shape: "blossom", col: "#F7A8C4"},
+  {season: "spring", k: "dc_wreath_sp", ic: "🌸", n: "Vòng hoa, treo cửa", p: 18, deco: "wall", shape: "wreath", cols: ["#7DBB6E", "#F7A8C4", "#FFFFFF", "#FFD15C"]},
+  // Mùa hè (tháng 6, 7, 8)
+  {season: "summer", k: "f_melon", ic: "🍉", n: "Dưa hấu bỏ hạt", p: 6, pantry: 1, dog: sFood(5, 3, 25)},
+  {season: "summer", k: "f_froyo", ic: "🍦", n: "Kem sữa chua cho chó", p: 9, pantry: 1, dog: sFood(5, 5, 15)},
+  {season: "summer", k: "sh_beach", ic: "🌺", n: "Áo sơ mi đi biển", p: 28, wear: "shirt", col: "#2FB5C4", stripe: "#FFD15C"},
+  {season: "summer", k: "hat_straw", ic: "👒", n: "Mũ rơm rộng vành", p: 20, wear: "hat", col: "#E9C77A", straw: 1, band: "#F25C9A"},
+  {season: "summer", k: "fc_heart", ic: "🕶️", n: "Kính râm màu hồng", p: 16, wear: "face", col: "#F25C9A"},
+  {season: "summer", k: "dc_shell", ic: "🐚", n: "Rổ vỏ sò để bàn", p: 14, deco: "table", shape: "basket", cols: ["#FFF4D6", "#F7C6DA", "#9FD3C7", "#FFFFFF"]},
+  {season: "summer", k: "dc_flags", ic: "🎏", n: "Dây cờ mùa hè, treo cửa", p: 16, deco: "wall", shape: "flags", cols: ["#E5533D", "#FFD15C", "#2FB5C4", "#7DBB6E"]},
+  // Mùa thu (tháng 9, 10)
+  {season: "autumn", k: "f_sweetpot", ic: "🍠", n: "Khoai lang hấp", p: 8, pantry: 1, dog: sFood(30, 2)},
+  {season: "autumn", k: "f_apple", ic: "🍎", n: "Táo cắt miếng", p: 6, pantry: 1, dog: sFood(10, 3, 5)},
+  {season: "autumn", k: "sh_plaid", ic: "🧥", n: "Áo caro mùa thu", p: 28, wear: "shirt", col: "#B0473A", stripe: "#2B2B2B"},
+  {season: "autumn", k: "nk_fall", ic: "🧣", n: "Khăn len nâu", p: 14, wear: "neck", col: "#8A5A3B", scarf: 1},
+  {season: "autumn", k: "hat_beret", ic: "🧢", n: "Mũ nồi đỏ", p: 18, wear: "hat", col: "#B0473A", cap: 1},
+  {season: "autumn", k: "dc_leaves", ic: "🍂", n: "Giỏ lá thu để bàn", p: 15, deco: "table", shape: "basket", cols: ["#C8553D", "#E07A2E", "#F2B630", "#8A5A3B"]},
+  {season: "autumn", k: "dc_wreath_au", ic: "🍁", n: "Vòng lá phong, treo cửa", p: 18, deco: "wall", shape: "wreath", cols: ["#8A5A3B", "#E07A2E", "#C8553D"]}];
+const SEASON_COLS = {thanks: ["#E07A2E", "#8A5A3B", "#F2B630", "#C8553D"], xmas: ["#D93B3B", "#2E8B57", "#FFFFFF", "#FFD15C"], tet: ["#D93B3B", "#FFD15C", "#F2A33A"],
+  spring: ["#F7A8C4", "#FFFFFF", "#7DBB6E", "#FFD15C"], summer: ["#2FB5C4", "#FFD15C", "#E5533D", "#9FD3C7"], autumn: ["#C8553D", "#E07A2E", "#8A5A3B"]};
 const INTS = {
   shop:  {x: 300, z: 0, w: 18, d: 13, n: "Siêu thị thú cưng", ic: "🛒", floor: "#F3EEE6", tile: "#E6DCCD", wall: "#FFF0F4", trim: "#B05C8C", bld: SHOP, face: Math.PI},
   pharm: {x: 400, z: 0, w: 13, d: 10, n: "Nhà thuốc", ic: "💊", floor: "#F1F7F3", tile: "#DDEDE3", wall: "#F4FBF7", trim: "#2E8B57", bld: PHARM, face: Math.PI/2},
@@ -3921,6 +3992,7 @@ const SECS = {
     {k: "care",    n: "Tắm gội, làm đẹp", ic: "🧴", t: "gondola", x: 4,    z: -0.9, w: 5, d: 1.1, st: {x: 4, z: 0.5}},
     {k: "acc",     n: "Mũ, nơ, vòng cổ",  ic: "🎀", t: "wall",    x: -8.55, z: 2.4, w: 0.6, d: 3.4, st: {x: -7.3, z: 2.4}},
     {k: "beds",    n: "Nệm cho chó",      ic: "🛏️", t: "beds",    x: 7.8,  z: 2.4, w: 1.6, d: 3.6, st: {x: 6.3, z: 2.4}},
+    {k: "season",  n: "Đồ theo mùa",      ic: SEASONS[seasonNow()].ic, t: "gondola", x: -4.6, z: 3.4, w: 2.6, d: 1.0, st: {x: -4.6, z: 2.2}},
     {k: "cash",    n: "Quầy thu ngân",    ic: "💳", t: "cash",    x: 4.2,  z: 4.9, w: 2.6, d: 0.8, st: {x: 4.2, z: 3.8}, staff: {x: 4.2, z: 5.7}}],
   pharm: [
     {k: "doctor",  n: "Dược sĩ tư vấn",   ic: "🩺", t: "counter", x: 0,    z: -3.6, w: 4.2, d: 0.8, st: {x: 0, z: -2.4}, staff: {x: 0, z: -4.35}},
@@ -3936,6 +4008,7 @@ const RESTO_TABLES = [[-5, -1.3], [0, -1.3], [5, -1.3], [-5, 2.5], [5, 2.5]];
 const SEC_COLORS = {clothes: ["#E5533D","#3C7DD9","#FFD15C","#F7A8C4","#5DB36A","#2F4FA8"], toys: ["#E5533D","#FFD15C","#4C8FE0","#7DBB6E","#F2A33A","#C38BEB"],
   plush: ["#B5784A","#FFFFFF","#FFD15C","#7DBB6E","#F7A8C4","#C9A27A"], food: ["#C8553D","#F2A33A","#8A5A3B","#E9D7A6","#7DBB6E"], care: ["#9FD3C7","#F7A8C4","#FFFFFF","#B9D7F0","#D9C2F0"],
   acc: ["#E5533D","#F7A8C4","#FFD15C","#4C8FE0","#2B2B2B"], meds: ["#FFFFFF","#E5533D","#4C8FE0"], vita: ["#F2A33A","#FFD15C","#7DBB6E"], flea: ["#2E8B57","#9FD3C7","#FFFFFF"], first: ["#E5533D","#FFFFFF","#B9D7F0"]};
+SEC_COLORS.season = SEASON_COLS[seasonNow()];
 const intG = {};   // k -> {g, walls, doors, grid}
 var townGroup = null, parkGroup = null, townGridSave = null;
 function buildInterior(k){
@@ -3998,7 +4071,8 @@ function buildInterior(k){
     else if (sec.t === "gondola"){   // kệ đôi giữa siêu thị
       box(sec.w, 1.4, 0.1, "#FFFFFF", cx, 0.7, cz); box(sec.w + 0.1, 0.12, sec.d, shade(I.trim, 0.25), cx, 0.06, cz);
       for (let r = 0; r < 3; r++){ const y = 0.2 + r*0.42; for (const s of [-1, 1]){ box(sec.w, 0.04, sec.d/2 - 0.05, "#FFFFFF", cx, y, cz + s*sec.d/4); products(sec, x0 + 0.15, x1 - 0.15, y + 0.02, cz + s*sec.d/4, sec.d/2, 12); } }
-      for (const s of [-1, 1]) box(0.12, 1.5, sec.d, I.trim, cx + s*sec.w/2, 0.75, cz); }
+      for (const s of [-1, 1]) box(0.12, 1.5, sec.d, I.trim, cx + s*sec.w/2, 0.75, cz);
+      if (sec.k === "season"){ const it = SEASON_ALL.find(x => x.season === seasonNow() && x.deco === "table"), dc = it && mkDeco(it); if (dc){ dc.scale.setScalar(1.6); dc.position.set(cx, 1.42, cz); add(dc); } } }
     else if (sec.t === "wall"){   // kệ dọc tường bên: chiều dài theo z
       const s = Math.sign(sec.x), bx = cx + s*0.2;
       box(0.08, 2.1, sec.d, shade(I.wall, -0.12), bx + s*0.1, 1.05, cz);
@@ -4184,11 +4258,13 @@ STORES.resto.items = [
   {k: "pho", ic: "🍜", n: "Phở bò", p: 20, me: 1}, {k: "buncha", ic: "🥢", n: "Bún chả", p: 20, me: 1}, {k: "comtam", ic: "🍛", n: "Cơm tấm sườn", p: 22, me: 1},
   {k: "banhxeo", ic: "🥞", n: "Bánh xèo", p: 18, me: 1}, {k: "goicuon", ic: "🌯", n: "Gỏi cuốn", p: 14, me: 1}, {k: "rice", ic: "🍚", n: "Cơm gà xối mỡ", p: 20, me: 1},
   {k: "che", ic: "🍧", n: "Chè ba màu", p: 10, me: 1}, {k: "mia", ic: "🥤", n: "Nước mía", p: 6, me: 1}, {k: "tra", ic: "🍵", n: "Trà đá", p: 3, me: 1}];
-const KEEP_ITEMS = () => { const m = {}; for (const st of Object.values(STORES)) for (const it of st.items) if (it.wear || it.toy || it.plush || it.bed) m[it.k] = it; return m; };
+const isKeep = it => !!(it.wear || it.toy || it.plush || it.bed || it.deco);
+STORES.sec_season = {ic: SEASONS[seasonNow()].ic, n: "Đồ theo mùa: " + SEASONS[seasonNow()].n, note: "Đồ theo mùa tự đổi theo ngày trên máy. Đồ đã mua vẫn giữ trong 🧺 Tủ đồ khi sang mùa khác.", items: SEASON_ALL.filter(it => it.season === seasonNow())};
+const KEEP_ITEMS = () => { const m = {}; for (const st of Object.values(STORES)) for (const it of st.items) if (isKeep(it)) m[it.k] = it; for (const it of SEASON_ALL) if (isKeep(it)) m[it.k] = it; return m; };
 const owns = k => !!(prof && prof.owned && prof.owned.includes(k));
 // ---- kho đồ (Sếp 15/11 qua Bơ): mỗi món có số lượng; "đang dùng" = đang mặc / nệm đang trải ----
 for (const it of STORES.sec_food.items) if (it.dog && it.k !== "treats") it.pantry = 1;   // đồ ăn mua ở siêu thị cất vào tủ đồ ăn
-const ALL_ITEMS = () => { const m = {}; for (const st of Object.values(STORES)) for (const it of st.items) if (!m[it.k]) m[it.k] = it; return m; };
+const ALL_ITEMS = () => { const m = {}; for (const st of Object.values(STORES)) for (const it of st.items) if (!m[it.k]) m[it.k] = it; for (const it of SEASON_ALL) if (!m[it.k]) m[it.k] = it; return m; };
 const invN = k => { if (!prof) return 0; const n = prof.inv && prof.inv[k]; return n != null ? n : (owns(k) ? 1 : 0); };
 function invAdd(k, d = 1){
   if (!prof.inv) prof.inv = {}; const n = Math.max(0, invN(k) + d); prof.inv[k] = n;
@@ -4196,7 +4272,7 @@ function invAdd(k, d = 1){
   if (n > 0 && i < 0) prof.owned.push(k); else if (n === 0 && i >= 0) prof.owned.splice(i, 1);
   return n;
 }
-const inUse = it => !!((it.wear && prof.wear && prof.wear[it.wear] === it.k) || (it.bed && prof.bedKey === it.k));
+const inUse = it => !!((it.wear && prof.wear && prof.wear[it.wear] === it.k) || (it.bed && prof.bedKey === it.k) || (it.deco && prof.deco && prof.deco[it.deco] === it.k));
 function eatPantry(k){
   const it = ALL_ITEMS()[k]; if (!it || !it.pantry || invN(k) < 1) return false;
   if (dogAway()){ awayHint(); return false; }
@@ -4293,6 +4369,22 @@ function applyWear(){
     else if (hat.crown){ const b = new THREE.Mesh(new THREE.CylinderGeometry(D.R*0.45, D.R*0.42, D.R*0.28, 16, 1, true), new THREE.MeshStandardMaterial({color: hat.col, metalness: 0.4, roughness: 0.4, side: THREE.DoubleSide})); g2.add(b);
       for (let n = 0; n < 5; n++){ const a = n/5*Math.PI*2, sp = new THREE.Mesh(new THREE.ConeGeometry(D.R*0.09, D.R*0.25, 6), b.material); sp.position.set(Math.cos(a)*D.R*0.43, D.R*0.25, Math.sin(a)*D.R*0.43); g2.add(sp); const j = sph(D.R*0.05, n % 2 ? "#E5533D" : "#4C8FE0"); j.position.set(Math.cos(a)*D.R*0.45, 0, Math.sin(a)*D.R*0.45); g2.add(j); }
       g2.position.set(top.x, top.y - D.R*0.55, top.z); }
+    else if (hat.brim || hat.straw){   // mũ có vành: mũ lễ Tạ Ơn (cao, khóa vàng), mũ rơm (thấp, vành rộng)
+      const tall = hat.brim ? 0.55 : 0.28, bw = hat.brim ? 0.68 : 0.95;
+      const cr = new THREE.Mesh(new THREE.CylinderGeometry(D.R*(hat.brim ? 0.34 : 0.4), D.R*0.4, D.R*tall, 18), mat(hat.col)); cr.position.y = D.R*tall/2; g2.add(cr);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(D.R*bw, D.R*bw, D.R*0.035, 24), mat(hat.col)); g2.add(rim);
+      const bd = new THREE.Mesh(new THREE.CylinderGeometry(D.R*0.405, D.R*0.405, D.R*0.1, 18), mat(hat.brim ? "#2B2B2B" : hat.band)); bd.position.y = D.R*0.07; if (hat.brim) bd.material = mat("#5A3A28"); g2.add(bd);
+      if (hat.brim){ const bk = rbox(D.R*0.2, D.R*0.16, D.R*0.03, D.R*0.01, hat.band); bk.position.set(0, D.R*0.07, D.R*0.4); g2.add(bk); }
+      g2.position.set(top.x, top.y - D.R*0.42, top.z); g2.rotation.x = -0.12; }
+    else if (hat.nonla){ const c = new THREE.Mesh(new THREE.ConeGeometry(D.R*0.85, D.R*0.42, 24), mat(hat.col)); c.position.y = D.R*0.21; g2.add(c);
+      const st2 = new THREE.Mesh(new THREE.TorusGeometry(D.R*0.5, D.R*0.015, 4, 24), mat("#C9A86A")); st2.rotation.x = Math.PI/2; st2.position.y = D.R*0.09; g2.add(st2);
+      g2.position.set(top.x, top.y - D.R*0.3, top.z); }
+    else if (hat.flower){ const r = new THREE.Mesh(new THREE.TorusGeometry(D.R*0.42, D.R*0.04, 6, 24), mat(hat.col)); r.rotation.x = Math.PI/2; g2.add(r);
+      for (let n = 0; n < 9; n++){ const a = n/9*Math.PI*2, f = sph(D.R*0.09, ["#F7A8C4", "#FFFFFF", "#FFD15C"][n % 3]); f.position.set(Math.cos(a)*D.R*0.42, D.R*0.04, Math.sin(a)*D.R*0.42); g2.add(f); }
+      g2.position.set(top.x, top.y - D.R*0.42, top.z); }
+    else if (hat.santa){ const c = new THREE.Mesh(new THREE.ConeGeometry(D.R*0.42, D.R*1.0, 16), mat(hat.col)); c.position.y = D.R*0.5; c.rotation.z = 0.35; g2.add(c);
+      const bd = new THREE.Mesh(new THREE.TorusGeometry(D.R*0.42, D.R*0.1, 8, 24), mat("#FFFFFF")); bd.rotation.x = Math.PI/2; g2.add(bd);
+      const pm = sph(D.R*0.13, "#FFFFFF"); pm.position.set(-D.R*0.32, D.R*0.95, 0); g2.add(pm); g2.position.set(top.x, top.y - D.R*0.5, top.z - D.R*0.05); }
     else { const c = new THREE.Mesh(new THREE.ConeGeometry(D.R*0.42, D.R*1.1, 16), mat(hat.col)); c.position.y = D.R*0.55; g2.add(c); const pm = sph(D.R*0.12, "#FFFFFF"); pm.position.y = D.R*1.12; g2.add(pm);
       for (let n = 0; n < 6; n++){ const dt2 = sph(D.R*0.05, ["#FFD15C","#FFFFFF","#7DE3C0"][n % 3]); const a = n*2.1, yy = 0.2 + (n % 3)*0.25; dt2.position.set(Math.cos(a)*D.R*0.42*(1 - yy*0.7), D.R*1.1*yy, Math.sin(a)*D.R*0.42*(1 - yy*0.7)); g2.add(dt2); }
       g2.position.set(top.x, top.y - D.R*0.6, top.z - D.R*0.1); g2.rotation.z = 0.25; }
@@ -4307,6 +4399,41 @@ function applyWear(){
   if (fc && hd && D.eyes && D.eyes.length){ const g2 = new THREE.Group();
     for (const e of D.eyes.slice(0, 2)){ const ep = (e.g || e).position; if (!ep) continue; const lens = new THREE.Mesh(new THREE.CylinderGeometry(D.R*0.2, D.R*0.2, D.R*0.04, 16), mat(fc.col, {r: 0.2})); lens.rotation.x = Math.PI/2; lens.position.set(ep.x, ep.y, ep.z + D.R*0.12); g2.add(lens); }
     if (g2.children.length === 2){ const a = g2.children[0].position, b = g2.children[1].position, br = rbox(Math.abs(a.x - b.x), D.R*0.04, D.R*0.03, 0.005, fc.col); br.position.set((a.x + b.x)/2, (a.y + b.y)/2 + D.R*0.05, (a.z + b.z)/2); g2.add(br); put(hd, g2); } }
+}
+// đồ trang trí theo mùa: tự dựng bằng khối đơn giản (không dùng hình của ai)
+function mkDeco(it){
+  const g = new THREE.Group(), cs = it.cols || [it.col || "#E07A2E"];
+  if (it.shape === "pumpkin"){ for (const [dx, sc] of [[0, 1], [0.1, 0.7], [-0.09, 0.75]]){ const b = sph(0.11*sc, "#E07A2E"); b.scale.y *= 0.72; b.position.set(dx, 0.08*sc, dx ? 0.05 : 0); g.add(b); }
+    const st = cyl(0.012, 0.016, 0.06, "#5E7A3A"); st.position.y = 0.17; g.add(st); const lf = sph(0.035, "#5DB36A"); lf.scale.multiply(new THREE.Vector3(1, 0.3, 0.6)); lf.position.set(0.03, 0.16, 0); g.add(lf); }
+  else if (it.shape === "tree"){ for (let i = 0; i < 3; i++){ const c = new THREE.Mesh(new THREE.ConeGeometry(0.13 - i*0.03, 0.15, 12), mat("#2E7D4F")); c.position.y = 0.12 + i*0.08; g.add(c); }
+    const tr = cyl(0.02, 0.02, 0.06, "#8A6142"); tr.position.y = 0.03; g.add(tr); const star = sph(0.03, "#FFD15C", {em: "#FFD15C", ei: 0.6}); star.position.y = 0.36; g.add(star);
+    for (let i = 0; i < 7; i++){ const a = i*2.4, y = 0.1 + (i % 3)*0.07, r = 0.11 - (i % 3)*0.03; const bl = sph(0.016, ["#D93B3B", "#FFD15C", "#4C8FE0"][i % 3]); bl.position.set(Math.cos(a)*r, y, Math.sin(a)*r); g.add(bl); } }
+  else if (it.shape === "blossom"){ const pot = cyl(0.07, 0.05, 0.09, it.col === "#FFD15C" ? "#B0473A" : "#FFFFFF"); pot.position.y = 0.045; g.add(pot);
+    for (let i = 0; i < 5; i++){ const a = i*1.26, br = cyl(0.006, 0.008, 0.2, "#6B4A2F", undefined, 6); br.position.set(Math.cos(a)*0.03, 0.18, Math.sin(a)*0.03); br.rotation.set(Math.sin(a)*0.35, 0, -Math.cos(a)*0.35); g.add(br);
+      for (let j = 0; j < 3; j++){ const f = sph(0.022, j % 2 ? it.col : "#FFFFFF"); f.position.set(Math.cos(a)*(0.05 + j*0.025), 0.2 + j*0.04, Math.sin(a)*(0.05 + j*0.025)); g.add(f); } } }
+  else if (it.shape === "basket"){ const b = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.07, 16, 1, true), new THREE.MeshStandardMaterial({color: "#B58A55", side: THREE.DoubleSide, roughness: 0.9})); b.position.y = 0.035; g.add(b);
+    const bt = cyl(0.09, 0.09, 0.01, "#9C7444"); bt.position.y = 0.005; g.add(bt);
+    for (let i = 0; i < 9; i++){ const a = i*2.3, r = 0.03 + (i % 3)*0.03, l = sph(0.035, cs[i % cs.length]); l.scale.y *= 0.45; l.position.set(Math.cos(a)*r, 0.07 + (i % 2)*0.012, Math.sin(a)*r); g.add(l); } }
+  else if (it.shape === "wreath"){ const r = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.045, 8, 24), mat(cs[0])); g.add(r);
+    for (let i = 0; i < 14; i++){ const a = i/14*Math.PI*2, l = sph(0.035, cs[1 + i % (cs.length - 1)]); l.scale.z *= 0.5; l.position.set(Math.cos(a)*0.17, Math.sin(a)*0.17, 0.035); g.add(l); }
+    for (const sx of [-1, 1]){ const bw = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 6), mat(cs[1])); bw.rotation.z = sx*Math.PI/2; bw.position.set(sx*0.04, -0.17, 0.05); g.add(bw); } }
+  else if (it.shape === "lantern"){ for (const sx of [-1, 1]){ const l = sph(0.11, "#D93B3B", {em: "#D93B3B", ei: 0.25}); l.scale.y *= 0.85; l.position.set(sx*0.32, -0.05, 0.12); g.add(l);
+      for (const dy of [0.09, -0.19]){ const c = cyl(0.045, 0.045, 0.03, "#FFD15C"); c.position.set(sx*0.32, dy + (dy > 0 ? 0 : 0.05), 0.12); g.add(c); }
+      const st = cyl(0.004, 0.004, 0.14, "#8A5A3B", undefined, 4); st.position.set(sx*0.32, 0.17, 0.12); g.add(st); const ts = cyl(0.012, 0.004, 0.1, "#FFD15C", undefined, 6); ts.position.set(sx*0.32, -0.24, 0.12); g.add(ts); } }
+  else if (it.shape === "flags"){ const n = 9; for (let i = 0; i < n; i++){ const f = i/(n - 1), x = -0.6 + f*1.2, y = -Math.sin(f*Math.PI)*0.1;
+      const fl = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.13, 3), mat(cs[i % cs.length])); fl.rotation.z = Math.PI; fl.scale.z = 0.25; fl.position.set(x, y - 0.06, 0.03); g.add(fl); }
+    const pts = []; for (let i = 0; i <= 12; i++){ const f = i/12; pts.push(new THREE.Vector3(-0.62 + f*1.24, -Math.sin(f*Math.PI)*0.1 + 0.005, 0.03)); } g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color: "#6B4A2F"}))); }
+  g.traverse(o => { if (o.isMesh){ o.castShadow = false; } });
+  return g;
+}
+let decoMeshes = [];
+function applyDeco(){   // đồ trang trí "đang dùng" mới hiện trong phòng khách: một món trên bàn, một món trên tường trên cửa phòng ngủ
+  for (const m of decoMeshes) if (m.parent) m.parent.remove(m); decoMeshes = [];
+  if (!prof || !room.L || !roomGroup) return; const D0 = prof.deco || {}, all = KEEP_ITEMS(), L = room.L;
+  const tb = all[D0.table]; if (tb){ const g = mkDeco(tb), p0 = localToRoom(L.table, 0.02, -0.06); g.position.set(p0.x, 0.45, p0.z); roomGroup.add(g); decoMeshes.push(g); }
+  const wl = all[D0.wall]; if (wl){ const g = mkDeco(wl); if (wl.shape === "flags") g.scale.setScalar(0.7);   // treo trên cánh cửa phòng ngủ, ngang tầm mắt (mở cửa thì đi theo cánh cửa)
+    g.position.copy(WALLS.B.pos(L.brDoor.t, 1.24, 0.1)); g.rotation.y = wallRot("B"); const pv = room.brDoor && room.brDoor.pivot;
+    if (pv){ const a0 = pv.rotation.y; pv.rotation.y = 0; roomGroup.add(g); roomGroup.updateMatrixWorld(true); pv.attach(g); pv.rotation.y = a0; } else roomGroup.add(g); decoMeshes.push(g); }
 }
 function wearItem(it){ if (!prof.wear) prof.wear = {}; prof.wear[it.wear] = prof.wear[it.wear] === it.k ? null : it.k; applyWear(); persist(); return !!prof.wear[it.wear]; }
 function useBed(it){ prof.bedLook = it.bed; prof.bedKey = it.k; roomKey = ""; persist(); }
@@ -6346,7 +6473,7 @@ function buildProfileRoom(resetCam){
   const r = profRoom(prof);
   if (roomKey !== r.layout + "/" + r.palette || bedBuilt !== (prof.bedKey || "")){ bedBuilt = prof.bedKey || ""; buildRoom(r.layout, r.palette); }
   setDoorSign(); if (room.brDoor){ room.brDoor.open = !!prof.brDoorOpen; }
-  updatePhotos(); applyDevices();
+  updatePhotos(); applyDevices(); applyDeco();
   if (resetCam){ camYaw = LAYOUTS[r.layout].cam*Math.PI/180; camPitch = Math.asin(0.62); camZoomDef = camZoom = W < H ? 1.15 : 1; setCamFree(false); }
 }
 function applyRoomChoice(layout, palette){   // đổi phòng ngay trong lúc chơi
@@ -7461,6 +7588,18 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     openStore("sec_beds"); buyItem("bd_pink"); ok("mua nệm: cất kho, nệm ở nhà chưa đổi", prof.bedKey !== "bd_pink"); useKeep(KEEP_ITEMS().bd_pink, false); openStore("sec_plush"); buyItem("pl_bear"); openStore("sec_toys"); buyItem("ty_disc");
     openStore("sec_food"); prof.stats.hunger = 90; buyItem("kibble"); buyItem("kibble"); ok("mua hạt ở siêu thị: vào tủ đồ ăn (2 phần), chó chưa ăn", invN("kibble") === 2 && prof.stats.hunger === 90 && pantryHtml().includes("còn 2"));
     eatPantry("kibble"); ok("cho ăn từ tủ đồ ăn: bớt đói, còn 1", invN("kibble") === 1 && prof.stats.hunger < 90);
+    ok("mùa tự động theo tháng: 11 Lễ Tạ Ơn, 12 Giáng Sinh, 1 Tết, 4 xuân, 7 hè, 10 thu", seasonOf(11) === "thanks" && seasonOf(12) === "xmas" && seasonOf(1) === "tet" && seasonOf(4) === "spring" && seasonOf(7) === "summer" && seasonOf(10) === "autumn");
+    ok("mùa nào cũng có đồ ăn, đồ mặc, đồ trang trí bàn và tường", Object.keys(SEASONS).every(k => { const L2 = SEASON_ALL.filter(it => it.season === k); return L2.some(it => it.pantry) && L2.some(it => it.wear) && L2.some(it => it.deco === "table") && L2.some(it => it.deco === "wall"); }));
+    ok("siêu thị có quầy Đồ theo mùa, chỉ bán đồ mùa này", SECS.shop.some(x => x.k === "season") && STORES.sec_season.items.length >= 6 && STORES.sec_season.items.every(it => it.season === seasonNow()));
+    { let bad = ""; const w0 = Object.assign({}, prof.wear || {}); for (const it of SEASON_ALL.filter(it => it.wear)){ prof.wear = {[it.wear]: it.k}; try { applyWear(); if (!wearMeshes.length) bad += it.k + " "; } catch (e){ bad += it.k + "!" + e.message + " "; } }
+      prof.wear = w0; applyWear(); ok("mọi món mặc theo mùa vẽ lên chó được" + (bad ? ": lỗi " + bad : ""), !bad); }
+    { let bad = ""; for (const it of SEASON_ALL.filter(it => it.deco)){ try { const g = mkDeco(it); if (g.children.length < 3) bad += it.k + " "; } catch (e){ bad += it.k + "!" + e.message + " "; } } ok("mọi đồ trang trí theo mùa dựng được" + (bad ? ": lỗi " + bad : ""), !bad); }
+    { curStore = "sec_season"; const tb = STORES.sec_season.items.find(it => it.deco === "table"), wl = STORES.sec_season.items.find(it => it.deco === "wall"); prof.coins = Math.max(coins(), 200);
+      buyItem(tb.k); ok("mua đồ trang trí: cất kho, chưa bày", invN(tb.k) === 1 && !(prof.deco || {}).table && !decoMeshes.length);
+      useKeep(KEEP_ITEMS()[tb.k], false); buyItem(wl.k); useKeep(KEEP_ITEMS()[wl.k], false);
+      ok("bày đồ trang trí: hiện trên bàn và trên tường phòng khách, kho ghi đang dùng", prof.deco.table === tb.k && prof.deco.wall === wl.k && decoMeshes.length === 2 && storeHtml().includes("đang dùng"));
+      useKeep(KEEP_ITEMS()[tb.k], false); ok("bấm lại: cất đồ trang trí, vẫn còn trong kho", !prof.deco.table && decoMeshes.length === 1 && invN(tb.k) === 1);
+      useKeep(KEEP_ITEMS()[wl.k], false); }
     ok("tủ kho tổng liệt kê đồ đã mua, có số lượng", ["Áo thun đỏ","x2","Gấu bông nâu","Hạt cho chó"].every(t => storeHtml().includes(t)));
     ok("mua nệm, gấu bông, đồ chơi: có trong tủ đồ", prof.bedKey === "bd_pink" && owns("pl_bear") && owns("ty_disc") && closetOwned().includes("Gấu bông nâu") && closetOwned().includes("Đĩa ném"));
     $("ovShop").classList.remove("show"); const tr0 = prof.treats.left = 50; prof.giftDay = null; cashier(); ok("quầy thu ngân: quà 5 viên bánh thưởng mỗi ngày một lần", prof.treats.left === tr0 + 5); cashier(); ok("quà chỉ một lần mỗi ngày", prof.treats.left === tr0 + 5);
@@ -7534,6 +7673,8 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   save = {version:SAVE_VERSION, profiles:[p], current:p.id};
   startProfile(p.id);
   if (QS.get("yaw")) camYaw = +QS.get("yaw")*Math.PI/180;
+  if (QS.get("deco") && prof){ prof.deco = {}; for (const k of QS.get("deco").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.deco){ invAdd(k); prof.deco[it.deco] = k; } } applyDeco(); }   // thử: &deco=dc_pumpkin,dc_wreath_th
+  if (QS.get("dwear") && prof){ prof.wear = {}; for (const k of QS.get("dwear").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.wear){ invAdd(k); prof.wear[it.wear] = k; } } setTimeout(applyWear, 500); }   // thử: &dwear=sh_pumpkin,hat_pilgrim
   if (QS.get("pitch")) camPitch = +QS.get("pitch")*Math.PI/180;
   if (QS.get("zoom")) camZoom = +QS.get("zoom");
   if (QS.get("hour")){ const d = new Date(); d.setHours(+QS.get("hour"), 0, 0, 0); p.clock = d.getTime(); }
@@ -7564,7 +7705,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     fade = m => m(); const step = (sec, cond) => { for (let i = 0; i < sec/0.05 && !(cond && cond()); i++){ tSec += 0.05; tickOutdoor(0.05); } };
     if (QS.get("ctrl")){ tickOwnerHome(0.033); hm.since = -99; setCtrlOwner(true); return; }
     if (!outdoor) setOutdoor(true);
-    const ik = QS.get("int"); if (ik){ enterInterior(ik); if (QS.get("wear")){ prof.coins = 999; for (const k of QS.get("wear").split(",")){ const st = Object.keys(STORES).find(s2 => STORES[s2].items.some(it => it.k === k)); curStore = st; buyItem(k); if (KEEP_ITEMS()[k]) useKeep(KEEP_ITEMS()[k], false); } $("ovShop").classList.remove("show"); }
+    const ik = QS.get("int"); if (ik){ enterInterior(ik); if (QS.get("ipos")) setTimeout(()=>{ const [x, z] = QS.get("ipos").split(",").map(Number); outdoor.x = INTS[ik].x + x; outdoor.z = INTS[ik].z + z; dog.pos = {x: outdoor.x + 0.7, z: outdoor.z + 0.3}; camYaw = +(QS.get("iyaw") || 0)*Math.PI/180; camPitch = 0.55; camZoom = 0.8; }, 700); if (QS.get("wear")){ prof.coins = 999; for (const k of QS.get("wear").split(",")){ const st = Object.keys(STORES).find(s2 => STORES[s2].items.some(it => it.k === k)); curStore = st; buyItem(k); if (KEEP_ITEMS()[k]) useKeep(KEEP_ITEMS()[k], false); } $("ovShop").classList.remove("show"); }
       if (QS.get("seat")){ const m = pickables.filter(x => x.userData.kind === "seat" && x.userData.seat.userData.table)[+QS.get("seat")]; sitAt({object: m}); step(25, () => !!outdoor.sit); step(1); prof.coins = 999; curStore = "resto"; buyItem("pho"); curStore = "resto"; buyItem("dogmeal"); $("ovShop").classList.remove("show"); step(1.5); }
       return; }
     const gk = QS.get("gear"), yk = QS.get("yk"), at = gk ? GEAR[gk].stand : YARD[yk].stand;
