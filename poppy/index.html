@@ -2358,10 +2358,13 @@ function openCloset(){
     <h3>💊 Tủ thuốc</h3>
     <div class="items"><button class="item" data-med="1"><span class="ic">💊</span>Thuốc</button></div>
     <div class="small">Chó ốm thì cho uống thuốc (tối đa ${MEDS_PER_DAY} lần mỗi ngày), rồi cho ngủ hoặc nghỉ trên nệm.</div>
+    ${pantryHtml()}
     ${closetOwned()}
+    ${storeHtml()}
     <div class="row" style="margin-top:12px"><button class="btn ghost" id="clClose">Đóng</button></div></div>`;
   el.querySelectorAll("[data-t]").forEach(b => b.onclick = ()=>{ $("ovCloset").classList.remove("show"); playToy(b.dataset.t); });
   el.querySelectorAll("[data-own]").forEach(b => b.onclick = ()=>{ const it = KEEP_ITEMS()[b.dataset.own]; if (!it) return; if (it.plush) $("ovCloset").classList.remove("show"); useKeep(it, false); persist(); if ($("ovCloset").classList.contains("show")) openCloset(); });
+  el.querySelectorAll("[data-eat]").forEach(b => b.onclick = ()=>{ if (eatPantry(b.dataset.eat)){ persist(); openCloset(); } });
   el.querySelector("[data-med]").onclick = ()=>{ $("ovCloset").classList.remove("show"); giveMedicine(); };
   $("clClose").onclick = ()=>$("ovCloset").classList.remove("show");
   $("ovCloset").classList.add("show");
@@ -3802,7 +3805,7 @@ function openStore(k){
   curStore = STORES[k] ? k : "pet"; const st = STORES[curStore], el = $("shopSheet");
   el.innerHTML = `<h2>${st.ic} ${st.n}</h2><div class="sub">Bạn đang có <b>🪙 ${coins()} xu</b>. Đi dạo, đi làm, cho chó đi vệ sinh đúng chỗ là có thêm xu.${st.note ? "<br>" + st.note : ""}</div>
     ${(() => { const btn = it => { const keep = it.wear || it.toy || it.plush || it.bed, own = keep && owns(it.k), worn = !!(it.wear && prof.wear && prof.wear[it.wear] === it.k), used = !!(it.bed && prof.bedKey === it.k);
-        const lab = it.soon ? "Sắp có" : own ? (it.wear ? (worn ? "✅ Đang mặc · bấm để cởi" : "✅ Đã có · bấm để mặc") : it.bed ? (used ? "✅ Đang dùng" : "✅ Đã có · bấm để dùng") : it.plush ? "✅ Đã có · bấm để ôm" : "✅ Đã có · bấm để chơi") : `🪙 ${it.p} xu`;
+        const nk = (keep || it.pantry) ? invN(it.k) : 0, lab = it.soon ? "Sắp có" : `🪙 ${it.p} xu` + (nk ? ` · 📦 có ${nk}${worn ? ", đang mặc" : used ? ", đang dùng" : ""}` : "");
         return `<button class="item" data-k="${it.k}" ${it.soon ? "disabled" : ""} ${worn || used ? 'style="outline:3px solid #2E8B57"' : ""}><span class="ic">${it.ic}</span>${it.n}<br><small>${lab}</small></button>`; };
       const me = st.items.filter(it => it.me), pet = st.items.filter(it => !it.me);
       return me.length ? `<div class="small" style="margin:6px 0 2px;font-weight:800">🐶 Cho chó</div><div class="closet"><div class="items">${pet.map(btn).join("")}</div></div>
@@ -3817,12 +3820,12 @@ const openShop = () => openStore("pet");
 function buyItem(k){
   const it = (STORES[curStore] || STORES.pet).items.find(x => x.k === k); if (!it || it.soon) return;
   const keep = it.wear || it.toy || it.plush || it.bed;
-  if (keep && owns(k)){ useKeep(it, false); persist(); openStore(curStore); return; }   // đồ đã mua: mặc / cởi / chơi / dùng lại, không mất xu
-  if ((it.dog || it.wear || it.toy || it.plush) && dogAway()){ toast(`${prof.dog.name} đang không ở đây`); return; }
+  if (it.dog && !it.pantry && dogAway()){ toast(`${prof.dog.name} đang không ở đây`); return; }
   if (coins() < it.p){ toast(`Chưa đủ xu. Cần 🪙 ${it.p}, bạn có ${coins()}. Đi dạo thêm để có xu nha`); return; }
   addCoins(-it.p);
   const S = prof.stats;
-  if (keep){ if (!prof.owned) prof.owned = []; prof.owned.push(k); useKeep(it, true); }
+  if (keep || it.pantry){ const n = invAdd(k);   // Sếp 15/11 (qua Bơ): mua xong cất vào kho, chưa dùng; mua lại thì tăng số lượng
+    toast(n > 1 ? `${it.ic} Mua thêm ${it.n.toLowerCase()}: trong kho có ${n}` : `${it.ic} Đã mua ${it.n.toLowerCase()}, cất vào ${it.pantry ? "🍖 Tủ đồ ăn" : "📦 Tủ kho"}. Bấm 🧺 Tủ đồ để dùng`, 3200); }
   else if (k === "treats"){ prof.treats.left = TREAT_BAG; toast("Đã mua bịch thưởng mới: 100 viên 🍪"); }
   else if (k === "meds"){ prof.medsExtra = (prof.medsExtra || 0) + 3; toast("Đã mua hộp thuốc: thêm 3 lần uống 💊"); }
   else if (it.dog){ it.dog(S); loved(); dog.faceCam = true; setState("eat", 1200); setTimeout(()=>gesture("wiggle"), 1300); toast(`${it.ic} ${prof.dog.name} thích lắm!`); }
@@ -4143,6 +4146,33 @@ STORES.resto.items = [
   {k: "che", ic: "🍧", n: "Chè ba màu", p: 10, me: 1}, {k: "mia", ic: "🥤", n: "Nước mía", p: 6, me: 1}, {k: "tra", ic: "🍵", n: "Trà đá", p: 3, me: 1}];
 const KEEP_ITEMS = () => { const m = {}; for (const st of Object.values(STORES)) for (const it of st.items) if (it.wear || it.toy || it.plush || it.bed) m[it.k] = it; return m; };
 const owns = k => !!(prof && prof.owned && prof.owned.includes(k));
+// ---- kho đồ (Sếp 15/11 qua Bơ): mỗi món có số lượng; "đang dùng" = đang mặc / nệm đang trải ----
+for (const it of STORES.sec_food.items) if (it.dog && it.k !== "treats") it.pantry = 1;   // đồ ăn mua ở siêu thị cất vào tủ đồ ăn
+const ALL_ITEMS = () => { const m = {}; for (const st of Object.values(STORES)) for (const it of st.items) if (!m[it.k]) m[it.k] = it; return m; };
+const invN = k => { if (!prof) return 0; const n = prof.inv && prof.inv[k]; return n != null ? n : (owns(k) ? 1 : 0); };
+function invAdd(k, d = 1){
+  if (!prof.inv) prof.inv = {}; const n = Math.max(0, invN(k) + d); prof.inv[k] = n;
+  if (!prof.owned) prof.owned = []; const i = prof.owned.indexOf(k);
+  if (n > 0 && i < 0) prof.owned.push(k); else if (n === 0 && i >= 0) prof.owned.splice(i, 1);
+  return n;
+}
+const inUse = it => !!((it.wear && prof.wear && prof.wear[it.wear] === it.k) || (it.bed && prof.bedKey === it.k));
+function eatPantry(k){
+  const it = ALL_ITEMS()[k]; if (!it || !it.pantry || invN(k) < 1) return false;
+  if (dogAway()){ awayHint(); return false; }
+  it.dog(prof.stats); invAdd(k, -1); loved(); dog.faceCam = true; setState("eat", 1200); setTimeout(()=>gesture("wiggle"), 1300);
+  toast(`${it.ic} ${prof.dog.name} ăn ${it.n.toLowerCase()} ngon lành! Còn ${invN(k)}`, 2600); return true;
+}
+function pantryHtml(){
+  const all = ALL_ITEMS(), list = Object.values(all).filter(it => it.pantry && invN(it.k) > 0);
+  return `<h3>🍖 Tủ đồ ăn</h3>` + (list.length ? `<div class="items">${list.map(it => `<button class="item" data-eat="${it.k}"><span class="ic">${it.ic}</span>${esc(it.n)}<br><small>còn ${invN(it.k)} · bấm để cho ăn</small></button>`).join("")}</div>`
+    : `<div class="empty">Tủ đồ ăn trống. Mua ở 🛒 siêu thị, quầy Thức ăn</div>`);
+}
+function storeHtml(){   // tủ kho tổng: mọi món đã mua, số lượng, trong kho hay đang dùng
+  const all = ALL_ITEMS(), list = Object.keys(prof.inv || {}).concat(prof.owned || []).filter((k, i, a) => a.indexOf(k) === i && all[k] && invN(k) > 0).map(k => all[k]);
+  if (!list.length) return `<h3>📦 Tủ kho tổng</h3><div class="empty">Kho trống. Đồ mua ở siêu thị sẽ cất vào đây</div>`;
+  return `<h3>📦 Tủ kho tổng</h3><div class="small" id="khoList">` + list.map(it => `<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed #ddd"><span>${it.ic} ${esc(it.n)}</span><span><b>x${invN(it.k)}</b> · ${inUse(it) ? "✅ đang dùng" : "📦 trong kho"}</span></div>`).join("") + `</div>`;
+}
 function tapSection(ik, i){
   const sec = (SECS[ik] || [])[i], I = INTS[ik], R = intG[ik]; if (!sec || !outdoor || !R) return;
   const st = {x: I.x + sec.st.x, z: I.z + sec.st.z};
@@ -7382,10 +7412,15 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     ok("siêu thị chia quầy: quần áo, đồ chơi, gấu bông, thức ăn, làm đẹp, mũ nơ, nệm, thu ngân", ["clothes","toys","plush","food","care","acc","beds","cash"].every(k => SECS.shop.some(x => x.k === k)));
     ok("nhà thuốc chia quầy: dược sĩ, thuốc, vitamin, ve rận, sơ cứu, cân", ["doctor","meds","vita","flea","first","scale"].every(k => SECS.pharm.some(x => x.k === k)));
     enterInterior("shop"); openStore("sec_clothes"); buyItem("sh_red");
-    ok("mua áo đỏ: trừ 20 xu, cất vào tủ, chó mặc ngay (thấy áo trên mô hình)", coins() === 980 && owns("sh_red") && prof.wear.shirt === "sh_red" && wearMeshes.length > 0);
-    buyItem("sh_red"); ok("bấm lại áo đã có: cởi ra, không mất xu", coins() === 980 && !prof.wear.shirt);
-    openStore("sec_acc"); buyItem("hat_party"); buyItem("nk_bow"); buyItem("fc_glass"); ok("đội mũ, đeo nơ, đeo kính cùng lúc", prof.wear.hat === "hat_party" && prof.wear.neck === "nk_bow" && prof.wear.face === "fc_glass" && wearMeshes.length >= 3, wearMeshes.length);
-    openStore("sec_beds"); buyItem("bd_pink"); openStore("sec_plush"); buyItem("pl_bear"); openStore("sec_toys"); buyItem("ty_disc");
+    ok("mua áo đỏ: trừ 20 xu, cất vào kho, chưa mặc", coins() === 980 && owns("sh_red") && invN("sh_red") === 1 && !(prof.wear || {}).shirt);
+    buyItem("sh_red"); ok("mua lại áo đã có: trừ xu, kho tăng lên 2", coins() === 960 && invN("sh_red") === 2);
+    useKeep(KEEP_ITEMS().sh_red, false); ok("lấy áo trong tủ ra mặc: chó mặc áo (thấy áo trên mô hình), kho ghi đang dùng", prof.wear.shirt === "sh_red" && wearMeshes.length > 0 && storeHtml().includes("đang dùng"));
+    useKeep(KEEP_ITEMS().sh_red, false); ok("bấm lại: cởi áo, áo vẫn trong kho", !prof.wear.shirt && invN("sh_red") === 2);
+    openStore("sec_acc"); for (const k of ["hat_party","nk_bow","fc_glass"]){ buyItem(k); useKeep(KEEP_ITEMS()[k], false); } ok("đội mũ, đeo nơ, đeo kính cùng lúc", prof.wear.hat === "hat_party" && prof.wear.neck === "nk_bow" && prof.wear.face === "fc_glass" && wearMeshes.length >= 3, wearMeshes.length);
+    openStore("sec_beds"); buyItem("bd_pink"); ok("mua nệm: cất kho, nệm ở nhà chưa đổi", prof.bedKey !== "bd_pink"); useKeep(KEEP_ITEMS().bd_pink, false); openStore("sec_plush"); buyItem("pl_bear"); openStore("sec_toys"); buyItem("ty_disc");
+    openStore("sec_food"); prof.stats.hunger = 90; buyItem("kibble"); buyItem("kibble"); ok("mua hạt ở siêu thị: vào tủ đồ ăn (2 phần), chó chưa ăn", invN("kibble") === 2 && prof.stats.hunger === 90 && pantryHtml().includes("còn 2"));
+    eatPantry("kibble"); ok("cho ăn từ tủ đồ ăn: bớt đói, còn 1", invN("kibble") === 1 && prof.stats.hunger < 90);
+    ok("tủ kho tổng liệt kê đồ đã mua, có số lượng", ["Áo thun đỏ","x2","Gấu bông nâu","Hạt cho chó"].every(t => storeHtml().includes(t)));
     ok("mua nệm, gấu bông, đồ chơi: có trong tủ đồ", prof.bedKey === "bd_pink" && owns("pl_bear") && owns("ty_disc") && closetOwned().includes("Gấu bông nâu") && closetOwned().includes("Đĩa ném"));
     $("ovShop").classList.remove("show"); const tr0 = prof.treats.left = 50; prof.giftDay = null; cashier(); ok("quầy thu ngân: quà 5 viên bánh thưởng mỗi ngày một lần", prof.treats.left === tr0 + 5); cashier(); ok("quà chỉ một lần mỗi ngày", prof.treats.left === tr0 + 5);
     exitInterior(); enterInterior("pharm"); prof.stats.sick = 60; openDoctor(); ok("dược sĩ xem bệnh, khuyên mua thuốc", $("shopSheet").innerText.includes("ốm") && $("ovShop").classList.contains("show")); $("ovShop").classList.remove("show"); prof.stats.sick = 0;
@@ -7488,7 +7523,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     fade = m => m(); const step = (sec, cond) => { for (let i = 0; i < sec/0.05 && !(cond && cond()); i++){ tSec += 0.05; tickOutdoor(0.05); } };
     if (QS.get("ctrl")){ tickOwnerHome(0.033); hm.since = -99; setCtrlOwner(true); return; }
     if (!outdoor) setOutdoor(true);
-    const ik = QS.get("int"); if (ik){ enterInterior(ik); if (QS.get("wear")){ prof.coins = 999; for (const k of QS.get("wear").split(",")){ const st = Object.keys(STORES).find(s2 => STORES[s2].items.some(it => it.k === k)); curStore = st; buyItem(k); } $("ovShop").classList.remove("show"); }
+    const ik = QS.get("int"); if (ik){ enterInterior(ik); if (QS.get("wear")){ prof.coins = 999; for (const k of QS.get("wear").split(",")){ const st = Object.keys(STORES).find(s2 => STORES[s2].items.some(it => it.k === k)); curStore = st; buyItem(k); if (KEEP_ITEMS()[k]) useKeep(KEEP_ITEMS()[k], false); } $("ovShop").classList.remove("show"); }
       if (QS.get("seat")){ const m = pickables.filter(x => x.userData.kind === "seat" && x.userData.seat.userData.table)[+QS.get("seat")]; sitAt({object: m}); step(25, () => !!outdoor.sit); step(1); prof.coins = 999; curStore = "resto"; buyItem("pho"); curStore = "resto"; buyItem("dogmeal"); $("ovShop").classList.remove("show"); step(1.5); }
       return; }
     const gk = QS.get("gear"), yk = QS.get("yk"), at = gk ? GEAR[gk].stand : YARD[yk].stand;
