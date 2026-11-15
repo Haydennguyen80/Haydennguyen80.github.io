@@ -182,6 +182,13 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
 #outStat{z-index:5}
 .svcList{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .svc{background:#fff;border:2px solid #e2dccd;border-radius:14px;padding:8px 10px}
+#chatList{max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:8px;background:#F7F3EA;border-radius:12px;margin-top:8px}
+.cm{max-width:78%;padding:7px 11px;border-radius:14px;font-size:15px;line-height:1.35;word-wrap:break-word;background:#fff;border:2px solid #e2dccd;align-self:flex-start}
+.cm.me{align-self:flex-end;background:#DFF3E4;border-color:#9FD3B0}
+.cm small{display:block;font-size:11px;color:#8a8a8a;margin-top:2px}
+.chatIn{display:flex;gap:6px;margin-top:8px}.chatIn input{flex:1;min-width:0;font-size:16px;padding:9px 11px;border-radius:12px;border:2px solid #e2dccd}
+.qk{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.qk button{font-size:13px;padding:6px 10px;border-radius:12px;border:2px solid #e2dccd;background:#fff;cursor:pointer}
+.dotN{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:#E5533D;color:#fff;font-size:12px;font-weight:800;text-align:center;margin-left:4px}
 .svcT{display:flex;gap:10px;align-items:flex-start;margin-bottom:6px}
 .svcT .ic{font-size:28px;line-height:1}
 .svc .btn{padding:7px 10px;font-size:13px}
@@ -6445,8 +6452,9 @@ function frOn(){
   frOff(); FR.on = true; FR.uid = fbUser.uid; FR.seenReq = null;
   const watch = (path, key) => { const r = frDB().ref(path + "/" + FR.uid); r.on("value", sn => { FR[key] = sn.val() || {}; frChanged(key); }, e => console.warn("bạn bè:", path, e)); FR.refs.push(r); };
   watch("friendReq", "req"); watch("friends", "friends"); watch("blocks", "blocks"); watch("friendSent", "sent");
+  { const r = frDB().ref("inbox/" + FR.uid); r.on("value", sn => chatInboxChanged(sn.val()), e => console.warn("hộp thư:", e)); FR.refs.push(r); }
 }
-function frOff(){ for (const r of FR.refs) r.off(); Object.assign(FR, {on: false, uid: null, refs: [], req: {}, friends: {}, blocks: {}, sent: {}, seenReq: null}); frBadge(); }
+function frOff(){ chatStop(); CHAT.inbox = {}; for (const r of FR.refs) r.off(); Object.assign(FR, {on: false, uid: null, refs: [], req: {}, friends: {}, blocks: {}, sent: {}, seenReq: null}); frBadge(); }
 function frChanged(key){
   if (key === "req"){
     const ids = Object.keys(FR.req);
@@ -6455,12 +6463,68 @@ function frChanged(key){
   }
   if (key === "blocks") for (const id of Object.keys(FR.blocks)) peerRemove(id);
   frBadge();
+  if (CHAT.with){ if (!FR.friends[CHAT.with]){ const id = CHAT.with; chatStop(); showPeer(id); } frBadge(); return; }   // đang nhắn tin: giữ nguyên ô nhập
   if ($("ovFriends").classList.contains("show")) FR.view ? showPeer(FR.view) : (FR.reporting ? null : openFriends());
 }
 function frBadge(){
   const b = $("btnFriends"); if (!b) return;
-  const n = Object.keys(FR.req).length;
+  const n = Object.keys(FR.req).length + chatUnread();
   b.style.display = fbUser ? "" : "none"; b.textContent = n ? `👥 ${n}` : "👥"; b.classList.toggle("hot", n > 0);
+}
+// ---------- NHẮN TIN GIỮA BẠN BÈ (Sếp 15/11, bước 6a): chỉ bạn bè mới nhắn được; máy chủ kiểm tra lại (luật chats/, inbox/) ----------
+const CHAT = {with: null, ref: null, msgs: [], inbox: {}, seen: {}, lastSend: 0};
+const chatPair = (a, b) => a < b ? a + "/" + b : b + "/" + a;
+const CHAT_QUICK = ["Chào bạn! 👋", "Ra công viên chơi không?", "Chó của bạn dễ thương quá! 🐶", "Hẹn gặp ở công viên nha", "Cảm ơn bạn! 💛", "Tạm biệt, mai chơi tiếp nha"];
+const CHAT_BAD = ["đm", "đmm", "dmm", "vcl", "vkl", "vl", "đéo", "địt", "lồn", "cặc", "đĩ", "đụ", "óc chó", "ngu", "fuck", "shit", "bitch"];
+function chatClean(t){   // an toàn cho trẻ em: che số điện thoại, email, đường link, từ tục
+  t = String(t || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  t = t.replace(/(?:\d[\s.\-]*){7,}/g, "*** ");
+  t = t.replace(/\S+@\S+\.\S+/g, "***").replace(/(https?:\/\/|www\.)\S+/gi, "***").replace(/\b\S+\.(com|vn|net|org|io|me)\b\S*/gi, "***");
+  for (const w of CHAT_BAD) t = t.replace(new RegExp("(^|[\\s.,!?])" + w + "(?=$|[\\s.,!?])", "giu"), "$1***");
+  return t.trim();
+}
+function chatUnread(){ let n = 0; for (const [id, v] of Object.entries(CHAT.inbox)) if (FR.friends[id] && CHAT.with !== id) n++; return n; }
+function chatInboxChanged(v){
+  const old = CHAT.inbox; CHAT.inbox = v || {};
+  for (const [id, m] of Object.entries(CHAT.inbox)) if (FR.friends[id] && CHAT.with !== id && (!old[id] || old[id].t !== m.t)) toast(`💬 ${m.name || "Bạn"} vừa nhắn tin cho bạn. Bấm 👥 để xem`, 4000);
+  if (CHAT.with && CHAT.inbox[CHAT.with]) chatMarkRead(CHAT.with);
+  frBadge(); if ($("ovFriends").classList.contains("show") && !FR.view && !CHAT.with) openFriends();
+}
+function chatMarkRead(id){ if (fb && fbUser && CHAT.inbox[id]) frDB().ref(`inbox/${fbUser.uid}/${id}`).remove().catch(() => {}); }
+function chatStop(){ if (CHAT.ref) CHAT.ref.off(); CHAT.ref = null; CHAT.with = null; CHAT.msgs = []; }
+function openChat(id){
+  if (!fbUser || !FR.friends[id]){ toast("Chỉ nhắn tin được với bạn bè"); return; }
+  closeRing(); chatStop(); FR.view = null; FR.reporting = false; CHAT.with = id;
+  const c = peerCard(id), el = $("friendsSheet");
+  el.innerHTML = `<h2>💬 ${esc(c.name)}</h2><div class="sub">${c.dog ? "Chó " + esc(c.dog) + " · " : ""}Chỉ hai bạn đọc được tin này</div>
+    <div class="lock" style="font-size:13px">🛡️ Không gửi số điện thoại, địa chỉ nhà, tên trường. Ai nói điều không hay thì bấm 🚩 Báo cáo hoặc 🚫 Chặn, và kể cho bố mẹ nghe.</div>
+    <div id="chatList"><div class="small">Đang tải tin nhắn…</div></div>
+    <div class="qk">${CHAT_QUICK.map((q, i) => `<button data-q="${i}">${esc(q)}</button>`).join("")}</div>
+    <div class="chatIn"><input id="chatTxt" maxlength="200" placeholder="Nhập tin nhắn…" autocomplete="off"><button class="btn gold" id="chatSend">Gửi</button></div>
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="chatBack">← ${esc(c.name)}</button><button class="btn ghost" id="frList">👥 Bạn bè</button><button class="btn ghost" id="frClose">Đóng</button></div>`;
+  const inp = $("chatTxt");
+  $("chatSend").onclick = () => { chatSend(id, inp.value).then(ok => { if (ok) inp.value = ""; }); };
+  inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); $("chatSend").click(); } };
+  el.querySelectorAll("[data-q]").forEach(b => b.onclick = () => chatSend(id, CHAT_QUICK[+b.dataset.q]));
+  $("chatBack").onclick = () => { chatStop(); showPeer(id); }; $("frList").onclick = () => { chatStop(); openFriends(); }; $("frClose").onclick = closeFriends;
+  $("ovFriends").classList.add("show");
+  if (fb && fbUser){ CHAT.ref = frDB().ref("chats/" + chatPair(fbUser.uid, id)).limitToLast(50);
+    CHAT.ref.on("value", sn => { const v = sn.val() || {}; CHAT.msgs = Object.values(v).sort((a, b) => a.t - b.t); chatRender(); chatMarkRead(id); }, () => { const L = $("chatList"); if (L) L.innerHTML = `<div class="small">Chưa tải được tin nhắn. Hai bạn còn là bạn bè không?</div>`; }); }
+  chatMarkRead(id); frBadge();
+}
+function chatRender(){
+  const L = $("chatList"); if (!L || !fbUser) return; const me = fbUser.uid;
+  const hm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  L.innerHTML = CHAT.msgs.length ? CHAT.msgs.map(m => `<div class="cm ${m.from === me ? "me" : ""}">${esc(m.text)}<small>${hm(m.t)}</small></div>`).join("") : `<div class="small">Chưa có tin nhắn. Gửi lời chào đầu tiên nha 👋</div>`;
+  L.scrollTop = L.scrollHeight;
+}
+async function chatSend(id, raw){
+  if (!fb || !fbUser || !FR.friends[id]){ toast("Chỉ nhắn tin được với bạn bè"); return false; }
+  const text = chatClean(raw); if (!text) return false;
+  if (Date.now() - CHAT.lastSend < 1500){ toast("Gửi chậm lại một chút nha"); return false; }
+  CHAT.lastSend = Date.now(); const me = fbUser.uid, t = Date.now();
+  try { await frDB().ref("chats/" + chatPair(me, id)).push({from: me, text, t}); await frDB().ref(`inbox/${id}/${me}`).set({name: myCard().name, t}); if (text !== String(raw).trim()) toast("🛡️ Một số chữ đã được che cho an toàn", 2500); return true; }
+  catch (e){ toast("Chưa gửi được (" + (e.code || e.message) + ")", 3500); return false; }
 }
 function frRel(id){ return FR.blocks[id] ? "blocked" : FR.friends[id] ? "friend" : FR.req[id] ? "asked" : FR.sent[id] ? "sent" : "none"; }
 async function frRun(up, okMsg){
@@ -6514,7 +6578,7 @@ function showPeer(id){
     none: `<button class="btn gold" id="frAdd">➕ Kết bạn</button>`,
     sent: `<div class="lock">⏳ Đã gửi lời mời. Chờ ${esc(c.name)} đồng ý.</div><div class="row" style="margin-top:8px"><button class="btn ghost" id="frCancel">Hủy lời mời</button></div>`,
     asked: `<div class="lock">${esc(c.name)} muốn kết bạn với bạn.</div><div class="row" style="margin-top:8px"><button class="btn gold" id="frYes">✅ Đồng ý</button><button class="btn ghost" id="frNo">Từ chối</button></div>`,
-    friend: `<div class="lock">💛 Hai bạn là bạn bè.</div><div class="row" style="margin-top:8px"><button class="btn ghost" id="frDel">Xóa bạn</button></div>`,
+    friend: `<div class="lock">💛 Hai bạn là bạn bè.</div><div class="row" style="margin-top:8px"><button class="btn gold" id="frChat">💬 Nhắn tin</button><button class="btn ghost" id="frDel">Xóa bạn</button></div>`,
     blocked: `<div class="lock">🚫 Bạn đã chặn người này.</div><div class="row" style="margin-top:8px"><button class="btn ghost" id="frUnb">Bỏ chặn</button></div>`}[rel];
   el.innerHTML = head + main + `<div class="row" style="margin-top:14px;padding-top:10px;border-top:2px dashed #E5DCC8">
       ${rel !== "blocked" && rel !== "login" ? `<button class="btn ghost" id="frBlk">🚫 Chặn</button>` : ""}${rel !== "login" ? `<button class="btn ghost" id="frRep">🚩 Báo cáo</button>` : ""}
@@ -6522,10 +6586,10 @@ function showPeer(id){
   const on = (k, f) => { const b = $(k); if (b) b.onclick = f; };
   on("frAdd", () => frAsk(id, c)); on("frCancel", () => frCancel(id)); on("frYes", () => frAccept(id)); on("frNo", () => frDecline(id));
   on("frDel", () => frUnfriend(id)); on("frUnb", () => frUnblock(id)); on("frBlk", () => frBlock(id, c)); on("frRep", () => frReport(id, c));
-  on("frList", openFriends); on("frClose", closeFriends);
+  on("frList", openFriends); on("frClose", closeFriends); on("frChat", () => openChat(id));
   $("ovFriends").classList.add("show");
 }
-function closeFriends(){ FR.view = null; FR.reporting = false; $("ovFriends").classList.remove("show"); }
+function closeFriends(){ chatStop(); frBadge(); FR.view = null; FR.reporting = false; $("ovFriends").classList.remove("show"); }
 function openFriends(){
   closeRing(); FR.view = null; FR.reporting = false;
   const el = $("friendsSheet"), here = id => NET.peers[id] && Date.now() - NET.peers[id].v.t < NET_STALE_MS;
@@ -6538,12 +6602,12 @@ function openFriends(){
     const E = o => Object.entries(o).sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
     el.innerHTML = `<h2>👥 Bạn bè</h2><div class="sub">Gặp ai ở công viên thì bấm vào nhân vật của bạn ấy để kết bạn. Phải được đồng ý mới thành bạn.</div>
       ${sec("Lời mời kết bạn", E(FR.req).map(([id, v]) => row(id, v, `<button class="btn gold" data-yes="${esc(id)}">Đồng ý</button><button class="btn ghost" data-no="${esc(id)}">Từ chối</button>`)), "Chưa có lời mời nào.")}
-      ${sec("Bạn bè", E(FR.friends).map(([id, v]) => row(id, v, `<button class="btn ghost" data-del="${esc(id)}">Xóa</button>`)), "Chưa có bạn nào. Ra công viên làm quen nha!")}
+      ${sec("Bạn bè", E(FR.friends).map(([id, v]) => row(id, v, `<button class="btn gold" data-chat="${esc(id)}">💬${CHAT.inbox[id] ? '<span class="dotN">mới</span>' : ""}</button><button class="btn ghost" data-del="${esc(id)}">Xóa</button>`)), "Chưa có bạn nào. Ra công viên làm quen nha!")}
       ${E(FR.sent).filter(([id]) => !FR.friends[id]).length ? sec("Đang chờ trả lời", E(FR.sent).filter(([id]) => !FR.friends[id]).map(([id, v]) => row(id, v, `<button class="btn ghost" data-cancel="${esc(id)}">Hủy</button>`)), "") : ""}
       ${Object.keys(FR.blocks).length ? sec("Đã chặn", E(FR.blocks).map(([id, v]) => row(id, v, `<button class="btn ghost" data-unb="${esc(id)}">Bỏ chặn</button>`)), "") : ""}
       <div class="row" style="margin-top:14px"><button class="btn ghost" id="frClose">Đóng</button></div>`;
     const all = (attr, f) => el.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => f(b.getAttribute("data-" + attr)));
-    all("yes", frAccept); all("no", frDecline); all("del", frUnfriend); all("cancel", frCancel); all("unb", frUnblock); all("peer", showPeer);
+    all("chat", openChat); all("yes", frAccept); all("no", frDecline); all("del", frUnfriend); all("cancel", frCancel); all("unb", frUnblock); all("peer", showPeer);
   }
   $("frClose").onclick = closeFriends;
   $("ovFriends").classList.add("show");
@@ -6560,6 +6624,8 @@ function frWipeFrom(uid, friends, req, sent){
   for (const id of Object.keys(req || {})) up[`friendReq/${uid}/${id}`] = null;
   for (const id of Object.keys(sent || {})) up[`friendReq/${id}/${uid}`] = null;
   up[`friendSent/${uid}`] = null; up[`blocks/${uid}`] = null;
+  for (const id of Object.keys(friends || {})){ up[`chats/${chatPair(uid, id)}`] = null; up[`inbox/${id}/${uid}`] = null; }   // tin nhắn cũng xóa
+  up[`inbox/${uid}`] = null;
   return up;
 }
 
@@ -7126,7 +7192,7 @@ document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("pointerdown
 document.addEventListener("visibilitychange", ()=>{ if (prof){ prof.last = Date.now(); persist(); } });
 // ---------- tự cập nhật (Sếp 15/11): game tự hỏi có bản mới không, mỗi 5 phút và mỗi lần quay lại game ----------
 // BUILD do tools/build-id.py ghi, khớp với version.json. Có bản mới: lưu dữ liệu, hiện thanh "Có bản mới"; quay lại game lần sau thì tự cập nhật.
-const BUILD = "524bc9f5a2";
+const BUILD = "9578aa66ed";
 var updNew = null, updLast = 0;
 function updOff(){ return location.protocol === "file:" || QS.get("selftest") || BUILD === "dev"; }
 async function checkUpdate(){
@@ -7664,12 +7730,21 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
     ok("đồng ý: thành bạn ở cả hai phía, xóa lời mời", c[`friends/${me}/${you}`] && c[`friends/${you}/${me}`] && c[`friendReq/${me}/${you}`] === null && c[`friendSent/${you}/${me}`] === null);
     const b = upBlock(me, you, card, t);
     ok("chặn: hết là bạn ở cả hai phía, xóa mọi lời mời", b[`blocks/${me}/${you}`] && [`friends/${me}/${you}`, `friends/${you}/${me}`, `friendReq/${me}/${you}`, `friendReq/${you}/${me}`].every(k => b[k] === null));
+    ok("nhắn tin: che số điện thoại, email, link, từ tục; giữ lời bình thường", chatClean("số mình 0912 345 678 nha").includes("***") && !/\d{3}/.test(chatClean("số mình 0912 345 678 nha")) && chatClean("mail a@b.com").includes("***") && chatClean("vào www.abc.com xem").includes("***") && chatClean("đồ ngu").includes("***") && chatClean("Chó của bạn dễ thương quá!") === "Chó của bạn dễ thương quá!" && chatClean("Nguyễn ơi ra công viên") === "Nguyễn ơi ra công viên" && chatClean("x".repeat(300)).length === 200);
+    ok("nhắn tin: hai người cùng một hộp thư, không phụ thuộc ai gửi trước", chatPair("a1", "b2") === chatPair("b2", "a1") && chatPair("b2", "a1") === "a1/b2");
     const w = frWipeFrom(me, {f1: {}}, {r1: {}}, {s1: {}});
+    ok("xóa tài khoản: xóa cả tin nhắn và hộp thư", w["chats/" + chatPair(me, "f1")] === null && w[`inbox/f1/${me}`] === null && w[`inbox/${me}`] === null);
     ok("xóa tài khoản: xóa bạn bè ở cả hai phía, lời mời đã nhận và đã gửi, danh sách chặn", w[`friends/${me}/f1`] === null && w[`friends/f1/${me}`] === null && w[`friendReq/${me}/r1`] === null && w[`friendReq/s1/${me}`] === null && w[`blocks/${me}`] === null);
     fbUser = {uid: me}; Object.assign(FR, {req: {}, friends: {}, blocks: {}, sent: {}});
     showPeer(you); ok("người lạ: có nút Kết bạn, Chặn, Báo cáo", !!$("frAdd") && !!$("frBlk") && !!$("frRep") && $("ovFriends").classList.contains("show"));
     FR.sent = {[you]: card}; showPeer(you); ok("đã gửi lời mời: chờ đồng ý, hủy được", !$("frAdd") && !!$("frCancel"));
     FR.sent = {}; FR.req = {[you]: Object.assign({t}, card)}; showPeer(you); ok("được mời: có nút Đồng ý và Từ chối", !!$("frYes") && !!$("frNo"));
+    { const fr0 = FR.friends, rq0 = FR.req, fb0 = fb; FR.req = {}; FR.friends = {[you]: Object.assign({t}, card)}; showPeer(you); const hasBtn = !!$("frChat");
+      fb = null; openChat(you); const okUI = !!$("chatTxt") && !!$("chatList") && document.querySelectorAll("#friendsSheet [data-q]").length === CHAT_QUICK.length && CHAT.with === you;
+      CHAT.msgs = [{from: me, text: "Chào", t}, {from: you, text: "Chào bạn <b>", t: t + 1}]; chatRender(); const L = $("chatList");
+      ok("bạn bè: có nút Nhắn tin; khung nhắn tin có câu mẫu, tin của mình bên phải, chữ lạ không chạy thành mã", hasBtn && okUI && L.querySelectorAll(".cm.me").length === 1 && L.innerHTML.includes("&lt;b&gt;"));
+      FR.friends = {}; openChat(you); ok("không phải bạn bè thì không mở được khung nhắn tin", CHAT.with !== you || !FR.friends[you]);
+      closeFriends(); fb = fb0; FR.friends = fr0; FR.req = rq0; }
     openFriends(); ok("danh sách bạn bè: hiện lời mời đang chờ", $("friendsSheet").innerText.includes("Bạn A") && !!$("friendsSheet").querySelector("[data-yes]"));
     frBadge(); ok("có lời mời: nút 👥 trên cùng báo số", $("btnFriends").textContent === "👥 1" && $("btnFriends").style.display === "");
     FR.req = {}; FR.friends = {[you]: Object.assign({t}, card)}; showPeer(you); ok("đã là bạn: có nút Xóa bạn", !!$("frDel"));
@@ -7830,6 +7905,8 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   startProfile(p.id);
   if (QS.get("yaw")) camYaw = +QS.get("yaw")*Math.PI/180;
   if (QS.get("deco") && prof){ prof.deco = {}; for (const k of QS.get("deco").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.deco){ invAdd(k); prof.deco[it.deco] = k; } } applyDeco(); }   // thử: &deco=dc_pumpkin,dc_wreath_th
+  if (QS.get("chatdemo") && TESTING) setTimeout(() => { fbUser = {uid: "me1"}; const t = Date.now() - 600000; FR.friends = {you2: {name: "Aiden", dog: "Bo", t}}; openChat("you2");   // thử: ảnh khung nhắn tin
+    CHAT.msgs = [{from: "you2", text: "Chào bạn! 👋", t}, {from: "me1", text: "Ra công viên chơi không?", t: t + 60000}, {from: "you2", text: "Chó của bạn dễ thương quá! 🐶", t: t + 120000}, {from: "me1", text: chatClean("số mình 0912 345 678 nha"), t: t + 180000}]; chatRender(); }, 1500);
   if (QS.get("watch") && prof){ const j = jobOf(QS.get("watch")); prof.job = j.k; prof.work = {k: j.k, until: gameNow(prof) + 3600000, pay: j.pay}; refreshWork(); setTimeout(() => startWatch(true), 800); }   // thử: &watch=waiter
   if (QS.get("outfit") && prof){ const it = KEEP_ITEMS()[QS.get("outfit")]; if (it && it.outfit){ invAdd(it.k); setTimeout(() => wearOutfit(it), 600); } }   // thử: &outfit=of_thanks
   if (QS.get("dwear") && prof){ prof.wear = {}; for (const k of QS.get("dwear").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.wear){ invAdd(k); prof.wear[it.wear] = k; } } setTimeout(applyWear, 500); }   // thử: &dwear=sh_pumpkin,hat_pilgrim

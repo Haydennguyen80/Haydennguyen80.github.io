@@ -236,6 +236,49 @@
           ".validate": false
         }
       }
+    },
+    "chats": {
+      "$a": {
+        "$b": {
+          ".read": "auth != null && (auth.uid === $a || auth.uid === $b)",
+          ".write": "auth != null && (auth.uid === $a || auth.uid === $b) && !newData.exists()",
+          "$mid": {
+            ".write": "auth != null && !data.exists() && $a < $b && (auth.uid === $a || auth.uid === $b) && newData.child('from').val() === auth.uid && root.child('friends/' + $a + '/' + $b).exists() && root.child('friends/' + $b + '/' + $a).exists() && !root.child('blocks/' + $a + '/' + $b).exists() && !root.child('blocks/' + $b + '/' + $a).exists()",
+            ".validate": "newData.hasChildren(['from','text','t'])",
+            "from": {
+              ".validate": "newData.isString()"
+            },
+            "text": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+            },
+            "t": {
+              ".validate": "newData.isNumber() && newData.val() <= now + 60000 && newData.val() >= now - 600000"
+            },
+            "$x": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
+    "inbox": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        ".write": "auth != null && auth.uid === $to && !newData.exists()",
+        "$from": {
+          ".write": "auth != null && ((auth.uid === $from && $from !== $to && root.child('friends/' + $to + '/' + $from).exists() && !root.child('blocks/' + $to + '/' + $from).exists()) || (auth.uid === $to && !newData.exists()) || (auth.uid === $from && !newData.exists()))",
+          ".validate": "newData.hasChildren(['name','t'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "t": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          },
+          "$x": {
+            ".validate": false
+          }
+        }
+      }
     }
   }
 }
