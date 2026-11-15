@@ -238,7 +238,7 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
     <button id="oTicket" style="display:none"><span class="ic">🎟️</span>Vé học</button>
     <button id="oCoins"><span class="ic">🪙</span>xu</button>
   </div>
-  <div id="workBar"><div id="workTxt"></div><button id="workHome">🏠 Về sớm</button></div>
+  <div id="workBar"><div id="workTxt"></div><button id="workWatch">👀 Xem chủ làm</button><button id="workHome">🏠 Về sớm</button></div>
   <div id="toolbar">
     <button id="tCall"><span class="ic">📣</span><span id="tCallLbl">Gọi tên</span></button>
     <button id="tGym"><span class="ic">🏃</span>Tập</button>
@@ -1748,9 +1748,10 @@ function updateCamera(k){
   if (camFree){ tx = camFreeX; tz = camFreeZ; }
   if (outdoor && outdoor.inside && INTS[outdoor.inside]){ const I = INTS[outdoor.inside]; tx = lerp(outdoor.x, I.x, 0.55); tz = lerp(outdoor.z, I.z - 1, 0.55); }   // trong cửa hàng: nhìn bao quát cả cửa hàng
   else if (outdoor){ tx = outdoor.x; tz = outdoor.z; if (outdoor.train && outdoor.train.phase !== "fetch"){ tx = dog.pos.x; tz = dog.pos.z; } }   // đang huấn luyện: camera nhìn theo chó
-  if (ride){ tx = ride.stage === "go" ? Math.max(-6, ride.car.x) : 0.4; tz = 6.4; }   // xe đón: nhìn cảnh trước nhà
+  if (ride){ tx = ride.stage === "go" ? Math.max(-6, ride.car.x) : 0.4; tz = 6.4; }
+  if (watch){ tx = watch.x; tz = watch.z; }   // đang xem chủ làm việc   // xe đón: nhìn cảnh trước nhà
   if (inBR && !camFree){ tx = BR.x + clamp(br.x, -1.6, 1.6)*0.55; tz = BR.z + clamp(br.z, -1.2, 1.2)*0.45; }   // phòng ngủ: bám theo chủ như phòng khách bám theo chó
-  const out = !!outdoor || !!ride, free = camFree || out || inBR, kk = free ? Math.max(k, out ? (ride ? 0.5 : 0.12) : 0.35) : k;
+  const out = !!outdoor || !!ride || !!watch, free = camFree || out || inBR, kk = free ? Math.max(k, out ? (ride ? 0.5 : 0.12) : 0.35) : k;
   camLook.x = lerp(camLook.x, free ? tx : clamp(tx, -1.6, 1.6), kk); camLook.z = lerp(camLook.z, free ? tz : clamp(tz, -1.2, 1.4), kk);
   camLook.y = QS && QS.get("close") ? 0.25 : CAM_TARGET.y;
   camera.position.copy(camLook).addScaledVector(camDir(), camDist*camZoom*(out ? (outdoor && outdoor.inside ? 1.75 : 1.5) : 1));   // trong cửa hàng: camera gần hơn
@@ -2762,7 +2763,7 @@ function frame(now){
   if (play) $("stopPlayTime").textContent = fmtTime(performance.now() - play.start);
 
   prof.resting = dog.state === "sleep";
-  tickRest(dt); tickDevices(); tickOutdoor(dt); tickOwnerHome(dt); tickRide(dt); tickBedroom(dt); tickBrDoor(dt); tickDogTrip(dt); tickAway(); tickWork(); netTick(dt);
+  tickRest(dt); tickDevices(); tickWatch(dt); tickOutdoor(dt); tickOwnerHome(dt); tickRide(dt); tickBedroom(dt); tickBrDoor(dt); tickDogTrip(dt); tickAway(); tickWork(); netTick(dt);
   tickStats(); tickMesses();
   liveApply = true; applyTime(prof, Date.now()); liveApply = false;
   if (prof.messes.length !== messMeshes.length) buildMesses();
@@ -4002,6 +4003,7 @@ const SEASON_COLS = {thanks: ["#E07A2E", "#8A5A3B", "#F2B630", "#C8553D"], xmas:
 const INTS = {
   shop:  {x: 300, z: 0, w: 18, d: 13, n: "Siêu thị thú cưng", ic: "🛒", floor: "#F3EEE6", tile: "#E6DCCD", wall: "#FFF0F4", trim: "#B05C8C", bld: SHOP, face: Math.PI},
   pharm: {x: 400, z: 0, w: 13, d: 10, n: "Nhà thuốc", ic: "💊", floor: "#F1F7F3", tile: "#DDEDE3", wall: "#F4FBF7", trim: "#2E8B57", bld: PHARM, face: Math.PI/2},
+  office: {x: 600, z: 0, w: 14, d: 10, n: "Công ty K&K", ic: "💼", floor: "#E9EEF2", tile: "#DCE3EA", wall: "#F4F8FA", trim: "#1E6F78", bld: OFFICE, face: Math.PI},
   resto: {x: 500, z: 0, w: 16, d: 12, n: "Nhà hàng", ic: "🍽️", floor: "#DDBF95", tile: "#CFAD82", wall: "#FFF3E0", trim: "#C8553D", bld: RESTO, face: Math.PI/2}};
 // quầy: toạ độ cục bộ (x sang phải, z về phía cửa), st = chỗ chủ đứng, staff = nhân viên đứng sau quầy
 const SECS = {
@@ -4026,11 +4028,18 @@ const SECS = {
   resto: [
     {k: "kitchen", n: "Bếp, mua mang về", ic: "👨‍🍳", t: "kitchen", x: 0, z: -4.9, w: 7, d: 0.8, st: {x: 0, z: -3.8}, staff: {x: 0, z: -5.6}},
     {k: "cash",    n: "Quầy thu ngân",    ic: "💳", t: "cash",    x: 5.6,  z: 4.9,  w: 2.2, d: 0.8, st: {x: 5.6, z: 3.8}, staff: {x: 5.6, z: 5.6}}]};
+SECS.office = [   // Sếp 15/11: bên trong công ty K&K: lễ tân, 4 bàn làm việc (bàn thứ 2 là bàn của chủ), góc nghỉ uống nước
+    {k: "recep",  n: "Lễ tân: dịch vụ chăm chó", ic: "🛎️", t: "cash", x: -3.6, z: 2.6, w: 2.4, d: 0.8, st: {x: -3.6, z: 1.5}, staff: {x: -3.6, z: 3.3}},
+    {k: "desk1",  n: "Bàn làm việc", ic: "🖥️", t: "desk", x: -4.5, z: -2.4, w: 1.6, d: 0.8, st: {x: -4.5, z: -1.3}, staff: {x: -4.5, z: -3.15}},
+    {k: "mydesk", n: "Bàn làm việc của bạn", ic: "💼", t: "desk", x: -1.5, z: -2.4, w: 1.6, d: 0.8, st: {x: -1.5, z: -1.3}},
+    {k: "desk3",  n: "Bàn làm việc", ic: "🖥️", t: "desk", x: 1.5, z: -2.4, w: 1.6, d: 0.8, st: {x: 1.5, z: -1.3}, staff: {x: 1.5, z: -3.15}},
+    {k: "desk4",  n: "Bàn làm việc", ic: "🖥️", t: "desk", x: 4.5, z: -2.4, w: 1.6, d: 0.8, st: {x: 4.5, z: -1.3}, staff: {x: 4.5, z: -3.15}},
+    {k: "water",  n: "Góc nghỉ: nước và bánh", ic: "☕", t: "wall", x: 6.55, z: 1.6, w: 0.6, d: 2.2, st: {x: 5.3, z: 1.6}}];
 const RESTO_TABLES = [[-5, -1.3], [0, -1.3], [5, -1.3], [-5, 2.5], [5, 2.5]];
 const SEC_COLORS = {clothes: ["#E5533D","#3C7DD9","#FFD15C","#F7A8C4","#5DB36A","#2F4FA8"], toys: ["#E5533D","#FFD15C","#4C8FE0","#7DBB6E","#F2A33A","#C38BEB"],
   plush: ["#B5784A","#FFFFFF","#FFD15C","#7DBB6E","#F7A8C4","#C9A27A"], food: ["#C8553D","#F2A33A","#8A5A3B","#E9D7A6","#7DBB6E"], care: ["#9FD3C7","#F7A8C4","#FFFFFF","#B9D7F0","#D9C2F0"],
   acc: ["#E5533D","#F7A8C4","#FFD15C","#4C8FE0","#2B2B2B"], meds: ["#FFFFFF","#E5533D","#4C8FE0"], vita: ["#F2A33A","#FFD15C","#7DBB6E"], flea: ["#2E8B57","#9FD3C7","#FFFFFF"], first: ["#E5533D","#FFFFFF","#B9D7F0"]};
-SEC_COLORS.season = SEASON_COLS[seasonNow()]; SEC_COLORS.outfit = ["#E5533D", "#3C7DD9", "#FFD15C", "#5DB36A", "#2F4FA8", "#C38BEB"];
+SEC_COLORS.water = ["#FFFFFF", "#B9875A", "#9FD3C7", "#F2A33A"]; SEC_COLORS.season = SEASON_COLS[seasonNow()]; SEC_COLORS.outfit = ["#E5533D", "#3C7DD9", "#FFD15C", "#5DB36A", "#2F4FA8", "#C38BEB"];
 const intG = {};   // k -> {g, walls, doors, grid}
 var townGroup = null, parkGroup = null, townGridSave = null;
 function buildInterior(k){
@@ -4075,7 +4084,7 @@ function buildInterior(k){
     }
   };
   const staff = (pos, look, sz) => { const v = buildOwner3D(look); v.root.scale.setScalar(1.25); v.root.position.set(X(pos.x), 0.01, Z(pos.z)); if (pos.z > sz) v.root.rotation.y = Math.PI; add(v.root); R.vendors.push(v);   /* nhân viên quay mặt về phía khách */
-    const ap = rbox(0.25, 0.3, 0.03, 0.02, look.apron || "#FFFFFF"); ap.position.set(0, 0.43, 0.105); v.root.add(ap);
+    if (look.apron !== false){ const ap = rbox(0.25, 0.3, 0.03, 0.02, look.apron || "#FFFFFF"); ap.position.set(0, 0.43, 0.105); v.root.add(ap); }
     if (look.hat === "chef"){ const h = cyl(0.13, 0.11, 0.2, "#FFFFFF"); h.position.set(0, 1.0, 0); v.root.add(h); const t = sph(0.15, "#FFFFFF"); t.scale.y = 0.6; t.position.set(0, 1.12, 0); v.root.add(t); }
     return v; };
   (SECS[k] || []).forEach((sec, i) => {
@@ -4104,6 +4113,12 @@ function buildInterior(k){
       box(sec.w, 0.2, sec.d, "#E9E2D2", cx, 0.1, cz);
       ["#4C8FE0", "#F7A8C4", "#7DBB6E"].forEach((c, n) => { const z = cz - sec.d/2 + 0.6 + n*1.2; const r = add(M(new THREE.TorusGeometry(0.4, 0.12, 10, 24), c)); r.rotation.x = Math.PI/2; r.position.set(cx, 0.32, z);
         const cu = add(M(new THREE.CylinderGeometry(0.4, 0.4, 0.07, 20), shade(c, 0.35))); cu.position.set(cx, 0.24, z); }); }
+    else if (sec.t === "desk"){   // bàn làm việc: mặt bàn, chân, màn hình, bàn phím, ghế
+      box(sec.w, 0.05, sec.d, "#C9A27A", cx, 0.74, cz); for (const sx of [-1, 1]) box(0.05, 0.72, sec.d - 0.06, "#8C949C", cx + sx*(sec.w/2 - 0.05), 0.36, cz);
+      box(0.6, 0.38, 0.04, "#2B2F38", cx, 1.0, cz - 0.22); box(0.54, 0.31, 0.01, "#7FD1F5", cx, 1.0, cz - 0.195); box(0.06, 0.12, 0.06, "#2B2F38", cx, 0.82, cz - 0.24);
+      box(0.42, 0.02, 0.14, "#E6E6E6", cx, 0.775, cz + 0.08); box(0.3, 0.03, 0.2, "#F2F2F2", cx + 0.5, 0.78, cz + 0.05);
+      box(0.46, 0.06, 0.46, "#3A4048", cx, 0.46, cz - 0.75); box(0.46, 0.5, 0.06, "#3A4048", cx, 0.75, cz - 0.98); box(0.06, 0.42, 0.06, "#8C949C", cx, 0.22, cz - 0.75);
+      if (sec.staff) staff(sec.staff, {hair: ["ngan", "dai", "bui", "xoan"][i % 4], shirt: ["#FFFFFF", "#B9D7F0", "#F7F1E3", "#D9C2F0"][i % 4], apron: false}, sec.z); }
     else if (sec.t === "cash" || sec.t === "counter" || sec.t === "kitchen"){
       box(sec.w, 1.0, sec.d, sec.t === "kitchen" ? "#B9BEC4" : "#FFFFFF", cx, 0.5, cz); box(sec.w + 0.08, 0.06, sec.d + 0.08, sec.t === "kitchen" ? "#8C949C" : I.trim, cx, 1.02, cz);
       if (sec.t === "cash"){ box(0.4, 0.25, 0.3, "#3A4048", cx - 0.4, 1.17, cz); box(0.32, 0.2, 0.03, "#7FD1F5", cx - 0.4, 1.4, cz - 0.08); box(0.6, 0.02, 0.4, "#2B2B2B", cx + 0.5, 1.06, cz); }
@@ -4113,7 +4128,8 @@ function buildInterior(k){
       if (sec.t === "kitchen"){ for (const [dx, c] of [[-2.2, "#555"], [-1.2, "#555"]]){ const pot = add(M(new THREE.CylinderGeometry(0.2, 0.18, 0.25, 16), c)); pot.position.set(cx + dx, 1.17, cz); }
         const st2 = add(M(new THREE.CylinderGeometry(0.18, 0.18, 0.04, 16), "#DDD")); st2.position.set(cx + 1.5, 1.07, cz); for (let n = 0; n < 4; n++){ const pl = add(M(new THREE.CylinderGeometry(0.15, 0.13, 0.03, 16), "#FFFFFF")); pl.position.set(cx + 0.3 + n*0.35, 1.07, cz + 0.15); }
         box(sec.w, 0.9, 0.5, "#8C949C", cx, 1.9, Z(-I.d/2) + 0.3); box(2.4, 0.9, 0.05, "#2F3B33", cx, 2.3, Z(-I.d/2) + 0.1); for (let r = 0; r < 4; r++) box(1.8, 0.05, 0.02, "#FFF4D6", cx, 2.55 - r*0.16, Z(-I.d/2) + 0.13); }
-      if (sec.staff) staff(sec.staff, sec.t === "kitchen" ? {hair: "ngan", shirt: "#FFFFFF", hat: "chef", apron: "#FFFFFF"} : sec.t === "counter" ? {hair: "dai", shirt: "#FFFFFF", apron: "#E8F6EE"} : {hair: k === "resto" ? "bui" : "duoi", shirt: I.trim, apron: "#FFFFFF"}, sec.z); }
+      if (sec.staff && k === "office") staff(sec.staff, {hair: ["ngan", "dai", "bui", "xoan"][i % 4], shirt: ["#FFFFFF", "#B9D7F0", "#F7F1E3", "#D9C2F0"][i % 4], apron: false}, sec.z);
+      else if (sec.staff) staff(sec.staff, sec.t === "kitchen" ? {hair: "ngan", shirt: "#FFFFFF", hat: "chef", apron: "#FFFFFF"} : sec.t === "counter" ? {hair: "dai", shirt: "#FFFFFF", apron: "#E8F6EE"} : {hair: k === "resto" ? "bui" : "duoi", shirt: I.trim, apron: "#FFFFFF"}, sec.z); }
     else if (sec.t === "scale"){ box(sec.w, 0.08, sec.d, "#8C949C", cx, 0.04, cz); box(sec.w - 0.1, 0.02, sec.d - 0.1, "#DDE3E8", cx, 0.09, cz); box(0.08, 1.1, 0.08, "#8C949C", cx, 0.55, cz - sec.d/2); box(0.5, 0.35, 0.06, "#3A4048", cx, 1.2, cz - sec.d/2); box(0.4, 0.22, 0.02, "#9BE7A6", cx, 1.2, cz - sec.d/2 + 0.04); }
     // bảng tên quầy treo phía trên
     const sy = sec.t === "gondola" ? 2.0 : sec.t === "shelf" || sec.t === "rack" ? 2.4 : sec.t === "wall" ? 2.4 : 1.9;
@@ -4177,7 +4193,7 @@ function enterInterior(k){
     if (!dogAway()){ dog.path = []; dog.then = null; dog.jump = null; dog.yLock = null; dog.pos = oNearest({x: o.x + 0.65, z: o.z + 0.2}); setState("happy", 900); }
     camYaw = 0.3; camPitch = 0.86; camZoom = 1; camLook.set(o.x, camLook.y, o.z - 1);
     sfx("chime"); updateOutBtns(); updateCamera(1); tickInterior(1);   // camera, tường vào đúng chỗ ngay
-    hint(k === "resto" ? `🍽️ Chào mừng tới ${I.n}! Bấm vào một cái ghế để ngồi và gọi món` : `${I.ic} Chào mừng tới ${I.n}! Bấm vào từng quầy để xem hàng. Bấm 🚪 Ra ngoài để về phố`, 4500);
+    hint(k === "resto" ? `🍽️ Chào mừng tới ${I.n}! Bấm vào một cái ghế để ngồi và gọi món` : k === "office" ? `💼 Chào mừng tới ${I.n}! Bấm 🛎️ Lễ tân để dùng dịch vụ chăm chó, bấm bàn làm việc để xem. Bấm 🚪 Ra ngoài để về phố` : `${I.ic} Chào mừng tới ${I.n}! Bấm vào từng quầy để xem hàng. Bấm 🚪 Ra ngoài để về phố`, 4500);
   });
 }
 function exitInterior(){
@@ -4321,6 +4337,8 @@ function tapSection(ik, i){
     if (sec.k === "doctor") return openDoctor();
     if (sec.k === "scale") return weighDog(I, sec);
     if (sec.k === "kitchen") return openStore("resto");
+    if (sec.k === "recep") return openOffice();
+    if (ik === "office") return officeSpot(sec);
     openStore("sec_" + sec.k);
   });
 }
@@ -4885,9 +4903,16 @@ const SERVICES = [
   {k: "lost",  ic: "🔎", n: "Tìm chó lạc", d: "Chó đi lạc thì báo ở đây. Công ty cùng bạn đi tìm, chó luôn được tìm thấy.", p: 0}];
 const sitting = () => !!(prof && prof.sitting && gameNow(prof) < prof.sitting.until);
 function fmtDT(t){ return new Date(t).toLocaleString("vi-VN", {hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit"}); }
+function bindOfficeIn(){ const b = $("offIn"); if (b) b.onclick = () => { $("ovOffice").classList.remove("show"); enterInterior("office"); }; }
+function officeSpot(sec){   // bàn làm việc, góc nghỉ trong công ty K&K
+  const j = prof.job && jobOf(prof.job), mine = j && j.k === "office";
+  if (sec.k === "water"){ const S = prof.stats; S.energy = Math.min(100, (S.energy ?? 80) + 3); bubble("☕ Nghỉ tay uống nước", 1600); if (!dogAway()){ dog.faceCam = true; gesture("wiggle"); } return; }
+  if (sec.k === "mydesk") return toast(mine ? `💼 Bàn làm việc của ${prof.owner || "bạn"}. Tới giờ làm thì chủ tự đi xe tới đây làm việc` : "💼 Bàn này dành cho nhân viên văn phòng. Nhận việc ở 🗺️ Bản đồ › 💼 Việc làm", 3500);
+  toast("🖥️ Đồng nghiệp đang làm việc. Suỵt, nói nhỏ thôi nha", 2500);
+}
 function openOffice(){
   const P = prof, el = $("officeSheet"), L = P.lost, boarded = P.boarding && dogAway();
-  const head = `<h2>🏢 ${COMPANY}</h2><div class="sub">Dịch vụ chăm chó · Bạn đang có <b>🪙 ${coins()} xu</b></div>`;
+  const head = `<h2>🏢 ${COMPANY}</h2><div class="sub">Dịch vụ chăm chó · Bạn đang có <b>🪙 ${coins()} xu</b></div>` + (outdoor && !outdoor.inside ? `<div class="row" style="margin:6px 0"><button class="btn ghost" id="offIn">🚪 Vào bên trong công ty</button></div>` : "");
   let body = "";
   if (L){
     body = L.stage === "report"
@@ -4913,7 +4938,7 @@ function openOffice(){
   if (q("ofPick")) q("ofPick").onclick = ()=>{ P.boarding = null; persist(); $("ovOffice").classList.remove("show"); reunite("Đón về rồi! Nhớ quá trời!"); };
   const stop = el.querySelector("[data-stop]"); if (stop) stop.onclick = ()=>{ P.sitting = null; persist(); openOffice(); };
   el.querySelectorAll("[data-svc]").forEach(b => b.onclick = ()=>useService(b.dataset.svc, +b.dataset.d || 0, b.dataset.c));
-  $("ovOffice").classList.add("show");
+  bindOfficeIn(); $("ovOffice").classList.add("show");
 }
 function useService(k, days, cmd){
   const P = prof, S = P.stats, v = SERVICES.find(x => x.k === k), cost = v.per ? v.per*days : v.p;
@@ -5068,6 +5093,7 @@ function refreshWork(){
   const bc = $("btnCtrl"); if (bc){ bc.style.display = homeLiving ? "" : "none"; bc.classList.toggle("on", co); bc.textContent = co ? "🐶 Điều khiển chó" : "🧍 Điều khiển chủ"; }
   $("btnMap").style.display = on || lv || inBR ? "none" : "";
   const bb = $("btnBedroom"); if (bb){ bb.textContent = inBR ? "🛋️ P. khách" : "🛏️ P. ngủ"; bb.style.display = on || outdoor || lv ? "none" : ""; }
+  const ww = $("workWatch"); if (ww) ww.textContent = watch ? "🏠 Về nhà xem chó" : "👀 Xem chủ làm";
   if (on) tickWorkBar(true);
 }
 let workBarAt = 0;
@@ -5076,6 +5102,53 @@ function tickWorkBar(force){
   const now = performance.now(); if (!force && now - workBarAt < 500) return; workBarAt = now;
   const j = jobOf(W0.k), left = Math.max(0, W0.until - gameNow(prof)), realMin = left/GAME_SPEED/60000;
   $("workTxt").innerHTML = `💼 <b>Đang đi làm: ${esc(j.n)}</b> · ${esc(j.where)}<br><span class="small">Hết ca lúc ${fmtClock(W0.until)} (còn khoảng ${realMin < 1 ? "dưới 1" : Math.ceil(realMin)} phút) · 🪙 ${W0.pay} xu · ${esc(prof.dog.name)} ở nhà ${sitting() ? "có K&K trông" : "một mình"}</span>`;
+}
+// ---------- XEM CHỦ LÀM VIỆC (Sếp 15/11): camera tới chỗ làm, thấy chủ đứng quầy, bưng món, ngồi bàn công ty ----------
+var watch = null;
+const WORK_SPOTS = {   // toạ độ cục bộ trong cửa hàng; nhiều điểm = chủ đi qua lại; face = hướng chủ quay mặt khi đứng một chỗ
+  cashier: {at: "shop", pts: [{x: 4.2, z: 5.7}], act: "hands", face: Math.PI},
+  shipper: {at: "shop", pts: [{x: -6, z: -4.4}, {x: 0, z: -4.4}, {x: 6, z: -4.4}, {x: 7.2, z: -4.4}, {x: 7.2, z: 0.2}, {x: 4, z: 0.4}, {x: -4, z: 0.4}, {x: -7, z: 0.4}, {x: -7, z: -4.4}], act: "carry"},
+  pharm:   {at: "pharm", pts: [{x: -4.9, z: -1.4}, {x: -4.9, z: 2.1}, {x: 4.9, z: 2.1}, {x: 4.9, z: -1.4}], act: "carry"},   // dược phụ xếp thuốc lên kệ
+  waiter:  {at: "resto", pts: [{x: 0, z: -3.9}, {x: -3.9, z: -2.4}, {x: 0, z: -3.9}, {x: 1.1, z: -2.4}, {x: 0, z: -3.9}, {x: 3.9, z: 1.4}], act: "carry"},
+  office:  {at: "office", pts: [{x: -1.5, z: -3.15}], act: "hands", face: 0}};
+function startWatch(instant){
+  const W0 = prof && prof.work; if (!W0 || watch) return;
+  const j = jobOf(W0.k), S = WORK_SPOTS[j.k] || WORK_SPOTS.office, I = INTS[S.at]; if (!I) return;
+  const go = () => {
+    if (!atWork()) return;
+    const R = intG[S.at] || buildInterior(S.at);
+    for (const kk in intG) intG[kk].g.visible = kk === S.at;
+    const O = buildOwner3D(ownerLookNow()); O.root.scale.setScalar(1.3); O.root.traverse(m => { if (m.isMesh) m.castShadow = true; }); scene.add(O.root);
+    if (S.act === "carry"){ const c = new THREE.Group();
+      if (j.k === "waiter"){ const pl = cyl(0.11, 0.09, 0.02, "#FFFFFF"); c.add(pl); const f = sph(0.06, "#E07A2E"); f.scale.y = 0.5; f.position.y = 0.03; c.add(f); }
+      else c.add(rbox(0.22, 0.16, 0.18, 0.01, "#C9A27A"));
+      c.position.set(0, 0.47, 0.2); O.rig.add(c); }
+    const p0 = S.pts[0], hid = R.vendors.filter(v => Math.hypot(v.root.position.x - (I.x + p0.x), v.root.position.z - (I.z + p0.z)) < 0.7);
+    for (const v of hid) v.root.visible = false;   // chủ đứng đúng chỗ nhân viên thì nhân viên đó nghỉ
+    watch = {k: S.at, spot: S, o: O, x: I.x + p0.x, z: I.z + p0.z, h: S.face ?? 0, i: S.pts.length > 1 ? 1 : 0, wait: 0, hid, cam: {yaw: camYaw, pitch: camPitch, zoom: camZoom}};
+    camYaw = (S.face ?? 0) + 0.45; camPitch = 0.72; camZoom = 0.8; camLook.set(watch.x, camLook.y, watch.z);
+    refreshWork(); updateCamera(1); tickWatch(0.016);
+    toast(`👀 ${prof.owner || "Chủ"} đang làm ${j.n.toLowerCase()} ở ${j.where}`, 3000);
+  };
+  if (instant) go(); else fade(go);
+}
+function stopWatch(instant){
+  if (!watch) return; const W = watch; watch = null;
+  const back = () => { scene.remove(W.o.root); for (const v of W.hid) v.root.visible = true; if (!outdoor || !outdoor.inside) for (const kk in intG) intG[kk].g.visible = false;
+    camYaw = W.cam.yaw; camPitch = W.cam.pitch; camZoom = W.cam.zoom; refreshWork(); updateCamera(1); };
+  if (instant) back(); else fade(back);
+}
+function tickWatch(dt){
+  if (!watch) return; if (!atWork() || outdoor){ stopWatch(true); return; }
+  const W = watch, S = W.spot, I = INTS[S.at], O = W.o, R = intG[S.at]; let moving = false;
+  if (S.pts.length > 1 && tSec >= W.wait){ const t = S.pts[W.i], tx = I.x + t.x, tz = I.z + t.z, dx = tx - W.x, dz = tz - W.z, d = Math.hypot(dx, dz);
+    if (d < 0.05){ W.i = (W.i + 1) % S.pts.length; W.wait = tSec + 1.2; } else { const st = Math.min(d, 1.3*dt); W.x += dx/d*st; W.z += dz/d*st; W.h = Math.atan2(dx, dz); moving = true; } }
+  personAnim(O, W.x, W.z, W.h, moving, dt);
+  if (S.act === "hands") for (const A of O.arms) A.arm.rotation.x = -0.85 + Math.sin(tSec*7 + A.s*1.3)*0.22;   // gõ phím, tính tiền
+  else for (const A of O.arms) A.arm.rotation.x = -1.05;   // hai tay bưng đồ
+  if (R){ const cx = camera.position.x - I.x, cz = camera.position.z - I.z;
+    for (const W2 of R.walls){ const out = W2.n[0]*cx + W2.n[1]*cz > (W2.n[0] ? I.w/2 : I.d/2) - 0.5, t = out ? 0.08 : 1; W2.g.scale.y = lerp(W2.g.scale.y, t, Math.min(1, dt*8)); W2.g.visible = W2.g.scale.y > 0.2; }
+    for (const [n, v] of R.vendors.entries()) for (const A of v.arms) A.arm.rotation.x = A.s > 0 ? -0.25 - Math.max(0, Math.sin(tSec*1.3 + n*1.7))*0.5 : 0; }
 }
 function tickWork(){
   if (!atWork()){ autoWork(); return; }
@@ -5846,6 +5919,7 @@ canvas.addEventListener("pointercancel", e=>endPtr(e, true));
 canvas.addEventListener("pointerleave", e=>{ if (!ptrs.size) rubbing = null; });
 canvas.addEventListener("wheel", e=>{ e.preventDefault(); camZoom = clamp(camZoom*Math.exp(e.deltaY*0.0012), ZOOM_MIN, ZOOM_MAX); }, {passive: false});
 function tapAt(x, y, hit = pickAt(x, y)){
+  if (watch) return;   // đang xem chủ làm việc: chỉ xem
   if (leaving() || brCross) return;
   if (inBR){ tapBedroom(hit); return; }
   if (hit && hit.object.userData.kind === "bedDoor" && !outdoor && !atWork()){ closeRing(); openDoorMenu(); return; }
@@ -7011,6 +7085,7 @@ $("oTicket").onclick = openTraining;
 $("oTreat").onclick = ()=>{ if (dogAway()){ awayHint(); return; } giveTreat(); };
 $("oCoins").onclick = ()=>toast(`Bạn có 🪙 ${coins()} xu. Đi dạo 10 m được 2 xu, cho chó đi vệ sinh ngoài cỏ được 2 xu, lần đi dạo đầu mỗi ngày được 10 xu`, 5000);
 $("toolbar").addEventListener("click", e=>{ if (prof && dogAway()){ e.stopPropagation(); awayHint(); } }, true);
+$("workWatch").onclick = ()=>{ if (watch) stopWatch(); else startWatch(); };
 $("workHome").onclick = ()=>{ if (atWork() && confirm("Về sớm? Bạn chỉ nhận xu cho phần ca đã làm.")) endWork(true); };
 $("btnBedroom").onclick = ()=>{ if (!prof) return; if (inBR) exitBedroom(); else enterBedroom(); };
 $("btnRoom").onclick = ()=>{ if (prof){ renderRoomSheet(); $("ovRoom").classList.add("show"); } };
@@ -7051,7 +7126,7 @@ document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("pointerdown
 document.addEventListener("visibilitychange", ()=>{ if (prof){ prof.last = Date.now(); persist(); } });
 // ---------- tự cập nhật (Sếp 15/11): game tự hỏi có bản mới không, mỗi 5 phút và mỗi lần quay lại game ----------
 // BUILD do tools/build-id.py ghi, khớp với version.json. Có bản mới: lưu dữ liệu, hiện thanh "Có bản mới"; quay lại game lần sau thì tự cập nhật.
-const BUILD = "ba65b0eb79";
+const BUILD = "524bc9f5a2";
 var updNew = null, updLast = 0;
 function updOff(){ return location.protocol === "file:" || QS.get("selftest") || BUILD === "dev"; }
 async function checkUpdate(){
@@ -7673,6 +7748,14 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
       ok("mọi bộ đồ đôi dựng được người chủ và có đồ chó đi kèm" + (bad ? ": lỗi " + bad : ""), !bad);
       ok("siêu thị có quầy Đồ đôi chủ và chó, quầy theo mùa có bộ đồ đôi của mùa", SECS.shop.some(x => x.k === "outfit") && STORES.sec_season.items.some(it => it.outfit));
       prof.wear = w0; applyWear(); }
+    { const w0 = prof.work, j0 = prof.job, od = outdoor; let bad = ""; outdoor = null;
+      for (const j of JOBS){ prof.job = j.k; prof.work = {k: j.k, until: gameNow(prof) + 3600000, pay: j.pay}; startWatch(true);
+        if (!watch || !watch.o.root.parent || !intG[watch.k].g.visible) bad += j.k + " ";
+        else { const x0 = watch.x, z0 = watch.z; for (let n = 0; n < 60; n++){ tSec += 0.05; tickWatch(0.05); } if (watch.spot.pts.length > 1 && Math.hypot(watch.x - x0, watch.z - z0) < 0.3) bad += j.k + "(đứng yên) "; }
+        stopWatch(true); if (watch) bad += j.k + "(không thoát) "; }
+      prof.work = w0; prof.job = j0; outdoor = od; for (const kk in intG) intG[kk].g.visible = !!(od && od.inside === kk); refreshWork();
+      ok("xem chủ làm việc: 5 nghề đều thấy chủ ở chỗ làm, shipper và phục vụ đi qua lại, thoát ra được" + (bad ? ": lỗi " + bad : ""), !bad); }
+    ok("công ty K&K có bên trong: lễ tân, 4 bàn làm việc, góc nghỉ", SECS.office.filter(x => x.t === "desk").length === 4 && SECS.office.some(x => x.k === "recep") && !!(intG.office || buildInterior("office")) && intG.office.vendors.length === 4);
     ok("tủ kho tổng liệt kê đồ đã mua, có số lượng", ["Áo thun đỏ","x2","Gấu bông nâu","Hạt cho chó"].every(t => storeHtml().includes(t)));
     ok("mua nệm, gấu bông, đồ chơi: có trong tủ đồ", prof.bedKey === "bd_pink" && owns("pl_bear") && owns("ty_disc") && closetOwned().includes("Gấu bông nâu") && closetOwned().includes("Đĩa ném"));
     $("ovShop").classList.remove("show"); const tr0 = prof.treats.left = 50; prof.giftDay = null; cashier(); ok("quầy thu ngân: quà 5 viên bánh thưởng mỗi ngày một lần", prof.treats.left === tr0 + 5); cashier(); ok("quà chỉ một lần mỗi ngày", prof.treats.left === tr0 + 5);
@@ -7747,6 +7830,7 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
   startProfile(p.id);
   if (QS.get("yaw")) camYaw = +QS.get("yaw")*Math.PI/180;
   if (QS.get("deco") && prof){ prof.deco = {}; for (const k of QS.get("deco").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.deco){ invAdd(k); prof.deco[it.deco] = k; } } applyDeco(); }   // thử: &deco=dc_pumpkin,dc_wreath_th
+  if (QS.get("watch") && prof){ const j = jobOf(QS.get("watch")); prof.job = j.k; prof.work = {k: j.k, until: gameNow(prof) + 3600000, pay: j.pay}; refreshWork(); setTimeout(() => startWatch(true), 800); }   // thử: &watch=waiter
   if (QS.get("outfit") && prof){ const it = KEEP_ITEMS()[QS.get("outfit")]; if (it && it.outfit){ invAdd(it.k); setTimeout(() => wearOutfit(it), 600); } }   // thử: &outfit=of_thanks
   if (QS.get("dwear") && prof){ prof.wear = {}; for (const k of QS.get("dwear").split(",")){ const it = KEEP_ITEMS()[k]; if (it && it.wear){ invAdd(k); prof.wear[it.wear] = k; } } setTimeout(applyWear, 500); }   // thử: &dwear=sh_pumpkin,hat_pilgrim
   if (QS.get("pitch")) camPitch = +QS.get("pitch")*Math.PI/180;
