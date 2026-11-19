@@ -212,6 +212,7 @@ label.chk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#1E
     <span class="badge" id="tbCoins">🪙 100</span>
     <span class="badge" id="tbLevel">Cấp 1</span>
     <button class="tb-btn" id="btnFriends" style="display:none" title="Bạn bè">👥</button>
+    <button class="tb-btn" id="btnSay" style="display:none" title="Nói (bong bóng chữ)">💬</button>
     <button class="tb-btn" id="btnBedroom">🛏️ P. ngủ</button>
     <button class="tb-btn" id="btnRoom">🏠 Phòng</button>
     <button class="tb-btn" id="btnProfiles">Đổi hồ sơ</button>
@@ -3243,8 +3244,26 @@ function townKit(root){
     else box(w, 0.35, 0.12, shade(col, -0.15), 0, G + H + 0.17, 0.02);
     if (opt.sign){ const sg = new THREE.Mesh(new THREE.PlaneGeometry(w*0.9, 0.8), new THREE.MeshBasicMaterial({map: signTex(opt.sign, opt.signBg || "#1E6F78", opt.signFg || "#FFFFFF", 768, 116)})); sg.position.set(0, G + 2.46, 0.07); /* thấp hơn ban công tầng 2 để dấu tiếng Việt không bị che */ if (opt.kind){ sg.userData.kind = opt.kind; pickables.push(sg); } add(sg); }
     if (opt.kind) storeFront(w, H, floors, fh, col, opt);
+    if (opt.ads) storeAds(w, d, fh, opt.ads);
     if (opt.kind) for (const m of g.children) if (m.isMesh && !m.userData.kind){ m.userData.kind = opt.kind; pickables.push(m); }
   });
+  // Sếp 19/11: vách tường ngoài có hình quảng cáo (poster trong ô kính, bảng lớn ở hai tường bên)
+  const adTex = {};
+  const adMat = a => { const key = a.join("|"); if (!adTex[key]) adTex[key] = canvasTex(256, 320, (c, W2, H2) => {
+      const [ic, t1, t2, bg] = a; c.fillStyle = bg; c.fillRect(0, 0, W2, H2); c.fillStyle = "rgba(255,255,255,0.18)"; c.beginPath(); c.arc(W2*0.8, H2*0.15, 80, 0, Math.PI*2); c.fill();
+      c.strokeStyle = "#FFFFFF"; c.lineWidth = 10; c.strokeRect(8, 8, W2 - 16, H2 - 16);
+      c.textAlign = "center"; c.textBaseline = "middle"; c.font = "110px 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif"; c.fillText(ic, W2/2, H2*0.36);
+      c.fillStyle = "#FFFFFF"; for (const [t, y, f] of [[t1, 0.68, 38], [t2, 0.85, 46]]){ let fs = f; c.font = `900 ${fs}px 'Baloo 2', Nunito, sans-serif`; while (c.measureText(t).width > W2 - 30 && fs > 16){ fs -= 2; c.font = `900 ${fs}px 'Baloo 2', Nunito, sans-serif`; } c.fillText(t, W2/2, H2*y); } });
+    return new THREE.MeshBasicMaterial({map: adTex[key]}); };
+  const storeAds = (w, d, fh, ads) => {
+    const gw = w*0.8, span = gw/2 - 1.3, two = span > 1.2, pw = Math.min(0.85, (two ? span/2 : span) - 0.12);
+    let n = 0;
+    for (const sx of [-1, 1]) for (const c of two ? [1.3 + span/4, 1.3 + span*3/4] : [1.3 + span/2]){
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, pw*1.25), adMat(ads[n++ % ads.length])); m.position.set(sx*c, G + 1.25, 0.045); add(m); }
+    for (const sx of [-1, 1]){ const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(3.2, d*0.5), Math.min(3.2, d*0.5)*1.25), adMat(ads[(sx < 0 ? 0 : 1) % ads.length]));
+      m.position.set(sx*(w/2 + 0.02), G + fh + 1.45, -d*0.45); m.rotation.y = sx*Math.PI/2; add(m);
+      box(0.06, Math.min(3.2, d*0.5)*1.25 + 0.16, Math.min(3.2, d*0.5) + 0.16, "#FFFFFF", sx*(w/2 + 0.005), G + fh + 1.45, -d*0.45); }
+  };
   // Sếp 15/11: mặt tiền cửa hàng đẹp hơn: cột hai bên, khung kính, khung biển, mái hiên sọc, chậu hoa hai bên cửa
   const stripeTex = {};
   const seasonFront = (w, gw) => {   // đồ trang trí theo mùa trước cửa hàng (tự đổi theo tháng)
@@ -3327,10 +3346,13 @@ function buildTown(){
   // CTY KHÔI & KHANG và siêu thị thú cưng: bên kia đường, đối diện công viên
   const store = (S, rot, front, opt) => shophouse(front.x, front.z, rot, rot === Math.PI ? S.w : S.d, opt.floors || 2, opt.col, Object.assign({d: rot === Math.PI ? S.d : S.w, ground: "#BFE3F7"}, opt));
   store(OFFICE, Math.PI, {x: OFFICE.x, z: OFFICE.z - OFFICE.d/2}, {col: "#F7F1E3", sign: COMPANY_SHORT + " · KHÔI & KHANG", signBg: "#1E6F78", signFg: "#FFF1D0", kind: "office", floors: 2});
-  store(SHOP, Math.PI, {x: SHOP.x, z: SHOP.z - SHOP.d/2}, {col: "#FFE3EC", sign: "SIÊU THỊ THÚ CƯNG", signBg: "#B05C8C", kind: "shop", floors: 2});
+  store(SHOP, Math.PI, {x: SHOP.x, z: SHOP.z - SHOP.d/2}, {col: "#FFE3EC", sign: "SIÊU THỊ THÚ CƯNG", signBg: "#B05C8C", kind: "shop", floors: 2,
+    ads: [["🍖", "THỨC ĂN HẠT", "GIẢM 20%", "#E5533D"], ["🧸", "ĐỒ CHƠI", "MỚI VỀ", "#4C8FE0"], ["🛁", "TẮM SPA", "CHO CHÓ", "#2FB5C4"], ["🎀", "NƠ XINH", "CHỈ 5 XU", "#D9608F"]]});
   // nhà thuốc, nhà hàng: bên kia đường 2 (mặt tiền nhìn về công viên)
-  store(PHARM, Math.PI/2, {x: PHARM.x + PHARM.w/2, z: PHARM.z}, {col: "#E8F6EE", sign: "NHÀ THUỐC", signBg: "#2E8B57", kind: "pharm", floors: 2});
-  store(RESTO, Math.PI/2, {x: RESTO.x + RESTO.w/2, z: RESTO.z}, {col: "#FBE7C6", sign: "NHÀ HÀNG", signBg: "#C8553D", kind: "resto", floors: 3, roof: true});
+  store(PHARM, Math.PI/2, {x: PHARM.x + PHARM.w/2, z: PHARM.z}, {col: "#E8F6EE", sign: "NHÀ THUỐC", signBg: "#2E8B57", kind: "pharm", floors: 2,
+    ads: [["💊", "VITAMIN", "CHÓ KHỎE", "#2E8B57"], ["🩺", "KHÁM SỨC KHỎE", "THỨ BẢY", "#3C7DD9"], ["🦷", "CHĂM RĂNG", "CHO CHÓ", "#2FB5C4"], ["🪲", "TẨY GIUN", "ĐỊNH KỲ", "#7A9B3C"]]});
+  store(RESTO, Math.PI/2, {x: RESTO.x + RESTO.w/2, z: RESTO.z}, {col: "#FBE7C6", sign: "NHÀ HÀNG", signBg: "#C8553D", kind: "resto", floors: 3, roof: true,
+    ads: [["🍜", "PHỞ BÒ", "MÓN MỚI", "#C8553D"], ["🍦", "KEM", "MÁT LẠNH", "#E07A9E"], ["🦴", "MÓN CHO CHÓ", "CÓ SẴN", "#8A5A3B"], ["🍰", "BÁNH NGỌT", "MỖI NGÀY", "#F2A33A"]]});
   for (let i = 3; i < 7; i++){ const z = -43.4 - i*4.4; shophouse(ST2.sw0 - 0.2, z,   /* 3 căn đầu nhường chỗ cho khu chơi cho chó (Sếp 15/11) */ Math.PI/2, 4, 2 + (i % 3 === 1 ? 1 : 0), FACADE[(i*5 + 2) % FACADE.length], {d: 7, roof: i % 3 === 2}); }
   buildDogYard(K);
   extDoor(K, "shop", SHOP.x, ST1.sw1 + 0.13, "x"); extDoor(K, "pharm", ST2.sw0 - 0.08, PHARM.z, "z"); extDoor(K, "resto", ST2.sw0 - 0.08, RESTO.z, "z");
@@ -4018,31 +4040,31 @@ const SECS = {
     {k: "clothes", n: "Quần áo thú cưng", ic: "👕", t: "rack",    x: -6,   z: -5.6, w: 4.4, d: 0.9, st: {x: -6, z: -4.2}},
     {k: "toys",    n: "Đồ chơi",          ic: "🎾", t: "shelf",   x: 0,    z: -5.9, w: 4.4, d: 0.7, st: {x: 0, z: -4.2}},
     {k: "plush",   n: "Gấu bông",         ic: "🧸", t: "shelf",   x: 6,    z: -5.9, w: 4.4, d: 0.7, st: {x: 6, z: -4.2}},
-    {k: "food",    n: "Thức ăn, bánh thưởng", ic: "🍖", t: "gondola", x: -4, z: -0.9, w: 5, d: 1.1, st: {x: -4, z: 0.5}},
-    {k: "care",    n: "Tắm gội, làm đẹp", ic: "🧴", t: "gondola", x: 4,    z: -0.9, w: 5, d: 1.1, st: {x: 4, z: 0.5}},
+    {k: "food",    n: "Thức ăn, bánh thưởng", ic: "🍖", t: "gondola", x: -4.8, z: -2.4, w: 3.4, d: 1.1, st: {x: -4.8, z: -1.0}},   // Sếp 19/11: kệ hàng hai bên, lối giữa từ cửa vào
+    {k: "care",    n: "Tắm gội, làm đẹp", ic: "🧴", t: "gondola", x: 4.8,  z: -2.4, w: 3.4, d: 1.1, st: {x: 4.8, z: -1.0}},
     {k: "acc",     n: "Mũ, nơ, vòng cổ",  ic: "🎀", t: "wall",    x: -8.55, z: 2.4, w: 0.6, d: 3.4, st: {x: -7.3, z: 2.4}},
     {k: "beds",    n: "Nệm cho chó",      ic: "🛏️", t: "beds",    x: 7.8,  z: 2.4, w: 1.6, d: 3.6, st: {x: 6.3, z: 2.4}},
     {k: "outfit",  n: "Đồ đôi chủ và chó", ic: "👔", t: "wall",  x: -8.55, z: -1.7, w: 0.6, d: 2.4, st: {x: -7.3, z: -1.7}},
-    {k: "season",  n: "Đồ theo mùa",      ic: SEASONS[seasonNow()].ic, t: "gondola", x: -4.6, z: 3.4, w: 2.6, d: 1.0, st: {x: -4.6, z: 2.2}},
-    {k: "cash",    n: "Quầy thu ngân",    ic: "💳", t: "cash",    x: 4.2,  z: 4.9, w: 2.6, d: 0.8, st: {x: 4.2, z: 3.8}, staff: {x: 4.2, z: 5.7}}],
+    {k: "season",  n: "Đồ theo mùa",      ic: SEASONS[seasonNow()].ic, t: "gondola", x: -4.8, z: 0.9, w: 3.4, d: 1.0, st: {x: -4.8, z: 2.1}},
+    {k: "cash",    n: "Quầy thu ngân",    ic: "💳", t: "cash",    x: 0,    z: 3.6, w: 2.8, d: 0.8, st: {x: 0, z: 4.7}, staff: {x: 0, z: 2.85}}],   // Sếp 19/11: bước vào là quầy thu ngân ở giữa cửa
   pharm: [
-    {k: "doctor",  n: "Dược sĩ tư vấn",   ic: "🩺", t: "counter", x: 0,    z: -3.6, w: 4.2, d: 0.8, st: {x: 0, z: -2.4}, staff: {x: 0, z: -4.35}},
+    {k: "doctor",  n: "Thu ngân · dược sĩ tư vấn", ic: "🩺", t: "cash", x: 0, z: 1.6, w: 3.0, d: 0.8, st: {x: 0, z: 2.8}, staff: {x: 0, z: 0.85}},   // Sếp 19/11: quầy giữa cửa, kệ thuốc hai bên
     {k: "meds",    n: "Thuốc chữa bệnh",  ic: "💊", t: "wall",    x: -6.15, z: -1.4, w: 0.6, d: 2.6, st: {x: -4.9, z: -1.4}},
     {k: "vita",    n: "Vitamin, bổ sung", ic: "🧴", t: "wall",    x: -6.15, z: 2.1,  w: 0.6, d: 2.6, st: {x: -4.9, z: 2.1}},
     {k: "flea",    n: "Ve rận, tẩy giun", ic: "🪲", t: "wall",    x: 6.15,  z: -1.4, w: 0.6, d: 2.6, st: {x: 4.9, z: -1.4}},
     {k: "first",   n: "Sơ cứu, răng miệng", ic: "🩹", t: "wall",  x: 6.15,  z: 2.1,  w: 0.6, d: 2.6, st: {x: 4.9, z: 2.1}},
-    {k: "scale",   n: "Cân sức khỏe",     ic: "⚖️", t: "scale",   x: -2.2, z: 2.4,  w: 1.1, d: 1.1, st: {x: -2.2, z: 3.6}}],
+    {k: "scale",   n: "Cân sức khỏe",     ic: "⚖️", t: "scale",   x: -2.6, z: -3.3, w: 1.1, d: 1.1, st: {x: -2.6, z: -2.1}}],
   resto: [
     {k: "kitchen", n: "Bếp, mua mang về", ic: "👨‍🍳", t: "kitchen", x: 0, z: -4.9, w: 7, d: 0.8, st: {x: 0, z: -3.8}, staff: {x: 0, z: -5.6}},
-    {k: "cash",    n: "Quầy thu ngân",    ic: "💳", t: "cash",    x: 5.6,  z: 4.9,  w: 2.2, d: 0.8, st: {x: 5.6, z: 3.8}, staff: {x: 5.6, z: 5.6}}]};
+    {k: "cash",    n: "Quầy thu ngân",    ic: "💳", t: "cash",    x: 0,    z: 3.6,  w: 2.4, d: 0.8, st: {x: 0, z: 4.7}, staff: {x: 0, z: 2.85}}]};   // Sếp 19/11: thu ngân giữa cửa
 SECS.office = [   // Sếp 15/11: bên trong công ty K&K: lễ tân, 4 bàn làm việc (bàn thứ 2 là bàn của chủ), góc nghỉ uống nước
-    {k: "recep",  n: "Lễ tân: dịch vụ chăm chó", ic: "🛎️", t: "cash", x: -3.6, z: 2.6, w: 2.4, d: 0.8, st: {x: -3.6, z: 1.5}, staff: {x: -3.6, z: 3.3}},
+    {k: "recep",  n: "Lễ tân: dịch vụ chăm chó", ic: "🛎️", t: "cash", x: 0, z: 2.4, w: 2.8, d: 0.8, st: {x: 0, z: 3.5}, staff: {x: 0, z: 1.65}},   // Sếp 19/11: bước vào là quầy tiếp khách, có nhân viên
     {k: "desk1",  n: "Bàn làm việc", ic: "🖥️", t: "desk", x: -4.5, z: -2.4, w: 1.6, d: 0.8, st: {x: -4.5, z: -1.3}, staff: {x: -4.5, z: -3.15}},
     {k: "mydesk", n: "Bàn làm việc của bạn", ic: "💼", t: "desk", x: -1.5, z: -2.4, w: 1.6, d: 0.8, st: {x: -1.5, z: -1.3}},
     {k: "desk3",  n: "Bàn làm việc", ic: "🖥️", t: "desk", x: 1.5, z: -2.4, w: 1.6, d: 0.8, st: {x: 1.5, z: -1.3}, staff: {x: 1.5, z: -3.15}},
     {k: "desk4",  n: "Bàn làm việc", ic: "🖥️", t: "desk", x: 4.5, z: -2.4, w: 1.6, d: 0.8, st: {x: 4.5, z: -1.3}, staff: {x: 4.5, z: -3.15}},
     {k: "water",  n: "Góc nghỉ: nước và bánh", ic: "☕", t: "wall", x: 6.55, z: 1.6, w: 0.6, d: 2.2, st: {x: 5.3, z: 1.6}}];
-const RESTO_TABLES = [[-5, -1.3], [0, -1.3], [5, -1.3], [-5, 2.5], [5, 2.5]];
+const RESTO_TABLES = [[-5, -1.3], [0, -1.3], [5, -1.3], [-5, 2.5], [5, 2.5], [-2.6, 0.9], [2.6, 0.9]];   // 19/11: thêm 2 bàn, khu bàn ăn hai bên lối đi
 const SEC_COLORS = {clothes: ["#E5533D","#3C7DD9","#FFD15C","#F7A8C4","#5DB36A","#2F4FA8"], toys: ["#E5533D","#FFD15C","#4C8FE0","#7DBB6E","#F2A33A","#C38BEB"],
   plush: ["#B5784A","#FFFFFF","#FFD15C","#7DBB6E","#F7A8C4","#C9A27A"], food: ["#C8553D","#F2A33A","#8A5A3B","#E9D7A6","#7DBB6E"], care: ["#9FD3C7","#F7A8C4","#FFFFFF","#B9D7F0","#D9C2F0"],
   acc: ["#E5533D","#F7A8C4","#FFD15C","#4C8FE0","#2B2B2B"], meds: ["#FFFFFF","#E5533D","#4C8FE0"], vita: ["#F2A33A","#FFD15C","#7DBB6E"], flea: ["#2E8B57","#9FD3C7","#FFFFFF"], first: ["#E5533D","#FFFFFF","#B9D7F0"]};
@@ -4146,9 +4168,22 @@ function buildInterior(k){
   });
   // đồ trang trí, bàn ghế nhà hàng
   if (k === "shop"){ for (let n = 0; n < 3; n++){ const cx = X(-7 + n*0.65), cz = Z(4.9); box(0.55, 0.45, 0.8, "#C9CED6", cx, 0.55, cz); for (const s of [-1, 1]) box(0.04, 0.5, 0.04, "#8C949C", cx + s*0.25, 0.25, cz + 0.35); box(0.04, 0.4, 0.5, "#8C949C", cx, 0.95, cz - 0.42); } }
-  if (k === "pharm"){ const b = new THREE.Group(); b.position.set(X(2.6), 0, Z(2.8)); const seat = M(new THREE.BoxGeometry(1.6, 0.08, 0.45), "#9FD3C7"); seat.position.y = 0.45; b.add(seat); const back = M(new THREE.BoxGeometry(1.6, 0.4, 0.06), "#9FD3C7"); back.position.set(0, 0.7, -0.2); b.add(back);
+  if (k === "pharm"){ const b = new THREE.Group(); b.position.set(X(3.2), 0, Z(-3.3)); const seat = M(new THREE.BoxGeometry(1.6, 0.08, 0.45), "#9FD3C7"); seat.position.y = 0.45; b.add(seat); const back = M(new THREE.BoxGeometry(1.6, 0.4, 0.06), "#9FD3C7"); back.position.set(0, 0.7, -0.2); b.add(back);
     for (const s of [-1, 1]){ const l = M(new THREE.BoxGeometry(0.08, 0.45, 0.4), "#777"); l.position.set(s*0.7, 0.22, 0); b.add(l); } g.add(b); tagSeat(b, 2);
-    for (const s of [-1, 1]){ const pl = add(M(SPHERE_LO, "#5E9E57")); pl.scale.set(0.35, 0.5, 0.35); pl.position.set(X(s*5.6), 0.7, Z(4.2)); box(0.4, 0.4, 0.4, "#C9A27A", X(s*5.6), 0.2, Z(4.2)); } }
+    for (const s of [-1, 1]){ const pl = add(M(SPHERE_LO, "#5E9E57")); pl.scale.set(0.35, 0.5, 0.35); pl.position.set(X(s*5.6), 0.7, Z(4.2)); box(0.4, 0.4, 0.4, "#C9A27A", X(s*5.6), 0.2, Z(4.2)); }
+    // Sếp 19/11: kệ thuốc dài sát tường sau, hai kệ thuốc giữa hai bên lối đi
+    box(I.w - 1.2, 2.2, 0.5, "#FFFFFF", I.x, 1.1, Z(-hd) + 0.35); for (let r = 0; r < 4; r++) products({k: "meds"}, X(-hw + 0.9), X(hw - 0.9), 0.2 + r*0.5, Z(-hd) + 0.55, 0.4, 22);
+    box(0.9, 0.9, 0.06, "#2E8B57", I.x, 2.55, Z(-hd) + 0.12); box(0.3, 0.7, 0.07, "#FFFFFF", I.x, 2.55, Z(-hd) + 0.14); box(0.7, 0.2, 0.07, "#FFFFFF", I.x, 2.55, Z(-hd) + 0.15);
+    for (const s of [-1, 1]){ const cx = X(s*3.3), cz = Z(-0.6); box(2.2, 1.4, 0.1, "#FFFFFF", cx, 0.7, cz); box(2.3, 0.12, 0.9, "#BFE3CF", cx, 0.06, cz);
+      for (let r = 0; r < 3; r++){ const y = 0.2 + r*0.42; for (const f of [-1, 1]){ box(2.2, 0.04, 0.38, "#FFFFFF", cx, y, cz + f*0.22); products({k: r % 2 ? "vita" : "meds"}, cx - 0.95, cx + 0.95, y + 0.02, cz + f*0.22, 0.38, 9); } }
+      for (const e of [-1, 1]) box(0.1, 1.5, 0.9, "#2E8B57", cx + e*1.1, 0.75, cz); } }
+  if (k === "office"){   // Sếp 19/11: ghế chờ cho khách, logo công ty trên tường sau
+    const b = new THREE.Group(); b.position.set(X(-4.6), 0, Z(3.4)); b.rotation.y = Math.PI/2;
+    const seat = M(new THREE.BoxGeometry(1.8, 0.14, 0.6), "#1E6F78"); seat.position.y = 0.42; b.add(seat); const back = M(new THREE.BoxGeometry(1.8, 0.5, 0.12), "#1E6F78"); back.position.set(0, 0.72, -0.26); b.add(back);
+    for (const s of [-1, 1]){ const arm = M(new THREE.BoxGeometry(0.12, 0.3, 0.6), "#17565D"); arm.position.set(s*0.9, 0.58, 0); b.add(arm); } g.add(b); tagSeat(b, 2);
+    box(0.6, 0.45, 0.6, "#C9A27A", X(-4.6), 0.22, Z(1.9)); const pl = add(M(SPHERE_LO, "#5E9E57")); pl.scale.set(0.35, 0.5, 0.35); pl.position.set(X(6.2), 0.7, Z(4.2)); box(0.4, 0.4, 0.4, "#C9A27A", X(6.2), 0.2, Z(4.2));
+    add(signPlane(COMPANY.toUpperCase(), 5.4, 0.62, "#1E6F78", "#FFF1D0", I.x, 2.2, Z(-hd) + 0.1, 0, null, [900, 104]));
+  }
   if (k === "resto"){
     for (const [tx, tz] of RESTO_TABLES){ const T0 = {x: X(tx), z: Z(tz)};
       const top = add(M(new THREE.CylinderGeometry(0.55, 0.55, 0.05, 20), "#FFFFFF")); top.position.set(T0.x, 0.75, T0.z); const cl = add(M(new THREE.CylinderGeometry(0.57, 0.57, 0.02, 20), "#C8553D")); cl.position.set(T0.x, 0.72, T0.z);
@@ -4167,9 +4202,11 @@ function buildInterior(k){
   rectB(-hw - 1, -hw + 0.4, -hd - 1, hd + 1); rectB(hw - 0.4, hw + 1, -hd - 1, hd + 1); rectB(-hw - 1, hw + 1, -hd - 1, -hd + 0.4); rectB(-hw - 1, hw + 1, hd - 0.4, hd + 1);
   for (const sec of SECS[k] || []){ const m = sec.t === "scale" ? 0.05 : 0.3; rectB(sec.x - sec.w/2 - m, sec.x + sec.w/2 + m, sec.z - sec.d/2 - m, sec.z + sec.d/2 + m);
     if (sec.t === "counter") rectB(-hw, hw, -hd, sec.z - sec.d/2);   // sau quầy dược sĩ: khách không vào
-    if (sec.t === "cash" || sec.t === "kitchen") rectB(sec.x - sec.w/2 - 0.3, sec.x + sec.w/2 + 0.3, sec.z, k === "resto" && sec.t === "kitchen" ? -hd + 0.4 : hd); }
+    if (sec.t === "cash" && sec.staff && sec.staff.z < sec.z) rectB(sec.x - sec.w/2 - 0.3, sec.x + sec.w/2 + 0.3, sec.staff.z - 0.5, sec.z);   // nhân viên đứng sau quầy, mặt nhìn ra cửa
+    else if (sec.t === "cash" || sec.t === "kitchen") rectB(sec.x - sec.w/2 - 0.3, sec.x + sec.w/2 + 0.3, sec.z, k === "resto" && sec.t === "kitchen" ? -hd + 0.4 : hd); }
   if (k === "shop") rectB(-7.6, -5.4, 4.2, 5.6);
-  if (k === "pharm"){ rectB(1.6, 3.6, 2.3, 3.3); for (const s of [-1, 1]) rectB(s*5.6 - 0.5, s*5.6 + 0.5, 3.7, 4.7); }
+  if (k === "office"){ rectB(-5.2, -3.9, 2.4, 4.4); rectB(-5.0, -4.2, 1.5, 2.3); rectB(5.7, 6.7, 3.7, 4.7); }
+  if (k === "pharm"){ rectB(2.2, 4.2, -3.8, -2.8); rectB(-hw, hw, -hd, -hd + 0.85); for (const s of [-1, 1]) rectB(s*3.3 - 1.3, s*3.3 + 1.3, -1.2, 0); for (const s of [-1, 1]) rectB(s*5.6 - 0.5, s*5.6 + 0.5, 3.7, 4.7); }
   if (k === "resto"){ for (const [tx, tz] of RESTO_TABLES){ rectB(tx - 0.75, tx + 0.75, tz - 0.75, tz + 0.75); for (const s of [-1, 1]) rectB(tx + s*0.85 - 0.3, tx + s*0.85 + 0.3, tz - 0.3, tz + 0.3); }
     for (const s of [-1, 1]) rectB(s*7.3 - 0.5, s*7.3 + 0.5, -5.8, -4.6); }
   R.grid = {G: GR, blk, b: {x0: I.x - hw, x1: I.x + hw, z0: I.z - hd, z1: I.z + hd}};
@@ -6316,7 +6353,7 @@ async function fbDeleteAccount(){
   for (let i = 0; i < 400; i++) up[`activity/${dayKey(now - i*86400000)}/${uid}`] = null;
   try {
     if (NET.joined) netLeave();
-    Object.assign(up, await frWipeUpdate(uid)); frOff();   // bạn bè, lời mời, danh sách chặn: xóa ở cả hai phía
+    Object.assign(up, await roomsWipe(uid), await frWipeUpdate(uid)); frOff();   // bạn bè, lời mời, danh sách chặn: xóa ở cả hai phía
     await fb.database().ref().update(up);
     try { await fbUser.delete(); }
     catch(e){ if (e.code !== "auth/requires-recent-login") throw e; await fbUser.reauthenticateWithPopup(new fb.auth.GoogleAuthProvider()); await fb.auth().currentUser.delete(); }
@@ -6371,9 +6408,10 @@ function myParkData(){
   return {name: String(P.owner || "Bạn").slice(0, 30), dog: String(P.dog.name).slice(0, 30), breed: String(P.dog.breed).slice(0, 20),
     coat: +P.dog.coat || 0, ear: String(P.dog.ear || "").slice(0, 20), tail: String(P.dog.tail || "").slice(0, 20), eye: +P.dog.eye || 0,
     hair: String(L.hair || "ngan").slice(0, 20), shirt: String(L.shirt || "#4C8FE0").slice(0, 10), pants: String(L.pants || "#3E5679").slice(0, 10),
-    x: r2(o.x), z: r2(o.z), h: r2(o.h || 0), dx: r2(dog.pos.x), dz: r2(dog.pos.z), t: Date.now()};
+    x: r2(o.x), z: r2(o.z), h: r2(o.h || 0), dx: r2(dog.pos.x), dz: r2(dog.pos.z), t: Date.now(),
+    ...sayPart()};
 }
-function netWant(){ return !!(fb && fbUser && prof && outdoor && inParkArea(outdoor) && !dogAway()); }
+function netWant(){ return !!(fb && fbUser && prof && outdoor && (outdoor.inside === "resto" || (!outdoor.inside && inParkArea(outdoor))) && !dogAway()); }   // 19/11: thấy nhau cả trong nhà hàng (hẹn đi ăn)
 function netJoin(){
   NET.joined = true; NET.ref = fb.database().ref("park/" + fbUser.uid); NET.ref.onDisconnect().remove();
   NET.list = fb.database().ref("park");
@@ -6396,7 +6434,7 @@ function netTick(dt){
     const moved = !L || Math.hypot(d.x - L.x, d.z - L.z) > 0.08 || Math.hypot(d.dx - L.dx, d.dz - L.dz) > 0.08;
     if ((moved && now - NET.lastSend > NET_SEND_MS) || now - NET.lastSend > NET_BEAT_MS){ NET.lastSend = now; NET.last = d; NET.ref.set(d).catch(e => console.warn("gửi vị trí:", e)); }
   }
-  tickPeers(dt);
+  tickPeers(dt); tickMySay(); sayBtn();
 }
 function nameTag(text){
   const tex = canvasTex(512, 96, (g, w, h) => { g.fillStyle = "rgba(255,255,255,0.92)"; const r = 40; g.beginPath(); g.roundRect ? g.roundRect(4, 8, w - 8, h - 16, r) : g.rect(4, 8, w - 8, h - 16); g.fill();
@@ -6412,21 +6450,21 @@ function peerUpsert(id, v){
     const d = buildDog3D({breed: v.breed, coat: v.coat|0, ear: v.ear, tail: v.tail, eye: v.eye|0, colors: {}}, {preview: true}); scene.add(d.root);
     const tag = nameTag(`${v.name} · 🐶 ${v.dog}`); scene.add(tag);
     const picks = []; for (const root of [own.root, d.root]) root.traverse(m => { if (m.isMesh){ m.userData.kind = "peer"; m.userData.uid = id; pickables.push(m); picks.push(m); } });
-    P = NET.peers[id] = {own, d, tag, picks, cur: {x: v.x, z: v.z, h: v.h || 0, dx: v.dx, dz: v.dz, dh: 0}, moving: false};
+    P = NET.peers[id] = {own, d, tag, say: saySprite(), picks, cur: {x: v.x, z: v.z, h: v.h || 0, dx: v.dx, dz: v.dz, dh: 0}, moving: false};
   }
   P.v = v;
 }
 function peerRemove(id){
   const P = NET.peers[id]; if (!P) return;
-  for (const o of [P.own.root, P.d.root, P.tag]) scene.remove(o);
+  for (const o of [P.own.root, P.d.root, P.tag, P.say]) scene.remove(o);
   for (const m of P.picks){ const i = pickables.indexOf(m); if (i >= 0) pickables.splice(i, 1); }
   delete NET.peers[id];
 }
 function tickPeers(dt){
   const now = Date.now();
   for (const [id, P] of Object.entries(NET.peers)){
-    const v = P.v, c = P.cur, show = !!outdoor && now - v.t < NET_STALE_MS;
-    P.own.root.visible = P.d.root.visible = P.tag.visible = show; if (!show) continue;
+    const v = P.v, c = P.cur, show = !!outdoor && now - v.t < NET_STALE_MS && (v.x > 400) === (outdoor.inside === "resto");   // cùng chỗ (công viên / nhà hàng) mới thấy
+    P.own.root.visible = P.d.root.visible = P.tag.visible = show; P.say.visible = false; if (!show) continue;
     const k = Math.min(1, dt*8), ox = c.x, odx = c.dx, odz = c.dz;
     c.x += (v.x - c.x)*k; c.z += (v.z - c.z)*k; c.dx += (v.dx - c.dx)*k; c.dz += (v.dz - c.dz)*k;
     let dh = (v.h || 0) - c.h; while (dh > Math.PI) dh -= 2*Math.PI; while (dh < -Math.PI) dh += 2*Math.PI; c.h += dh*k;
@@ -6436,6 +6474,8 @@ function tickPeers(dt){
     P.d.root.position.set(c.dx, -0.16 + (dmv ? Math.abs(Math.sin(tSec*12))*0.02 : 0), c.dz); P.d.root.rotation.y = c.dh;
     updateDog3D(poseFor(dmv ? "stand" : "sit", P.d.B), tSec, P.d);
     P.tag.position.set(c.x, -0.16 + 1.75, c.z);
+    const said = v.say && now - (v.st || 0) < SAY_MS && now - (v.st || 0) > -60000 ? sayShown(v, id) : "";
+    if (said){ saySet(P.say, said); P.say.visible = true; P.say.position.set(c.x, -0.16 + 2.45, c.z); }
   }
 }
 /* ---------- BƯỚC 4: KẾT BẠN (Sếp duyệt 09/11, làm 10/11) ----------
@@ -6453,8 +6493,10 @@ function frOn(){
   const watch = (path, key) => { const r = frDB().ref(path + "/" + FR.uid); r.on("value", sn => { FR[key] = sn.val() || {}; frChanged(key); }, e => console.warn("bạn bè:", path, e)); FR.refs.push(r); };
   watch("friendReq", "req"); watch("friends", "friends"); watch("blocks", "blocks"); watch("friendSent", "sent");
   { const r = frDB().ref("inbox/" + FR.uid); r.on("value", sn => chatInboxChanged(sn.val()), e => console.warn("hộp thư:", e)); FR.refs.push(r); }
+  { const r = frDB().ref("myRooms/" + FR.uid); r.on("value", sn => { ROOMS.mine = sn.val() || {}; frBadge(); if ($("ovFriends").classList.contains("show") && !FR.view && !CHAT.with && !ROOMS.open && !$("sayTxt") && !$("pickOk")) openFriends(); }, e => console.warn("phòng:", e)); FR.refs.push(r); }
+  { const r = frDB().ref("roomInbox/" + FR.uid); r.on("value", sn => roomsInboxChanged(sn.val()), e => console.warn("hộp thư phòng:", e)); FR.refs.push(r); }
 }
-function frOff(){ chatStop(); CHAT.inbox = {}; for (const r of FR.refs) r.off(); Object.assign(FR, {on: false, uid: null, refs: [], req: {}, friends: {}, blocks: {}, sent: {}, seenReq: null}); frBadge(); }
+function frOff(){ chatStop(); roomStop(); ROOMS.mine = {}; ROOMS.inbox = {}; CHAT.inbox = {}; for (const r of FR.refs) r.off(); Object.assign(FR, {on: false, uid: null, refs: [], req: {}, friends: {}, blocks: {}, sent: {}, seenReq: null}); frBadge(); }
 function frChanged(key){
   if (key === "req"){
     const ids = Object.keys(FR.req);
@@ -6463,12 +6505,13 @@ function frChanged(key){
   }
   if (key === "blocks") for (const id of Object.keys(FR.blocks)) peerRemove(id);
   frBadge();
-  if (CHAT.with){ if (!FR.friends[CHAT.with]){ const id = CHAT.with; chatStop(); showPeer(id); } frBadge(); return; }   // đang nhắn tin: giữ nguyên ô nhập
+  if (CHAT.with){ if (!FR.friends[CHAT.with]){ const id = CHAT.with; chatStop(); showPeer(id); } frBadge(); return; }
+  if (ROOMS.open || $("sayTxt") || $("pickOk")) return;   // đang ở phòng nhóm / ô nói / chọn bạn: giữ nguyên   // đang nhắn tin: giữ nguyên ô nhập
   if ($("ovFriends").classList.contains("show")) FR.view ? showPeer(FR.view) : (FR.reporting ? null : openFriends());
 }
 function frBadge(){
   const b = $("btnFriends"); if (!b) return;
-  const n = Object.keys(FR.req).length + chatUnread();
+  const n = Object.keys(FR.req).length + chatUnread() + roomUnread();
   b.style.display = fbUser ? "" : "none"; b.textContent = n ? `👥 ${n}` : "👥"; b.classList.toggle("hot", n > 0);
 }
 // ---------- NHẮN TIN GIỮA BẠN BÈ (Sếp 15/11, bước 6a): chỉ bạn bè mới nhắn được; máy chủ kiểm tra lại (luật chats/, inbox/) ----------
@@ -6494,11 +6537,12 @@ function chatMarkRead(id){ if (fb && fbUser && CHAT.inbox[id]) frDB().ref(`inbox
 function chatStop(){ if (CHAT.ref) CHAT.ref.off(); CHAT.ref = null; CHAT.with = null; CHAT.msgs = []; }
 function openChat(id){
   if (!fbUser || !FR.friends[id]){ toast("Chỉ nhắn tin được với bạn bè"); return; }
-  closeRing(); chatStop(); FR.view = null; FR.reporting = false; CHAT.with = id;
+  closeRing(); chatStop(); roomStop(); FR.view = null; FR.reporting = false; CHAT.with = id;
   const c = peerCard(id), el = $("friendsSheet");
   el.innerHTML = `<h2>💬 ${esc(c.name)}</h2><div class="sub">${c.dog ? "Chó " + esc(c.dog) + " · " : ""}Chỉ hai bạn đọc được tin này</div>
     <div class="lock" style="font-size:13px">🛡️ Không gửi số điện thoại, địa chỉ nhà, tên trường. Ai nói điều không hay thì bấm 🚩 Báo cáo hoặc 🚫 Chặn, và kể cho bố mẹ nghe.</div>
     <div id="chatList"><div class="small">Đang tải tin nhắn…</div></div>
+    ${meetBtns()}
     <div class="qk">${CHAT_QUICK.map((q, i) => `<button data-q="${i}">${esc(q)}</button>`).join("")}</div>
     <div class="chatIn"><input id="chatTxt" maxlength="200" placeholder="Nhập tin nhắn…" autocomplete="off"><button class="btn gold" id="chatSend">Gửi</button></div>
     <div class="row" style="margin-top:12px"><button class="btn ghost" id="chatBack">← ${esc(c.name)}</button><button class="btn ghost" id="frList">👥 Bạn bè</button><button class="btn ghost" id="frClose">Đóng</button></div>`;
@@ -6506,6 +6550,7 @@ function openChat(id){
   $("chatSend").onclick = () => { chatSend(id, inp.value).then(ok => { if (ok) inp.value = ""; }); };
   inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); $("chatSend").click(); } };
   el.querySelectorAll("[data-q]").forEach(b => b.onclick = () => chatSend(id, CHAT_QUICK[+b.dataset.q]));
+  el.querySelectorAll("[data-meet]").forEach(b => b.onclick = () => chatSend(id, MEET[b.dataset.meet].text, b.dataset.meet));
   $("chatBack").onclick = () => { chatStop(); showPeer(id); }; $("frList").onclick = () => { chatStop(); openFriends(); }; $("frClose").onclick = closeFriends;
   $("ovFriends").classList.add("show");
   if (fb && fbUser){ CHAT.ref = frDB().ref("chats/" + chatPair(fbUser.uid, id)).limitToLast(50);
@@ -6515,15 +6560,16 @@ function openChat(id){
 function chatRender(){
   const L = $("chatList"); if (!L || !fbUser) return; const me = fbUser.uid;
   const hm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
-  L.innerHTML = CHAT.msgs.length ? CHAT.msgs.map(m => `<div class="cm ${m.from === me ? "me" : ""}">${esc(m.text)}<small>${hm(m.t)}</small></div>`).join("") : `<div class="small">Chưa có tin nhắn. Gửi lời chào đầu tiên nha 👋</div>`;
+  L.innerHTML = CHAT.msgs.length ? CHAT.msgs.map(m => `<div class="cm ${m.from === me ? "me" : ""}">${esc(m.text)}${meetCard(m)}<small>${hm(m.t)}</small></div>`).join("") : `<div class="small">Chưa có tin nhắn. Gửi lời chào đầu tiên nha 👋</div>`;
+  L.querySelectorAll("[data-go]").forEach(b => b.onclick = () => meetGo(b.dataset.go));
   L.scrollTop = L.scrollHeight;
 }
-async function chatSend(id, raw){
+async function chatSend(id, raw, meet){
   if (!fb || !fbUser || !FR.friends[id]){ toast("Chỉ nhắn tin được với bạn bè"); return false; }
-  const text = chatClean(raw); if (!text) return false;
+  const text = meet ? MEET[meet].text : chatClean(raw); if (!text) return false;
   if (Date.now() - CHAT.lastSend < 1500){ toast("Gửi chậm lại một chút nha"); return false; }
   CHAT.lastSend = Date.now(); const me = fbUser.uid, t = Date.now();
-  try { await frDB().ref("chats/" + chatPair(me, id)).push({from: me, text, t}); await frDB().ref(`inbox/${id}/${me}`).set({name: myCard().name, t}); if (text !== String(raw).trim()) toast("🛡️ Một số chữ đã được che cho an toàn", 2500); return true; }
+  try { await frDB().ref("chats/" + chatPair(me, id)).push(meet ? {from: me, text, t, meet} : {from: me, text, t}); await frDB().ref(`inbox/${id}/${me}`).set({name: myCard().name, t}); if (text !== String(raw).trim()) toast("🛡️ Một số chữ đã được che cho an toàn", 2500); return true; }
   catch (e){ toast("Chưa gửi được (" + (e.code || e.message) + ")", 3500); return false; }
 }
 function frRel(id){ return FR.blocks[id] ? "blocked" : FR.friends[id] ? "friend" : FR.req[id] ? "asked" : FR.sent[id] ? "sent" : "none"; }
@@ -6570,7 +6616,7 @@ function peerCard(id){
 }
 function showPeer(id){
   if (!id) return;
-  closeRing(); FR.view = id; FR.reporting = false;
+  closeRing(); roomStop(); FR.view = id; FR.reporting = false;
   const c = peerCard(id), rel = fbUser ? frRel(id) : "login", el = $("friendsSheet");
   const head = `<h2>👋 ${esc(c.name)}</h2><div class="sub">${c.dog ? `Chó <b>${esc(c.dog)}</b>${c.breed && BREEDS[c.breed] ? ` (${BREEDS[c.breed].name})` : ""}` : ""}${c.here ? " · 🟢 đang ở công viên" : ""}</div>`;
   const main = {
@@ -6589,9 +6635,9 @@ function showPeer(id){
   on("frList", openFriends); on("frClose", closeFriends); on("frChat", () => openChat(id));
   $("ovFriends").classList.add("show");
 }
-function closeFriends(){ chatStop(); frBadge(); FR.view = null; FR.reporting = false; $("ovFriends").classList.remove("show"); }
+function closeFriends(){ chatStop(); roomStop(); frBadge(); FR.view = null; FR.reporting = false; $("ovFriends").classList.remove("show"); }
 function openFriends(){
-  closeRing(); FR.view = null; FR.reporting = false;
+  closeRing(); roomStop(); FR.view = null; FR.reporting = false;
   const el = $("friendsSheet"), here = id => NET.peers[id] && Date.now() - NET.peers[id].v.t < NET_STALE_MS;
   const row = (id, v, btns) => `<div class="svc" style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0;cursor:pointer" data-peer="${esc(id)}"><b>${esc(v.name || "Người chơi")}</b>
       <div class="small">${v.dog ? "🐶 " + esc(v.dog) : ""}${here(id) ? " · 🟢 đang ở công viên" : ""}</div></div>${btns}</div>`;
@@ -6603,14 +6649,240 @@ function openFriends(){
     el.innerHTML = `<h2>👥 Bạn bè</h2><div class="sub">Gặp ai ở công viên thì bấm vào nhân vật của bạn ấy để kết bạn. Phải được đồng ý mới thành bạn.</div>
       ${sec("Lời mời kết bạn", E(FR.req).map(([id, v]) => row(id, v, `<button class="btn gold" data-yes="${esc(id)}">Đồng ý</button><button class="btn ghost" data-no="${esc(id)}">Từ chối</button>`)), "Chưa có lời mời nào.")}
       ${sec("Bạn bè", E(FR.friends).map(([id, v]) => row(id, v, `<button class="btn gold" data-chat="${esc(id)}">💬${CHAT.inbox[id] ? '<span class="dotN">mới</span>' : ""}</button><button class="btn ghost" data-del="${esc(id)}">Xóa</button>`)), "Chưa có bạn nào. Ra công viên làm quen nha!")}
+      ${roomsSection()}
       ${E(FR.sent).filter(([id]) => !FR.friends[id]).length ? sec("Đang chờ trả lời", E(FR.sent).filter(([id]) => !FR.friends[id]).map(([id, v]) => row(id, v, `<button class="btn ghost" data-cancel="${esc(id)}">Hủy</button>`)), "") : ""}
       ${Object.keys(FR.blocks).length ? sec("Đã chặn", E(FR.blocks).map(([id, v]) => row(id, v, `<button class="btn ghost" data-unb="${esc(id)}">Bỏ chặn</button>`)), "") : ""}
       <div class="row" style="margin-top:14px"><button class="btn ghost" id="frClose">Đóng</button></div>`;
     const all = (attr, f) => el.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => f(b.getAttribute("data-" + attr)));
+    all("room", openRoom); { const b = $("roomNew"); if (b) b.onclick = roomCreate; }
     all("chat", openChat); all("yes", frAccept); all("no", frDecline); all("del", frUnfriend); all("cancel", frCancel); all("unb", frUnblock); all("peer", showPeer);
   }
   $("frClose").onclick = closeFriends;
   $("ovFriends").classList.add("show");
+}
+// ---------- BƯỚC 6b (Sếp chốt 19/11): BONG BÓNG CHỮ ở công viên, PHÒNG CHAT NHÓM, HẸN GẶP (công viên / nhà hàng) ----------
+// Bong bóng chữ: miễn phí, không gọi giọng nói. Câu có sẵn thì ai cũng thấy; câu tự gõ thì chỉ bạn bè thấy chữ, người lạ thấy "💬 …".
+const SAY_QUICK = ["Chào bạn! 👋", "Chó của bạn dễ thương quá! 🐶", "Mình chơi chung nha!", "Đi nhà hàng không? 🍽️", "Ra hồ bơi không? 🏊", "Cảm ơn bạn! 💛", "Tạm biệt nha 👋", "Ha ha 😄"];
+const SAY_MS = 8000;
+const SAY = {text: "", t: 0, mine: null};
+function sayTex(text){
+  return canvasTex(512, 160, (g, w, h) => {
+    g.fillStyle = "rgba(255,255,255,0.96)"; g.strokeStyle = "#145060"; g.lineWidth = 6;
+    g.beginPath(); g.roundRect ? g.roundRect(6, 6, w - 12, h - 44, 34) : g.rect(6, 6, w - 12, h - 44); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(w/2 - 22, h - 40); g.lineTo(w/2, h - 6); g.lineTo(w/2 + 22, h - 40); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = "#1F2A30"; let fs = 46; g.font = `700 ${fs}px Nunito, sans-serif`;
+    let tw = g.measureText(text).width; if (tw > w*0.88){ fs = Math.max(26, Math.floor(fs*w*0.88/tw)); g.font = `700 ${fs}px Nunito, sans-serif`; }
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, w/2, (h - 38)/2 + 2);
+  });
+}
+function saySprite(){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({depthTest: false, transparent: true})); sp.scale.set(2.6, 0.81, 1); sp.renderOrder = 9; sp.visible = false; scene.add(sp); return sp; }
+function saySet(sp, text){ if (sp.userData.text === text) return; sp.userData.text = text; if (sp.material.map) sp.material.map.dispose(); sp.material.map = sayTex(text); sp.material.needsUpdate = true; }
+function sayShown(v, id){   // chữ người khác nói, hiện cho mình xem
+  const txt = String(v.say || "").slice(0, 60);
+  if (!txt) return "";
+  if (SAY_QUICK.includes(txt) || FR.friends[id]) return txt;
+  return "💬 …";
+}
+function sayPart(){ return SAY.text && Date.now() - SAY.t < SAY_MS ? {say: SAY.text, st: SAY.t} : {}; }
+function parkSay(raw){
+  if (!NET.joined){ toast("Ra công viên (hoặc vào nhà hàng) rồi mới nói được nha"); return false; }
+  const quick = SAY_QUICK.includes(raw), text = quick ? raw : chatClean(raw).slice(0, 60);
+  if (!text) return false;
+  if (Date.now() - SAY.t < 1500){ toast("Nói chậm lại một chút nha"); return false; }
+  SAY.text = text; SAY.t = Date.now(); NET.last = null; NET.lastSend = 0;   // gửi ngay
+  if (!quick && text !== String(raw).trim()) toast("🛡️ Một số chữ đã được che cho an toàn", 2500);
+  return true;
+}
+function tickMySay(){
+  if (!SAY.mine) SAY.mine = saySprite();
+  const on = !!outdoor && NET.joined && SAY.text && Date.now() - SAY.t < SAY_MS;
+  SAY.mine.visible = on;
+  if (on){ saySet(SAY.mine, SAY.text); SAY.mine.position.set(outdoor.x, -0.16 + 2.45, outdoor.z); }
+}
+function openSay(){
+  closeRing(); chatStop(); FR.view = null; FR.reporting = false;
+  const el = $("friendsSheet");
+  el.innerHTML = `<h2>💬 Nói ở ${outdoor && outdoor.inside === "resto" ? "nhà hàng" : "công viên"}</h2>
+    <div class="sub">Lời bạn nói hiện thành bong bóng trên đầu nhân vật trong ${SAY_MS/1000} giây. Câu có sẵn thì ai cũng đọc được. Câu bạn tự gõ thì chỉ bạn bè đọc được, người lạ chỉ thấy 💬.</div>
+    <div class="lock" style="font-size:13px">🛡️ Không nói số điện thoại, địa chỉ nhà, tên trường.</div>
+    <div class="qk">${SAY_QUICK.map((q, i) => `<button data-s="${i}">${esc(q)}</button>`).join("")}</div>
+    <div class="chatIn"><input id="sayTxt" maxlength="60" placeholder="Tự gõ (chỉ bạn bè đọc được)…" autocomplete="off"><button class="btn gold" id="saySend">Nói</button></div>
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="frList">👥 Bạn bè</button><button class="btn ghost" id="frClose">Đóng</button></div>`;
+  const inp = $("sayTxt");
+  $("saySend").onclick = () => { if (parkSay(inp.value)){ inp.value = ""; closeFriends(); } };
+  inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); $("saySend").click(); } };
+  el.querySelectorAll("[data-s]").forEach(b => b.onclick = () => { if (parkSay(SAY_QUICK[+b.dataset.s])) closeFriends(); });
+  $("frList").onclick = openFriends; $("frClose").onclick = closeFriends;
+  $("ovFriends").classList.add("show");
+}
+function sayBtn(){ const b = $("btnSay"); if (b) b.style.display = NET.joined ? "" : "none"; }
+
+// ---------- HẸN GẶP: tin nhắn có nút "Đi tới đó" ----------
+const MEET = {park: {ic: "📍", n: "công viên", text: "📍 Hẹn gặp ở công viên nha!"}, resto: {ic: "🍽️", n: "nhà hàng", text: "🍽️ Hẹn đi nhà hàng nha!"}};
+function meetGo(place){
+  closeFriends();
+  if (!prof){ return; }
+  if (place === "resto"){
+    if (outdoor && outdoor.inside === "resto"){ toast("Bạn đang ở nhà hàng rồi 🍽️"); return; }
+    travelTo("resto");
+    setTimeout(() => { if (outdoor && !outdoor.inside) goIntoBuilding("resto"); }, 1200);
+  } else travelTo("park");
+}
+const meetBtns = () => `<div class="row" style="margin:6px 0"><button class="btn ghost" data-meet="park">📍 Hẹn ở công viên</button><button class="btn ghost" data-meet="resto">🍽️ Hẹn đi nhà hàng</button></div>`;
+const meetCard = m => m.meet && MEET[m.meet] ? `<div><button class="btn gold" style="margin-top:6px;padding:4px 12px" data-go="${m.meet}">${MEET[m.meet].ic} Đi tới ${MEET[m.meet].n}</button></div>` : "";
+
+// ---------- PHÒNG CHAT NHÓM: chủ phòng thêm bạn bè của mình vào (tối đa 8 người); ai cũng tự rời phòng được ----------
+const ROOM_MAX = 8;
+const ROOMS = {mine: {}, inbox: {}, open: null, ref: null, msgs: [], data: null, dataRef: null, lastSend: 0};
+const roomUnread = () => Object.keys(ROOMS.inbox).filter(r => ROOMS.mine[r] && ROOMS.open !== r).length;
+function roomsInboxChanged(v){
+  const old = ROOMS.inbox; ROOMS.inbox = v || {};
+  for (const [r, m] of Object.entries(ROOMS.inbox)) if (ROOMS.mine[r] && ROOMS.open !== r && (!old[r] || old[r].t !== m.t)) toast(`💬 Phòng "${(ROOMS.mine[r] || {}).name || "nhóm"}" có tin mới. Bấm 👥 để xem`, 4000);
+  if (ROOMS.open && ROOMS.inbox[ROOMS.open]) roomMarkRead(ROOMS.open);
+  frBadge(); if ($("ovFriends").classList.contains("show") && !FR.view && !CHAT.with && !ROOMS.open) openFriends();
+}
+function roomMarkRead(r){ if (fb && fbUser && ROOMS.inbox[r]) frDB().ref(`roomInbox/${fbUser.uid}/${r}`).remove().catch(() => {}); }
+function roomStop(){ if (ROOMS.ref) ROOMS.ref.off(); if (ROOMS.dataRef) ROOMS.dataRef.off(); Object.assign(ROOMS, {open: null, ref: null, dataRef: null, msgs: [], data: null}); }
+function roomsSection(){
+  const E = Object.entries(ROOMS.mine).sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
+  const rows = E.map(([r, v]) => `<div class="svc" style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>👨‍👩‍👧 ${esc(v.name || "Phòng")}</b></div>
+    <button class="btn gold" data-room="${esc(r)}">Vào${ROOMS.inbox[r] ? '<span class="dotN">mới</span>' : ""}</button></div>`);
+  return `<h3 style="margin:14px 0 6px">Phòng chat nhóm</h3>${rows.length ? `<div class="svcList">${rows.join("")}</div>` : `<div class="small">Chưa có phòng nào.</div>`}
+    <div class="row" style="margin-top:6px"><button class="btn ghost" id="roomNew">➕ Tạo phòng nhóm</button></div>`;
+}
+function roomPicker(title, sub, already, onOk, withName){
+  const el = $("friendsSheet"), F = Object.entries(FR.friends).filter(([id]) => !already[id]);
+  el.innerHTML = `<h2>${title}</h2><div class="sub">${sub}</div>
+    ${withName ? `<div class="chatIn" style="margin:8px 0"><input id="roomName" maxlength="30" placeholder="Tên phòng, ví dụ: Hội chó cưng" autocomplete="off"></div>` : ""}
+    ${F.length ? `<div class="svcList">${F.map(([id, v]) => `<label class="svc" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" data-pick="${esc(id)}"><b>${esc(v.name || "Bạn")}</b><span class="small">🐶 ${esc(v.dog || "")}</span></label>`).join("")}</div>`
+      : `<div class="small">Chưa có bạn bè nào để thêm. Kết bạn ở công viên trước nha.</div>`}
+    <div class="row" style="margin-top:12px"><button class="btn gold" id="pickOk">Xong</button><button class="btn ghost" id="pickBack">← Quay lại</button></div>`;
+  $("pickOk").onclick = () => { const ids = [...el.querySelectorAll("[data-pick]:checked")].map(b => b.dataset.pick); onOk(ids, withName ? $("roomName").value : ""); };
+  $("pickBack").onclick = () => ROOMS.open ? openRoom(ROOMS.open) : openFriends();
+  $("ovFriends").classList.add("show");
+}
+function roomCreate(){
+  if (!fbUser) return;
+  roomPicker("➕ Tạo phòng nhóm", `Bạn là chủ phòng. Chọn bạn bè để mời vào (tối đa ${ROOM_MAX - 1} bạn).`, {}, async (ids, name) => {
+    name = chatClean(name).slice(0, 30) || "Phòng của " + myCard().name;
+    if (!ids.length){ toast("Chọn ít nhất 1 bạn nha"); return; }
+    if (ids.length > ROOM_MAX - 1){ toast(`Mỗi phòng tối đa ${ROOM_MAX} người`); return; }
+    const me = fbUser.uid, r = frDB().ref("rooms").push().key, now = Date.now();
+    const members = {[me]: {name: myCard().name}}; for (const id of ids) members[id] = {name: cut((FR.friends[id] || {}).name) || "Bạn"};
+    try {
+      await frDB().ref("rooms/" + r).set({owner: me, name, t: now, members});
+      const up = {}; for (const id of Object.keys(members)) up[`myRooms/${id}/${r}`] = {name, t: now};
+      await frDB().ref().update(up);
+      toast(`🎉 Đã tạo phòng "${name}"`, 3000); openRoom(r);
+    } catch(e){ toast("Chưa tạo được phòng (" + (e.code || e.message) + ")", 4000); }
+  }, true);
+}
+function openRoom(r){
+  if (!fb || !fbUser || !ROOMS.mine[r]) return;
+  closeRing(); chatStop(); if (ROOMS.open !== r) roomStop(); FR.view = null; FR.reporting = false; ROOMS.open = r;
+  const el = $("friendsSheet"), me = fbUser.uid;
+  const draw = () => {
+    const D = ROOMS.data || {}, mem = D.members || {}, own = D.owner === me;
+    el.innerHTML = `<h2>👨‍👩‍👧 ${esc(D.name || ROOMS.mine[r].name || "Phòng")}</h2>
+      <div class="sub">${Object.keys(mem).length} người: ${Object.entries(mem).map(([id, m]) => esc(m.name) + (id === D.owner ? " 👑" : "")).join(", ")}. Chỉ người trong phòng đọc được.</div>
+      <div class="lock" style="font-size:13px">🛡️ Không gửi số điện thoại, địa chỉ nhà, tên trường. Ai nói điều không hay thì kể cho bố mẹ nghe.</div>
+      <div id="chatList"><div class="small">Đang tải tin nhắn…</div></div>
+      ${meetBtns()}
+      <div class="qk">${CHAT_QUICK.map((q, i) => `<button data-q="${i}">${esc(q)}</button>`).join("")}</div>
+      <div class="chatIn"><input id="chatTxt" maxlength="200" placeholder="Nhập tin nhắn…" autocomplete="off"><button class="btn gold" id="chatSend">Gửi</button></div>
+      <div class="row" style="margin-top:12px">${own ? `<button class="btn ghost" id="roomAdd">➕ Thêm bạn</button><button class="btn ghost" id="roomKick">➖ Bớt người</button><button class="btn ghost" id="roomDel">🗑️ Xóa phòng</button>`
+        : `<button class="btn ghost" id="roomLeave">🚪 Rời phòng</button>`}<button class="btn ghost" id="frList">👥 Bạn bè</button><button class="btn ghost" id="frClose">Đóng</button></div>`;
+    const inp = $("chatTxt");
+    $("chatSend").onclick = () => roomSend(r, inp.value).then(ok => { if (ok) inp.value = ""; });
+    inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); $("chatSend").click(); } };
+    el.querySelectorAll("[data-q]").forEach(b => b.onclick = () => roomSend(r, CHAT_QUICK[+b.dataset.q]));
+    el.querySelectorAll("[data-meet]").forEach(b => b.onclick = () => roomSend(r, MEET[b.dataset.meet].text, b.dataset.meet));
+    const on = (k, f) => { const b = $(k); if (b) b.onclick = f; };
+    on("roomAdd", () => roomPicker("➕ Thêm bạn vào phòng", "Chỉ thêm được bạn bè của bạn.", mem, ids => roomAdd(r, ids)));
+    on("roomKick", () => roomKick(r)); on("roomDel", () => roomDelete(r)); on("roomLeave", () => roomLeave(r));
+    on("frList", () => { roomStop(); openFriends(); }); on("frClose", closeFriends);
+    roomRender();
+  };
+  ROOMS.dataRef = frDB().ref("rooms/" + r);
+  ROOMS.dataRef.on("value", sn => { if (ROOMS.open !== r) return; ROOMS.data = sn.val(); if (!ROOMS.data || !(ROOMS.data.members || {})[me]){ roomGone(r); return; } draw(); },
+    () => roomGone(r));
+  ROOMS.ref = frDB().ref("roomMsgs/" + r).limitToLast(50);
+  ROOMS.ref.on("value", sn => { if (ROOMS.open !== r) return; const v = sn.val() || {}; ROOMS.msgs = Object.values(v).sort((a, b) => a.t - b.t); roomRender(); roomMarkRead(r); }, () => {});
+  ROOMS.data = null; el.innerHTML = `<h2>👨‍👩‍👧 ${esc(ROOMS.mine[r].name || "Phòng")}</h2><div class="small">Đang mở phòng…</div>`;
+  $("ovFriends").classList.add("show"); roomMarkRead(r); frBadge();
+}
+function roomGone(r){
+  if (ROOMS.open !== r) return;
+  roomStop(); if (fbUser) frDB().ref(`myRooms/${fbUser.uid}/${r}`).remove().catch(() => {});
+  toast("Phòng này đã đóng hoặc bạn không còn trong phòng", 3500); openFriends();
+}
+function roomRender(){
+  const L = $("chatList"); if (!L || !fbUser) return; const me = fbUser.uid;
+  const hm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  L.innerHTML = ROOMS.msgs.length ? ROOMS.msgs.map(m => `<div class="cm ${m.from === me ? "me" : ""}">${m.from === me ? "" : `<b style="font-size:12px">${esc(m.name || "Bạn")}</b><br>`}${esc(m.text)}${meetCard(m)}<small>${hm(m.t)}</small></div>`).join("")
+    : `<div class="small">Chưa có tin nhắn. Chào cả phòng đi nha 👋</div>`;
+  L.querySelectorAll("[data-go]").forEach(b => b.onclick = () => meetGo(b.dataset.go));
+  L.scrollTop = L.scrollHeight;
+}
+async function roomSend(r, raw, meet){
+  if (!fb || !fbUser || !ROOMS.mine[r]) return false;
+  const text = meet ? MEET[meet].text : chatClean(raw); if (!text) return false;
+  if (Date.now() - ROOMS.lastSend < 1500){ toast("Gửi chậm lại một chút nha"); return false; }
+  ROOMS.lastSend = Date.now(); const me = fbUser.uid, t = Date.now(), msg = {from: me, name: myCard().name, text, t};
+  if (meet) msg.meet = meet;
+  try {
+    await frDB().ref("roomMsgs/" + r).push(msg);
+    const mem = (ROOMS.data && ROOMS.data.members) || {}, up = {};
+    for (const id of Object.keys(mem)) if (id !== me) up[`roomInbox/${id}/${r}`] = {name: cut((ROOMS.data || {}).name) || "Phòng", t};
+    if (Object.keys(up).length) await frDB().ref().update(up).catch(() => {});
+    if (!meet && text !== String(raw).trim()) toast("🛡️ Một số chữ đã được che cho an toàn", 2500);
+    return true;
+  } catch(e){ toast("Chưa gửi được (" + (e.code || e.message) + ")", 3500); return false; }
+}
+async function roomAdd(r, ids){
+  const D = ROOMS.data || {}, n = Object.keys(D.members || {}).length;
+  if (!ids.length){ openRoom(r); return; }
+  if (n + ids.length > ROOM_MAX){ toast(`Mỗi phòng tối đa ${ROOM_MAX} người`); return; }
+  const up = {}, now = Date.now();
+  for (const id of ids) up[`members/${id}`] = {name: cut((FR.friends[id] || {}).name) || "Bạn"};
+  try { await frDB().ref("rooms/" + r).update(up);
+    const up2 = {}; for (const id of ids) up2[`myRooms/${id}/${r}`] = {name: cut(D.name) || "Phòng", t: now};
+    await frDB().ref().update(up2); toast("Đã thêm vào phòng", 2500); openRoom(r);
+  } catch(e){ toast("Chưa thêm được (" + (e.code || e.message) + ")", 3500); }
+}
+function roomKick(r){
+  const D = ROOMS.data || {}, me = fbUser.uid, el = $("friendsSheet"), M = Object.entries(D.members || {}).filter(([id]) => id !== me);
+  el.innerHTML = `<h2>➖ Bớt người khỏi phòng</h2><div class="svcList">${M.map(([id, m]) => `<div class="svc" style="display:flex;align-items:center;gap:8px"><b style="flex:1">${esc(m.name)}</b><button class="btn ghost" data-kick="${esc(id)}">Mời ra</button></div>`).join("") || `<div class="small">Phòng chỉ có mình bạn.</div>`}</div>
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="pickBack">← Quay lại</button></div>`;
+  el.querySelectorAll("[data-kick]").forEach(b => b.onclick = async () => { const id = b.dataset.kick;
+    try { await frDB().ref(`rooms/${r}/members/${id}`).remove(); await frDB().ref(`myRooms/${id}/${r}`).remove().catch(() => {}); toast("Đã mời ra khỏi phòng"); openRoom(r); }
+    catch(e){ toast("Chưa làm được (" + (e.code || e.message) + ")"); } });
+  $("pickBack").onclick = () => openRoom(r);
+}
+async function roomLeave(r){
+  if (!confirm("Rời phòng này?")) return;
+  const me = fbUser.uid;
+  try { await frDB().ref(`rooms/${r}/members/${me}`).remove(); } catch(e){}
+  await frDB().ref().update({[`myRooms/${me}/${r}`]: null, [`roomInbox/${me}/${r}`]: null}).catch(() => {});
+  roomStop(); toast("Đã rời phòng"); openFriends();
+}
+async function roomDelete(r){
+  if (!confirm("Xóa phòng này? Mọi tin nhắn trong phòng sẽ mất.")) return;
+  const D = ROOMS.data || {}, me = fbUser.uid, up = {};
+  for (const id of Object.keys(D.members || {})){ up[`myRooms/${id}/${r}`] = null; up[`roomInbox/${id}/${r}`] = null; }
+  try { await frDB().ref().update(up).catch(() => {}); await frDB().ref("roomMsgs/" + r).remove(); await frDB().ref("rooms/" + r).remove(); roomStop(); toast("Đã xóa phòng"); openFriends(); }
+  catch(e){ toast("Chưa xóa được (" + (e.code || e.message) + ")"); }
+}
+async function roomsWipe(uid){   // xóa tài khoản: phòng mình làm chủ thì xóa, phòng khác thì rời
+  const up = {}; let mine = {};
+  try { mine = (await frDB().ref("myRooms/" + uid).get()).val() || {}; } catch(e){}
+  for (const r of Object.keys(mine)){
+    let D = null; try { D = (await frDB().ref("rooms/" + r).get()).val(); } catch(e){}
+    if (D && D.owner === uid){ for (const id of Object.keys(D.members || {})){ up[`myRooms/${id}/${r}`] = null; up[`roomInbox/${id}/${r}`] = null; } up[`roomMsgs/${r}`] = null; up[`rooms/${r}`] = null; }
+    else if (D) up[`rooms/${r}/members/${uid}`] = null;
+  }
+  up[`myRooms/${uid}`] = null; up[`roomInbox/${uid}`] = null;
+  return up;
 }
 // xóa tài khoản: gỡ hết dữ liệu bạn bè ở cả hai phía
 async function frWipeUpdate(uid){
@@ -7144,6 +7416,7 @@ $("ocBed").onclick = () => { if (ownerHome()) enterBedroom(); };
 $("ocOut").onclick = goOutside;
 $("btnMap").onclick = openMap;
 $("btnFriends").onclick = openFriends;
+$("btnSay").onclick = openSay;
 $("oCall").onclick = callDogOut;
 $("oStop").onclick = ()=>stopSwim(false);
 $("oFree").onclick = freeDog;
@@ -7192,7 +7465,7 @@ document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("pointerdown
 document.addEventListener("visibilitychange", ()=>{ if (prof){ prof.last = Date.now(); persist(); } });
 // ---------- tự cập nhật (Sếp 15/11): game tự hỏi có bản mới không, mỗi 5 phút và mỗi lần quay lại game ----------
 // BUILD do tools/build-id.py ghi, khớp với version.json. Có bản mới: lưu dữ liệu, hiện thanh "Có bản mới"; quay lại game lần sau thì tự cập nhật.
-const BUILD = "9578aa66ed";
+const BUILD = "1e2ed40180";
 var updNew = null, updLast = 0;
 function updOff(){ return location.protocol === "file:" || QS.get("selftest") || BUILD === "dev"; }
 async function checkUpdate(){
@@ -7745,6 +8018,26 @@ if (QS.get("gallery")){ // ?gallery=1 : xem tất cả giống và tư thế (đ
       ok("bạn bè: có nút Nhắn tin; khung nhắn tin có câu mẫu, tin của mình bên phải, chữ lạ không chạy thành mã", hasBtn && okUI && L.querySelectorAll(".cm.me").length === 1 && L.innerHTML.includes("&lt;b&gt;"));
       FR.friends = {}; openChat(you); ok("không phải bạn bè thì không mở được khung nhắn tin", CHAT.with !== you || !FR.friends[you]);
       closeFriends(); fb = fb0; FR.friends = fr0; FR.req = rq0; }
+    { // 19/11 bước 6b: bong bóng chữ, hẹn gặp, phòng nhóm
+      const fr0 = FR.friends, rq0 = FR.req, fb0 = fb, j0 = NET.joined; fb = null;
+      FR.friends = {}; ok("bong bóng: câu có sẵn thì người lạ đọc được, câu tự gõ thì người lạ chỉ thấy 💬", sayShown({say: SAY_QUICK[0]}, you) === SAY_QUICK[0] && sayShown({say: "mai đi học không"}, you) === "💬 …");
+      FR.friends = {[you]: Object.assign({t}, card)}; ok("bong bóng: bạn bè đọc được câu tự gõ", sayShown({say: "mai đi học không"}, you) === "mai đi học không");
+      NET.joined = false; ok("bong bóng: chưa ở công viên thì không nói được", parkSay(SAY_QUICK[0]) === false);
+      NET.joined = true; SAY.t = 0; const said = parkSay("gọi mình 0912345678 nha"); ok("bong bóng: nói được, số điện thoại bị che", said && SAY.text.includes("***") && !/\d{5}/.test(SAY.text));
+      const pd = sayPart(); ok("bong bóng: gửi kèm vị trí trong 8 giây", pd.say === SAY.text && typeof pd.st === "number");
+      SAY.t = Date.now() - SAY_MS - 10; ok("bong bóng: quá 8 giây thì thôi gửi", !("say" in sayPart())); SAY.text = ""; SAY.t = 0;
+      ok("hẹn gặp: tin hẹn có nút Đi tới công viên / nhà hàng", meetCard({meet: "park"}).includes('data-go="park"') && meetCard({meet: "resto"}).includes('data-go="resto"') && meetCard({}) === "" && meetCard({meet: "xx"}) === "");
+      openChat(you); ok("nhắn tin: có 2 nút hẹn gặp", document.querySelectorAll("#friendsSheet [data-meet]").length === 2);
+      CHAT.msgs = [{from: you, text: MEET.resto.text, t, meet: "resto"}]; chatRender(); ok("nhắn tin: tin hẹn hiện nút Đi tới nhà hàng", !!$("chatList").querySelector('[data-go="resto"]'));
+      closeFriends();
+      ROOMS.mine = {r1: {name: "Hội chó <b>", t}}; ROOMS.inbox = {r1: {name: "x", t}}; FR.req = {};
+      openFriends(); ok("bạn bè: có mục Phòng chat nhóm, nút Tạo phòng, phòng có tin mới", !!$("roomNew") && !!$("friendsSheet").querySelector('[data-room="r1"] .dotN') && $("friendsSheet").innerHTML.includes("&lt;b&gt;"));
+      frBadge(); ok("phòng có tin mới: nút 👥 báo số", $("btnFriends").textContent === "👥 1");
+      roomPicker("t", "s", {}, () => {}, true); ok("tạo phòng: chọn bạn bè và đặt tên", !!$("roomName") && document.querySelectorAll("#friendsSheet [data-pick]").length === 1);
+      closeFriends(); ROOMS.mine = {}; ROOMS.inbox = {}; frBadge();
+      NET.joined = true; sayBtn(); const sb = $("btnSay").style.display === ""; NET.joined = false; sayBtn();
+      ok("nút 💬 Nói chỉ hiện khi đang ở công viên / nhà hàng", sb && $("btnSay").style.display === "none");
+      NET.joined = j0; fb = fb0; FR.friends = fr0; FR.req = rq0; frBadge(); }
     openFriends(); ok("danh sách bạn bè: hiện lời mời đang chờ", $("friendsSheet").innerText.includes("Bạn A") && !!$("friendsSheet").querySelector("[data-yes]"));
     frBadge(); ok("có lời mời: nút 👥 trên cùng báo số", $("btnFriends").textContent === "👥 1" && $("btnFriends").style.display === "");
     FR.req = {}; FR.friends = {[you]: Object.assign({t}, card)}; showPeer(you); ok("đã là bạn: có nút Xóa bạn", !!$("frDel"));
