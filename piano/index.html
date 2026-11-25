@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Piano Ayden</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Piano Ayden">
+<meta name="theme-color" content="#2b4c7e">
+<style>
+:root{--nen:#fdf8ef;--chu:#2a2a33;--xanh:#2b4c7e;--la:#34a853;--vang:#f5b400;--do:#e5484d;--the:#ffffff;--vien:#e6dccb}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--nen);color:var(--chu);font:17px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;border:0;border-radius:14px;padding:10px 14px;background:var(--xanh);color:#fff;cursor:pointer;min-height:44px}
+button.phu{background:#fff;color:var(--xanh);border:2px solid var(--xanh)}
+button.nho{min-height:36px;padding:6px 10px;font-size:15px}
+button.bat{background:var(--vang);color:#222}
+button:disabled{opacity:.45}
+input,select{font:inherit;padding:8px;border:1px solid var(--vien);border-radius:10px;background:#fff;max-width:100%}
+.an{display:none!important}
+header{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:var(--xanh);color:#fff;position:sticky;top:0;z-index:20}
+header h1{font-size:21px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{background:rgba(255,255,255,.18)}
+main{padding:16px;max-width:900px;margin:0 auto}
+.the{background:var(--the);border:1px solid var(--vien);border-radius:18px;padding:14px;margin-bottom:14px}
+.so{display:flex;gap:10px;flex-wrap:wrap}
+.so>div{flex:1;min-width:120px;text-align:center;background:#fff7e3;border-radius:14px;padding:10px}
+.so b{display:block;font-size:26px}
+.huy{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.huy span{background:#eef4ff;border-radius:20px;padding:4px 10px;font-size:15px}
+.huy span.chua{opacity:.35}
+.hang{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bai{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--vien);border-radius:14px;background:#fff;margin-bottom:10px}
+.bai .ten{flex:1;min-width:0}
+.bai .ten b{display:block;font-size:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bai .ten small{color:#777}
+.sao{font-size:26px;background:none;color:#ccc;padding:4px;min-height:auto}
+.sao.on{color:var(--vang)}
+/* trang tập */
+#tap{padding:0 0 150px}
+.trang{position:relative;margin:0 auto 14px;max-width:1100px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.trang img{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.lop{position:absolute;inset:0}
+.o{position:absolute;border-radius:6px}
+.o.qua{background:rgba(52,168,83,.20)}
+.o.xong{background:rgba(52,168,83,.38)}
+.o.dang{outline:3px solid var(--vang);background:rgba(245,180,0,.18)}
+.o.lap{box-shadow:inset 0 -6px 0 rgba(43,76,126,.55)}
+.o .n{position:absolute;left:2px;top:-2px;font-size:11px;color:#c33;font-weight:700}
+.vach{position:absolute;width:3px;background:var(--do);border-radius:2px}
+.vach.sua{width:22px;margin-left:-10px;background:rgba(229,72,77,.25);border-left:10px solid transparent;border-right:10px solid transparent;background-clip:padding-box}
+.vach.sua::after{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background:var(--do)}
+.he{position:absolute;outline:2px dashed rgba(43,76,126,.35)}
+canvas.ve{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+canvas.ve.mo{pointer-events:auto;touch-action:none}
+#dk{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--vien);padding:8px 10px calc(8px + env(safe-area-inset-bottom));z-index:30;box-shadow:0 -2px 10px rgba(0,0,0,.08)}
+#dk .hang{justify-content:center}
+#dk .tt{font-size:14px;color:#555;text-align:center;min-height:20px}
+#choi{font-size:22px;min-width:64px}
+.nhip{display:flex;align-items:center;gap:4px}
+.nhip b{min-width:44px;text-align:center}
+input[type=range]{width:130px}
+.hop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.hop .the{width:100%;max-width:460px;max-height:90vh;overflow:auto}
+.hop label{display:block;margin:10px 0 4px;font-weight:600}
+.goiy{background:#fff7e3;border-radius:12px;padding:8px 12px;margin:8px auto;max-width:1100px;font-size:15px}
+.dem{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:120px;font-weight:800;color:var(--xanh);pointer-events:none;z-index:40;text-shadow:0 4px 20px #fff}
+#toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;z-index:60;font-size:16px;max-width:90vw}
+</style>
+</head>
+<body>
+<header><button id="ve" class="nho an">◀ Thư viện</button><h1 id="tieude">🎹 Piano của Ayden</h1><button id="caidat" class="nho an">⚙️</button></header>
+
+<main id="nha">
+  <div class="the">
+    <div class="so">
+      <div><b id="chuoi">0</b>🔥 ngày liên tiếp</div>
+      <div><b id="homnay">0</b>phút hôm nay</div>
+      <div><b id="tong">0</b>phút tất cả</div>
+    </div>
+    <div class="huy" id="huy"></div>
+  </div>
+  <div class="hang" style="margin-bottom:12px">
+    <button id="them">➕ Thêm bài</button>
+    <select id="sapxep"><option value="dang">Đang tập trước</option><option value="ten">Theo tên</option><option value="ngay">Mới thêm</option><option value="nguon">Theo nguồn</option></select>
+    <span style="flex:1"></span>
+    <button class="phu nho" id="saoluu">💾 Sao lưu</button>
+    <button class="phu nho" id="phuchoi">📥 Mở bản sao lưu</button>
+  </div>
+  <div id="ds"></div>
+  <p id="trong" class="an" style="text-align:center;color:#777">Chưa có bài nào. Bấm <b>➕ Thêm bài</b>, chọn file PDF hoặc ảnh sheet cô gửi (lưu từ Zalo vào Tệp hoặc Ảnh trước).</p>
+  <input type="file" id="chonfile" accept="application/pdf,image/*" multiple class="an">
+  <input type="file" id="chonsaoluu" accept="application/json,.json" class="an">
+</main>
+
+<section id="tap" class="an">
+  <div id="goiy" class="goiy an"></div>
+  <div id="trangs"></div>
+</section>
+
+<div id="dk" class="an">
+  <div class="tt" id="trangthai">Chạm ô nhịp để tô xanh khi đánh xong. Bấm ▶ để vạch chạy theo nhịp.</div>
+  <div class="hang">
+    <button id="choi">▶</button>
+    <div class="nhip"><button class="phu nho" id="bpmtru">−</button><b id="bpm">80</b><button class="phu nho" id="bpmcong">+</button></div>
+    <label style="font-size:14px">Tốc độ <b id="tocdo">100%</b><br><input type="range" id="tdo" min="50" max="100" step="5" value="100"></label>
+    <button class="phu nho" id="go">🥁 Gõ nhịp</button>
+    <button class="phu nho" id="lap">🔁 Lặp</button>
+    <button class="phu nho" id="tangdan" title="Mỗi lần lặp xong tăng 5% tốc độ">📈 Tăng dần</button>
+    <button class="phu nho" id="vebut">✏️ Vẽ</button>
+    <button class="phu nho" id="suao">✂️ Sửa ô</button>
+  </div>
+</div>
+
+<div id="hopthem" class="hop an"><div class="the">
+  <h2 style="margin-top:0">Thêm bài mới</h2>
+  <label>Tên bài</label><input id="tten" style="width:100%">
+  <label>Nguồn</label><select id="tnguon"><option>Cô gửi</option><option>Trên mạng</option><option>Khác</option></select>
+  <label>Nhịp</label><select id="tnhip"><option value="2">2/4</option><option value="3">3/4</option><option value="4" selected>4/4</option><option value="6">6/8</option></select>
+  <label>Tempo (nốt đen / phút)</label><input id="tbpm" type="number" min="30" max="200" value="80">
+  <label><input type="checkbox" id="tnet"> Làm nét (ảnh chụp mờ thì bật)</label>
+  <p id="tfile" style="color:#777;font-size:15px"></p>
+  <div class="hang"><button id="tok">Thêm</button><button class="phu" id="thuy">Hủy</button></div>
+</div></div>
+
+<div id="hopcai" class="hop an"><div class="the">
+  <h2 style="margin-top:0">Cài đặt bài</h2>
+  <label>Tên bài</label><input id="cten" style="width:100%">
+  <label>Nguồn</label><select id="cnguon"><option>Cô gửi</option><option>Trên mạng</option><option>Khác</option></select>
+  <label>Nhịp</label><select id="cnhip"><option value="2">2/4</option><option value="3">3/4</option><option value="4">4/4</option><option value="6">6/8</option></select>
+  <label><input type="checkbox" id="cthuoc"> 🎉 Bé đã thuộc bài này</label>
+  <div class="hang" style="margin-top:12px">
+    <button class="phu nho" id="cdoan">🔍 Tự đoán lại ô nhịp</button>
+    <button class="phu nho" id="cnet">✨ Bật/tắt làm nét</button>
+    <button class="phu nho" id="cxoaxanh">🧽 Xóa tô xanh</button>
+  </div>
+  <div class="hang" style="margin-top:16px"><button id="cok">Lưu</button><button class="phu" id="chuy">Đóng</button><span style="flex:1"></span><button class="nho" style="background:var(--do)" id="cxoa">Xóa bài</button></div>
+</div></div>
+
+<div id="dem" class="dem an"></div>
+<div id="toast" class="an"></div>
+
+<script>
+"use strict";
+/* ============ Lưu trữ (IndexedDB) ============ */
+const DB = (() => {
+  let dbp;
+  function mo() {
+    if (dbp) return dbp;
+    dbp = new Promise((ok, loi) => {
+      const r = indexedDB.open("piano-ayden", 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore("bai", { keyPath: "id" });
+        d.createObjectStore("trang");
+        d.createObjectStore("kv");
+      };
+      r.onsuccess = () => ok(r.result);
+      r.onerror = () => loi(r.error);
+    });
+    return dbp;
+  }
+  async function tx(store, mode, fn) {
+    const d = await mo();
+    return new Promise((ok, loi) => {
+      const t = d.transaction(store, mode), s = t.objectStore(store);
+      let kq;
+      Promise.resolve(fn(s)).then(v => { kq = v; });
+      t.oncomplete = () => ok(kq);
+      t.onerror = () => loi(t.error);
+    });
+  }
+  const req = r => new Promise((ok, loi) => { r.onsuccess = () => ok(r.result); r.onerror = () => loi(r.error); });
+  return {
+    get: (s, k) => tx(s, "readonly", st => req(st.get(k))),
+    all: s => tx(s, "readonly", st => req(st.getAll())),
+    put: (s, v, k) => tx(s, "readwrite", st => req(k === undefined ? st.put(v) : st.put(v, k))),
+    del: (s, k) => tx(s, "readwrite", st => req(st.delete(k))),
+  };
+})();
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+
+const $ = id => document.getElementById(id);
+function toast(t, ms = 2500) { const e = $("toast"); e.textContent = t; e.classList.remove("an"); clearTimeout(toast.h); toast.h = setTimeout(() => e.classList.add("an"), ms); }
+const homNay = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+
+/* ============ Xử lý ảnh: làm nét + đoán ô nhịp ============ */
+function veLen(img, w) {
+  const s = w / img.naturalWidth, c = document.createElement("canvas");
+  c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+function xam(c) {
+  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data, g = new Uint8Array(c.width * c.height);
+  for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+  return g;
+}
+// Làm nét: ngưỡng thích nghi theo vùng (bỏ nền xám, bóng tay), ra trắng đen rõ
+function lamNet(c) {
+  const w = c.width, h = c.height, g = xam(c), I = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) { let s = 0; for (let x = 0; x < w; x++) { s += g[y * w + x]; I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + s; } }
+  const r = Math.max(8, Math.round(w / 60)), x2 = c.getContext("2d"), im = x2.createImageData(w, h), o = im.data;
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+    for (let x = 0; x < w; x++) {
+      const xa = Math.max(0, x - r), xb = Math.min(w, x + r + 1);
+      const s = I[y1 * (w + 1) + xb] - I[y0 * (w + 1) + xb] - I[y1 * (w + 1) + xa] + I[y0 * (w + 1) + xa];
+      const tb = s / ((y1 - y0) * (xb - xa)), v = g[y * w + x] < tb * 0.86 ? 0 : 255, k = (y * w + x) * 4;
+      o[k] = o[k + 1] = o[k + 2] = v; o[k + 3] = 255;
+    }
+  }
+  x2.putImageData(im, 0, 0);
+  return c;
+}
+function otsu(g) {
+  const hs = new Array(256).fill(0); for (const v of g) hs[v]++;
+  let tong = 0; for (let i = 0; i < 256; i++) tong += i * hs[i];
+  let sB = 0, wB = 0, best = 0, t = 128;
+  for (let i = 0; i < 256; i++) { wB += hs[i]; if (!wB) continue; const wF = g.length - wB; if (!wF) break; sB += i * hs[i];
+    const mB = sB / wB, mF = (tong - sB) / wF, v = wB * wF * (mB - mF) ** 2; if (v > best) { best = v; t = i; } }
+  return t;
+}
+// Đoán ô nhịp: tìm khuông 5 dòng -> ghép hệ (tay phải + tay trái) -> vạch dọc cắt qua mọi khuông của hệ
+function doanONhip(c) {
+  const w = c.width, h = c.height, g = xam(c), t = otsu(g), den = new Uint8Array(w * h);
+  for (let i = 0; i < g.length; i++) den[i] = g[i] <= t ? 1 : 0;
+  const hang = new Float32Array(h);
+  for (let y = 0; y < h; y++) { let s = 0; for (let x = 0; x < w; x++) s += den[y * w + x]; hang[y] = s / w; }
+  const dong = [];
+  let cur = [];
+  for (let y = 0; y < h; y++) {
+    if (hang[y] > 0.45) { if (cur.length && y - cur[cur.length - 1] > 1) { dong.push(cur.reduce((a, b) => a + b) / cur.length); cur = []; } cur.push(y); }
+  }
+  if (cur.length) dong.push(cur.reduce((a, b) => a + b) / cur.length);
+  const khuong = [];
+  for (let i = 0; i + 4 < dong.length;) {
+    const gs = [1, 2, 3, 4].map(k => dong[i + k] - dong[i + k - 1]), mx = Math.max(...gs), mn = Math.min(...gs), tb = gs.reduce((a, b) => a + b) / 4;
+    if (mx - mn <= Math.max(3, tb * 0.25) && tb > 4 && tb < 45) { khuong.push({ t: Math.round(dong[i]), b: Math.round(dong[i + 4]), sp: tb }); i += 5; } else i++;
+  }
+  if (!khuong.length) return [];
+  const he = []; let nhom = [khuong[0]];
+  for (const k of khuong.slice(1)) {
+    const p = nhom[nhom.length - 1];
+    if (k.t - p.b < 9 * p.sp && nhom.length < 2) nhom.push(k); else { he.push(nhom); nhom = [k]; }
+  }
+  he.push(nhom);
+  const laDong = y => hang[y] > 0.45;
+  const kq = [];
+  for (const ks of he) {
+    const sp = ks[0].sp;
+    let ok = null;
+    for (const k of ks) {
+      const col = new Uint8Array(w);
+      for (let x = 0; x < w; x++) { let s = 0; for (let y = k.t; y <= k.b; y++) s += den[y * w + x]; col[x] = s / (k.b - k.t + 1) > 0.92 ? 1 : 0; }
+      ok = ok ? ok.map((v, x) => v & col[x]) : col;
+    }
+    let nh = [], cu = [];
+    for (let x = 0; x < w; x++) if (ok[x]) { if (cu.length && x - cu[cu.length - 1] > 2) { nh.push(cu); cu = []; } cu.push(x); }
+    if (cu.length) nh.push(cu);
+    const r = Math.round(1.2 * sp);
+    const sach = x => {
+      for (const k of ks) {
+        let s = 0, n = 0;
+        for (let y = k.t; y <= k.b; y++) { if (laDong(y)) continue; for (let xx = Math.max(0, x - r); xx <= Math.min(w - 1, x + r); xx++) { if (Math.abs(xx - x) <= 2) continue; s += den[y * w + xx]; n++; } }
+        if (n && s / n > 0.08) return false;
+      }
+      return true;
+    };
+    let xs = nh.map(v => ({ x: Math.round(v.reduce((a, b) => a + b) / v.length), d: v.length })).filter(v => v.d > 4 || sach(v.x)).map(v => v.x);
+    const gop = [];
+    for (const x of xs) { if (gop.length && x - gop[gop.length - 1] < 1.5 * sp) gop[gop.length - 1] = x; else gop.push(x); }
+    // khuông không có vạch đầu hệ: lấy điểm bắt đầu dòng kẻ
+    const y0 = ks[0].t; let trai = 0; while (trai < w && !den[y0 * w + trai]) trai++;
+    let phai = w - 1; while (phai > 0 && !den[y0 * w + phai]) phai--;
+    if (!gop.length || gop[0] - trai > 3 * sp) gop.unshift(trai);
+    if (phai - gop[gop.length - 1] > 3 * sp) gop.push(phai);
+    if (gop.length >= 2) kq.push({ top: Math.max(0, Math.round(ks[0].t - 3 * sp)), bot: Math.min(h, Math.round(ks[ks.length - 1].b + 3 * sp)), xs: gop });
+  }
+  return kq;
+}
+
+/* ============ Đọc file: PDF -> ảnh trang ============ */
+let pdfjsP;
+function napPdfJs() {
+  if (pdfjsP) return pdfjsP;
+  pdfjsP = new Promise((ok, loi) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; ok(pdfjsLib); };
+    s.onerror = () => loi(new Error("Không tải được bộ đọc PDF (cần mạng lần đầu)"));
+    document.head.appendChild(s);
+  });
+  return pdfjsP;
+}
+const RONG = 1400;
+const toBlob = c => new Promise(ok => c.toBlob(ok, "image/png"));
+function moAnh(blob) { return new Promise((ok, loi) => { const i = new Image(); i.onload = () => ok(i); i.onerror = loi; i.src = URL.createObjectURL(blob); }); }
+async function fileSangTrang(files, onTienDo) {
+  const out = [];
+  for (const f of files) {
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+      const lib = await napPdfJs(), pdf = await lib.getDocument({ data: await f.arrayBuffer() }).promise;
+      for (let p = 1; p <= pdf.numPages; p++) {
+        onTienDo && onTienDo(`Đọc PDF trang ${p}/${pdf.numPages}…`);
+        const pg = await pdf.getPage(p), v0 = pg.getViewport({ scale: 1 }), v = pg.getViewport({ scale: RONG / v0.width });
+        const c = document.createElement("canvas"); c.width = Math.round(v.width); c.height = Math.round(v.height);
+        const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+        await pg.render({ canvasContext: x, viewport: v }).promise;
+        out.push(await toBlob(c));
+      }
+    } else {
+      onTienDo && onTienDo(`Đọc ảnh ${f.name}…`);
+      const img = await moAnh(f);
+      out.push(await toBlob(veLen(img, Math.min(RONG, Math.max(img.naturalWidth, 1000)))));
+    }
+  }
+  return out;
+}
+async function xuLyTrang(blob, net) {
+  const img = await moAnh(blob), c = veLen(img, img.naturalWidth);
+  if (net) lamNet(c);
+  const o = doanONhip(c);
+  return { anh: net ? await toBlob(c) : null, o, w: c.width, h: c.height };
+}
+
+/* ============ Thống kê, huy hiệu Poppy ============ */
+async function layTK() { return (await DB.get("kv", "tk")) || { ngay: {}, xong: 0 }; }
+async function congGiay(s) { const tk = await layTK(), d = homNay(); tk.ngay[d] = (tk.ngay[d] || 0) + s; await DB.put("kv", tk, "tk"); }
+function tinhChuoi(ngay) {
+  let n = 0; const d = new Date();
+  if (!(ngay[homNay()] >= 60)) d.setDate(d.getDate() - 1);
+  for (;;) { const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); if ((ngay[k] || 0) >= 60) { n++; d.setDate(d.getDate() - 1); } else break; }
+  return n;
+}
+async function veNha() {
+  const tk = await layTK(), ds = await DB.all("bai");
+  const tong = Object.values(tk.ngay).reduce((a, b) => a + b, 0), chuoi = tinhChuoi(tk.ngay);
+  $("chuoi").textContent = chuoi; $("homnay").textContent = Math.floor((tk.ngay[homNay()] || 0) / 60); $("tong").textContent = Math.floor(tong / 60);
+  const huy = [
+    ["🐶 Poppy vẫy đuôi", tong >= 60, "tập phút đầu tiên"],
+    ["🦴 Khúc xương", chuoi >= 3, "tập 3 ngày liền"],
+    ["🏅 Poppy tự hào", chuoi >= 7, "tập 7 ngày liền"],
+    ["⭐ Chăm chỉ", tong >= 30 * 60, "tập đủ 30 phút"],
+    ["🌟 Siêu chăm", tong >= 300 * 60, "tập đủ 5 giờ"],
+    ["🎹 Thuộc bài đầu", ds.some(b => b.thuoc), "thuộc 1 bài"],
+    ["🏆 Nghệ sĩ nhí", ds.filter(b => b.thuoc).length >= 5, "thuộc 5 bài"],
+  ];
+  $("huy").innerHTML = huy.map(([t, ok, g]) => `<span class="${ok ? "" : "chua"}" title="${g}">${t}</span>`).join("");
+  const kieu = $("sapxep").value;
+  ds.sort((a, b) => kieu === "ten" ? a.ten.localeCompare(b.ten, "vi") : kieu === "ngay" ? b.them - a.them : kieu === "nguon" ? (a.nguon || "").localeCompare(b.nguon || "", "vi") || a.ten.localeCompare(b.ten, "vi") : (b.dang ? 1 : 0) - (a.dang ? 1 : 0) || b.mo - a.mo);
+  $("trong").classList.toggle("an", ds.length > 0);
+  $("ds").innerHTML = "";
+  for (const b of ds) {
+    const e = document.createElement("div"); e.className = "bai";
+    e.innerHTML = `<button class="sao ${b.dang ? "on" : ""}" title="Đang tập">★</button><div class="ten"><b>${b.thuoc ? "🎉 " : ""}${esc(b.ten)}</b><small>${esc(b.nguon || "")} · thêm ${new Date(b.them).toLocaleDateString("vi-VN")} · ${b.soTrang} trang · ${demO(b)} ô nhịp</small></div><button>Tập ▶</button>`;
+    e.querySelector(".sao").onclick = async ev => { ev.stopPropagation(); b.dang = !b.dang; await DB.put("bai", b); veNha(); };
+    e.querySelector("button:last-child").onclick = () => moBai(b.id);
+    e.querySelector(".ten").onclick = () => moBai(b.id);
+    $("ds").appendChild(e);
+  }
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const demO = b => b.trang.reduce((s, t) => s + t.o.reduce((a, he) => a + he.xs.length - 1, 0), 0);
+
+/* ============ Thêm bài ============ */
+let fileCho = [];
+$("them").onclick = () => $("chonfile").click();
+$("chonfile").onchange = () => {
+  fileCho = [...$("chonfile").files]; $("chonfile").value = "";
+  if (!fileCho.length) return;
+  $("tten").value = fileCho[0].name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+  $("tnet").checked = !fileCho.some(f => /pdf/i.test(f.type) || /\.pdf$/i.test(f.name));
+  $("tfile").textContent = fileCho.length + " file: " + fileCho.map(f => f.name).join(", ");
+  $("hopthem").classList.remove("an");
+};
+$("thuy").onclick = () => $("hopthem").classList.add("an");
+$("tok").onclick = async () => {
+  $("tok").disabled = true;
+  try {
+    const net = $("tnet").checked, blobs = await fileSangTrang(fileCho, t => toast(t, 60000));
+    const id = "b" + Date.now(), trang = [];
+    for (let i = 0; i < blobs.length; i++) {
+      toast(`Tìm ô nhịp trang ${i + 1}/${blobs.length}…`, 60000);
+      await new Promise(r => setTimeout(r, 30));
+      const x = await xuLyTrang(blobs[i], net);
+      await DB.put("trang", { goc: blobs[i], net: x.anh }, id + ":" + i);
+      trang.push({ o: x.o, w: x.w, h: x.h, ve: [] });
+    }
+    const bai = { id, ten: $("tten").value.trim() || "Bài mới", nguon: $("tnguon").value, nhip: +$("tnhip").value, bpm: +$("tbpm").value || 80, lamNet: net, them: Date.now(), mo: Date.now(), dang: true, thuoc: false, soTrang: blobs.length, trang, xong: [] };
+    await DB.put("bai", bai);
+    $("hopthem").classList.add("an");
+    toast(`Đã thêm "${bai.ten}": ${demO(bai)} ô nhịp. Người lớn xem lại khung ô nhịp nhé.`, 5000);
+    await moBai(id, true);
+  } catch (e) { toast("Lỗi: " + e.message, 6000); }
+  $("tok").disabled = false;
+};
+
+/* ============ Trang tập ============ */
+let B = null, dsO = [], urls = [], cheDo = "tap", dangChoi = false, viTri = -1, lapA = -1, lapB = -1, chonLap = 0;
+async function moBai(id, suaNgay) {
+  B = await DB.get("bai", id); if (!B) return;
+  B.mo = Date.now(); await DB.put("bai", B);
+  urls.forEach(u => URL.revokeObjectURL(u)); urls = [];
+  $("nha").classList.add("an"); $("tap").classList.remove("an"); $("dk").classList.remove("an");
+  $("ve").classList.remove("an"); $("caidat").classList.remove("an"); $("tieude").textContent = B.ten;
+  $("bpm").textContent = B.bpm; viTri = -1; lapA = lapB = -1;
+  const box = $("trangs"); box.innerHTML = "";
+  for (let i = 0; i < B.soTrang; i++) {
+    const t = await DB.get("trang", B.id + ":" + i), blob = (B.lamNet && t.net) || t.goc, u = URL.createObjectURL(blob); urls.push(u);
+    const d = document.createElement("div"); d.className = "trang"; d.dataset.i = i;
+    d.innerHTML = `<img src="${u}" draggable="false"><div class="lop"></div><canvas class="ve"></canvas>`;
+    box.appendChild(d);
+    d.querySelector("img").onload = () => { if (B) veNet(d); };
+  }
+  datCheDo(suaNgay ? "sua" : "tap");
+  window.scrollTo(0, 0);
+}
+function lapDsO() {
+  dsO = [];
+  B.trang.forEach((t, ti) => t.o.forEach((he, hi) => { for (let k = 0; k + 1 < he.xs.length; k++) dsO.push({ ti, hi, k, he, t }); }));
+}
+function veLop() {
+  lapDsO();
+  document.querySelectorAll(".trang").forEach(d => {
+    const ti = +d.dataset.i, t = B.trang[ti], lop = d.querySelector(".lop"); lop.innerHTML = "";
+    const px = v => (v / t.w * 100) + "%", py = v => (v / t.h * 100) + "%";
+    if (cheDo === "sua") {
+      t.o.forEach((he, hi) => {
+        const e = document.createElement("div"); e.className = "he"; e.style.left = 0; e.style.right = 0; e.style.top = py(he.top); e.style.height = py(he.bot - he.top);
+        e.onclick = ev => { const r = lop.getBoundingClientRect(), x = Math.round((ev.clientX - r.left) / r.width * t.w); he.xs.push(x); he.xs.sort((a, b) => a - b); luu(); veLop(); };
+        lop.appendChild(e);
+        he.xs.forEach((x, xi) => {
+          const v = document.createElement("div"); v.className = "vach sua"; v.style.left = px(x); v.style.top = py(he.top); v.style.height = py(he.bot - he.top);
+          v.onclick = ev => { ev.stopPropagation(); he.xs.splice(xi, 1); luu(); veLop(); };
+          lop.appendChild(v);
+        });
+      });
+      return;
+    }
+    dsO.forEach((o, n) => {
+      if (o.ti !== ti) return;
+      const e = document.createElement("div"); e.className = "o"; e.dataset.n = n;
+      e.style.left = px(o.he.xs[o.k] + 2); e.style.width = px(o.he.xs[o.k + 1] - o.he.xs[o.k] - 4); e.style.top = py(o.he.top); e.style.height = py(o.he.bot - o.he.top);
+      e.innerHTML = `<span class="n">${n + 1}</span>`;
+      e.onclick = () => chamO(n);
+      lop.appendChild(e);
+    });
+    veNet(d);
+  });
+  toMau();
+}
+function toMau() {
+  document.querySelectorAll(".o").forEach(e => {
+    const n = +e.dataset.n;
+    e.classList.toggle("xong", B.xong.includes(n));
+    e.classList.toggle("qua", dangChoi && viTri > n && (lapA < 0 || n >= lapA));
+    e.classList.toggle("dang", n === viTri);
+    e.classList.toggle("lap", lapA >= 0 && n >= lapA && n <= (lapB >= 0 ? lapB : lapA));
+  });
+}
+async function luu() { await DB.put("bai", B); }
+async function chamO(n) {
+  if (chonLap) {
+    if (chonLap === 1) { lapA = n; lapB = -1; chonLap = 2; $("trangthai").textContent = `Lặp từ ô ${n + 1}. Chạm ô CUỐI của đoạn lặp.`; }
+    else { lapB = Math.max(n, lapA); lapA = Math.min(n, lapA); chonLap = 0; $("lap").classList.add("bat"); $("trangthai").textContent = `Lặp ô ${lapA + 1} → ${lapB + 1}. Bấm ▶ để tập. Bấm 🔁 lần nữa để bỏ lặp.`; }
+    toMau(); return;
+  }
+  if (dangChoi) return;
+  const i = B.xong.indexOf(n);
+  if (i >= 0) B.xong.splice(i, 1); else B.xong.push(n);
+  toMau(); luu(); congGiay(2);
+}
+function datCheDo(m) {
+  cheDo = m;
+  $("suao").classList.toggle("bat", m === "sua"); $("vebut").classList.toggle("bat", m === "ve");
+  document.querySelectorAll("canvas.ve").forEach(c => c.classList.toggle("mo", m === "ve"));
+  $("goiy").classList.toggle("an", m !== "sua");
+  $("goiy").innerHTML = "✂️ <b>Sửa ô nhịp</b> (người lớn làm): chạm <b style='color:#e5484d'>vạch đỏ</b> để xóa vạch sai, chạm chỗ trống trong khung để thêm vạch. Xong bấm ✂️ lần nữa.";
+  $("trangthai").textContent = m === "ve" ? "✏️ Đang vẽ ghi chú: vẽ bằng ngón tay hoặc bút. Bấm ✏️ lần nữa để thôi vẽ. Bấm giữ ✏️ để xóa nét vẽ trang đang xem." : m === "sua" ? "Đang sửa ô nhịp." : "Chạm ô nhịp để tô xanh khi đánh xong. Bấm ▶ để vạch chạy theo nhịp.";
+  veLop();
+}
+$("suao").onclick = () => { dung(); datCheDo(cheDo === "sua" ? "tap" : "sua"); };
+$("vebut").onclick = () => { dung(); datCheDo(cheDo === "ve" ? "tap" : "ve"); };
+let giuVe; $("vebut").onpointerdown = () => { giuVe = setTimeout(() => { const d = trangDangXem(); if (d && confirm("Xóa hết nét vẽ ở trang này?")) { B.trang[+d.dataset.i].ve = []; luu(); veNet(d); } }, 900); };
+$("vebut").onpointerup = $("vebut").onpointerleave = () => clearTimeout(giuVe);
+$("ve").onclick = () => { dung(); urls.forEach(u => URL.revokeObjectURL(u)); urls = []; B = null; $("tap").classList.add("an"); $("dk").classList.add("an"); $("nha").classList.remove("an"); $("ve").classList.add("an"); $("caidat").classList.add("an"); $("tieude").textContent = "🎹 Piano của Ayden"; veNha(); };
+function trangDangXem() { let best = null, bd = 1e9; document.querySelectorAll(".trang").forEach(d => { const r = d.getBoundingClientRect(), dd = Math.abs(r.top + r.height / 2 - innerHeight / 2); if (dd < bd) { bd = dd; best = d; } }); return best; }
+
+/* ============ Vẽ ghi chú ============ */
+function veNet(d) {
+  const c = d.querySelector("canvas.ve"), t = B.trang[+d.dataset.i], r = d.getBoundingClientRect();
+  c.width = Math.max(1, Math.round(r.width * devicePixelRatio)); c.height = Math.max(1, Math.round(r.height * devicePixelRatio));
+  const x = c.getContext("2d"); x.clearRect(0, 0, c.width, c.height); x.lineCap = x.lineJoin = "round";
+  for (const n of t.ve) { x.strokeStyle = n.m; x.lineWidth = n.w * c.width; x.beginPath(); n.p.forEach(([a, b], i) => i ? x.lineTo(a * c.width, b * c.height) : x.moveTo(a * c.width, b * c.height)); x.stroke(); }
+  if (!c.dataset.gan) {
+    c.dataset.gan = 1; let net = null;
+    c.onpointerdown = e => { if (cheDo !== "ve") return; c.setPointerCapture(e.pointerId); const r2 = c.getBoundingClientRect(); net = { m: "#d93025", w: 0.004, p: [[(e.clientX - r2.left) / r2.width, (e.clientY - r2.top) / r2.height]] }; };
+    c.onpointermove = e => { if (!net) return; const r2 = c.getBoundingClientRect(), p = [(e.clientX - r2.left) / r2.width, (e.clientY - r2.top) / r2.height], q = net.p[net.p.length - 1], x2 = c.getContext("2d");
+      x2.strokeStyle = net.m; x2.lineWidth = net.w * c.width; x2.lineCap = "round"; x2.beginPath(); x2.moveTo(q[0] * c.width, q[1] * c.height); x2.lineTo(p[0] * c.width, p[1] * c.height); x2.stroke(); net.p.push(p); };
+    c.onpointerup = c.onpointercancel = () => { if (net && net.p.length > 1) { B.trang[+d.dataset.i].ve.push(net); luu(); } net = null; };
+  }
+}
+addEventListener("resize", () => { if (B) document.querySelectorAll(".trang").forEach(veNet); });
+
+/* ============ Nhịp, vạch chạy, lặp đoạn ============ */
+let ac = null, goNhip = true, hen = null, batDau = 0, giayTap = 0;
+function amThanh() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); return ac; }
+function tic(t, manh) {
+  if (!goNhip) return;
+  const a = amThanh(), o = a.createOscillator(), g = a.createGain();
+  o.frequency.value = manh ? 1500 : 1000; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(manh ? 0.6 : 0.35, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.08);
+}
+const tocDo = () => +$("tdo").value / 100;
+const giayMoiPhach = () => 60 / (B.bpm * tocDo()) * (B.nhip === 6 ? 0.5 : 1);
+$("tdo").oninput = () => { $("tocdo").textContent = $("tdo").value + "%"; };
+$("bpmtru").onclick = () => { B.bpm = Math.max(30, B.bpm - 5); $("bpm").textContent = B.bpm; luu(); };
+$("bpmcong").onclick = () => { B.bpm = Math.min(200, B.bpm + 5); $("bpm").textContent = B.bpm; luu(); };
+$("go").onclick = () => { goNhip = !goNhip; $("go").classList.toggle("bat", goNhip); };
+$("go").classList.add("bat");
+$("lap").onclick = () => {
+  if (lapA >= 0 || chonLap) { lapA = lapB = -1; chonLap = 0; $("lap").classList.remove("bat"); $("trangthai").textContent = "Đã bỏ lặp."; toMau(); return; }
+  if (cheDo !== "tap") datCheDo("tap");
+  dung(); chonLap = 1; $("lap").classList.add("bat"); $("trangthai").textContent = "🔁 Chạm ô ĐẦU của đoạn muốn lặp.";
+};
+$("choi").onclick = () => dangChoi ? dung() : choi();
+function choi() {
+  if (!dsO.length) { toast("Bài chưa có ô nhịp. Bấm ✂️ Sửa ô để thêm."); return; }
+  if (cheDo !== "tap") datCheDo("tap");
+  amThanh(); dangChoi = true; $("choi").textContent = "⏸";
+  const tu = lapA >= 0 ? lapA : 0, n = B.nhip === 6 ? 6 : B.nhip, p = giayMoiPhach(), dem = $("dem");
+  dem.classList.remove("an");
+  const t0 = ac.currentTime + 0.1;
+  for (let k = 0; k < n; k++) tic(t0 + k * p, k === 0);
+  let k = 0; dem.textContent = n;
+  const demNguoc = setInterval(() => { k++; if (k >= n) { clearInterval(demNguoc); dem.classList.add("an"); } else dem.textContent = n - k; }, p * 1000);
+  hen = setTimeout(() => { batDau = performance.now(); chayO(tu, t0 + n * p); }, n * p * 1000);
+  hen2 = demNguoc;
+}
+let hen2 = null, vachEl = null, raf = 0;
+function chayO(i, tAm) {
+  if (!dangChoi) return;
+  if (lapB >= 0 && i > lapB) {
+    i = lapA;
+    if (tangDan && tocDo() < 1) { $("tdo").value = Math.min(100, +$("tdo").value + 5); $("tdo").oninput(); toast("Tốt lắm! Nhanh hơn một chút: " + $("tdo").value + "%"); }
+  }
+  if (i >= dsO.length) { dung(); toast("🎉 Hết bài! Giỏi quá Ayden!", 4000); return; }
+  viTri = i; toMau();
+  const o = dsO[i], n = B.nhip === 6 ? 6 : B.nhip, p = giayMoiPhach(), L = n * p;
+  for (let k = 0; k < n; k++) tic(tAm + k * p, k === 0);
+  const el = document.querySelector(`.o[data-n="${i}"]`);
+  if (el) { const r = el.getBoundingClientRect(); if (r.top < 70 || r.bottom > innerHeight - 160) el.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  if (vachEl) vachEl.remove();
+  vachEl = document.createElement("div"); vachEl.className = "vach";
+  const lop = document.querySelector(`.trang[data-i="${o.ti}"] .lop`), t = o.t;
+  vachEl.style.top = (o.he.top / t.h * 100) + "%"; vachEl.style.height = ((o.he.bot - o.he.top) / t.h * 100) + "%";
+  lop.appendChild(vachEl);
+  const bd = performance.now(), x0 = o.he.xs[o.k], x1 = o.he.xs[o.k + 1];
+  cancelAnimationFrame(raf);
+  const buoc = () => { const f = Math.min(1, (performance.now() - bd) / (L * 1000)); vachEl.style.left = ((x0 + (x1 - x0) * f) / t.w * 100) + "%"; if (f < 1 && dangChoi) raf = requestAnimationFrame(buoc); };
+  buoc();
+  hen = setTimeout(() => chayO(i + 1, tAm + L), L * 1000);
+}
+let tangDan = false;
+$("tangdan").onclick = () => { tangDan = !tangDan; $("tangdan").classList.toggle("bat", tangDan); toast(tangDan ? "Mỗi lần lặp xong sẽ nhanh thêm 5%, tới 100%." : "Tắt tăng dần."); };
+function dung() {
+  if (!dangChoi) return;
+  dangChoi = false; clearTimeout(hen); clearInterval(hen2); cancelAnimationFrame(raf); $("dem").classList.add("an");
+  $("choi").textContent = "▶"; if (vachEl) { vachEl.remove(); vachEl = null; }
+  const s = Math.round((performance.now() - batDau) / 1000); if (batDau && s > 0) congGiay(Math.min(s, 3600)); batDau = 0;
+  toMau();
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) dung(); });
+
+/* ============ Cài đặt bài ============ */
+$("caidat").onclick = () => { dung(); $("cten").value = B.ten; $("cnguon").value = B.nguon; $("cnhip").value = B.nhip; $("cthuoc").checked = !!B.thuoc; $("hopcai").classList.remove("an"); };
+$("chuy").onclick = () => $("hopcai").classList.add("an");
+$("cok").onclick = async () => { B.ten = $("cten").value.trim() || B.ten; B.nguon = $("cnguon").value; B.nhip = +$("cnhip").value; const vuaThuoc = !B.thuoc && $("cthuoc").checked; B.thuoc = $("cthuoc").checked; await luu(); $("tieude").textContent = B.ten; $("hopcai").classList.add("an"); if (vuaThuoc) toast("🎉🐶 Poppy vỗ tay! Ayden đã thuộc bài " + B.ten, 4000); };
+$("cxoaxanh").onclick = async () => { B.xong = []; await luu(); toMau(); toast("Đã xóa tô xanh."); };
+async function doanLai(net) {
+  for (let i = 0; i < B.soTrang; i++) {
+    toast(`Đang xử lý trang ${i + 1}/${B.soTrang}…`, 60000);
+    const t = await DB.get("trang", B.id + ":" + i), x = await xuLyTrang(t.goc, net);
+    t.net = x.anh; await DB.put("trang", t, B.id + ":" + i);
+    B.trang[i].o = x.o; B.trang[i].w = x.w; B.trang[i].h = x.h;
+  }
+  B.lamNet = net; B.xong = []; await luu(); $("hopcai").classList.add("an"); toast(`Xong: ${demO(B)} ô nhịp.`); moBai(B.id, true);
+}
+$("cdoan").onclick = () => { if (confirm("Tự đoán lại ô nhịp? Phần đã sửa tay và tô xanh sẽ mất.")) doanLai(B.lamNet); };
+$("cnet").onclick = () => { if (confirm((B.lamNet ? "Tắt" : "Bật") + " làm nét? App sẽ đoán lại ô nhịp.")) doanLai(!B.lamNet); };
+$("cxoa").onclick = async () => { if (!confirm(`Xóa hẳn bài "${B.ten}"?`)) return; for (let i = 0; i < B.soTrang; i++) await DB.del("trang", B.id + ":" + i); await DB.del("bai", B.id); $("hopcai").classList.add("an"); $("ve").onclick(); };
+
+/* ============ Sao lưu ============ */
+const sangData = b => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
+$("saoluu").onclick = async () => {
+  toast("Đang gom dữ liệu…", 60000);
+  const ds = await DB.all("bai"), trang = {};
+  for (const b of ds) for (let i = 0; i < b.soTrang; i++) { const t = await DB.get("trang", b.id + ":" + i); trang[b.id + ":" + i] = { goc: await sangData(t.goc), net: t.net ? await sangData(t.net) : null }; }
+  const blob = new Blob([JSON.stringify({ app: "piano-ayden", ngay: homNay(), bai: ds, trang, tk: await layTK() })], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Piano Ayden sao luu ${homNay()}.json`; a.click();
+  toast("Đã tạo file sao lưu. Trên iPad: chọn Lưu vào Tệp.", 5000);
+};
+$("phuchoi").onclick = () => $("chonsaoluu").click();
+$("chonsaoluu").onchange = async () => {
+  const f = $("chonsaoluu").files[0]; $("chonsaoluu").value = ""; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text()); if (d.app !== "piano-ayden") throw new Error("không phải file sao lưu của app");
+    for (const [k, v] of Object.entries(d.trang)) await DB.put("trang", { goc: await (await fetch(v.goc)).blob(), net: v.net ? await (await fetch(v.net)).blob() : null }, k);
+    for (const b of d.bai) await DB.put("bai", b);
+    if (d.tk) await DB.put("kv", d.tk, "tk");
+    toast(`Đã mở lại ${d.bai.length} bài.`); veNha();
+  } catch (e) { toast("Lỗi: " + e.message, 5000); }
+};
+
+$("sapxep").onchange = veNha;
+veNha();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
