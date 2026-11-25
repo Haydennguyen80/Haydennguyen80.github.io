@@ -130,6 +130,7 @@ input[type=range]{width:130px}
   <label>Tên bài</label><input id="cten" style="width:100%">
   <label>Nguồn</label><select id="cnguon"><option>Cô gửi</option><option>Trên mạng</option><option>Khác</option></select>
   <label>Nhịp</label><select id="cnhip"><option value="2">2/4</option><option value="3">3/4</option><option value="4">4/4</option><option value="6">6/8</option></select>
+  <label><input type="checkbox" id="clayda"> Bài có ô lấy đà ở đầu (đánh số ô như trên sheet, ô đầu là 0)</label>
   <label><input type="checkbox" id="cthuoc"> 🎉 Bé đã thuộc bài này</label>
   <div class="hang" style="margin-top:12px">
     <button class="phu nho" id="cdoan">🔍 Tự đoán lại ô nhịp</button>
@@ -444,7 +445,7 @@ function veLop() {
       if (o.ti !== ti) return;
       const e = document.createElement("div"); e.className = "o"; e.dataset.n = n;
       e.style.left = px(o.he.xs[o.k] + 2); e.style.width = px(o.he.xs[o.k + 1] - o.he.xs[o.k] - 4); e.style.top = py(o.he.top); e.style.height = py(o.he.bot - o.he.top);
-      e.innerHTML = `<span class="n">${n + 1}</span>`;
+      e.innerHTML = `<span class="n">${soO(n)}</span>`;
       e.onclick = () => chamO(n);
       lop.appendChild(e);
     });
@@ -461,11 +462,12 @@ function toMau() {
     e.classList.toggle("lap", lapA >= 0 && n >= lapA && n <= (lapB >= 0 ? lapB : lapA));
   });
 }
+const soO = n => n + (B && B.layDa ? 0 : 1);
 async function luu() { await DB.put("bai", B); }
 async function chamO(n) {
   if (chonLap) {
-    if (chonLap === 1) { lapA = n; lapB = -1; chonLap = 2; $("trangthai").textContent = `Lặp từ ô ${n + 1}. Chạm ô CUỐI của đoạn lặp.`; }
-    else { lapB = Math.max(n, lapA); lapA = Math.min(n, lapA); chonLap = 0; $("lap").classList.add("bat"); $("trangthai").textContent = `Lặp ô ${lapA + 1} → ${lapB + 1}. Bấm ▶ để tập. Bấm 🔁 lần nữa để bỏ lặp.`; }
+    if (chonLap === 1) { lapA = n; lapB = -1; chonLap = 2; $("trangthai").textContent = `Lặp từ ô ${soO(n)}. Chạm ô CUỐI của đoạn lặp.`; }
+    else { lapB = Math.max(n, lapA); lapA = Math.min(n, lapA); chonLap = 0; $("lap").classList.add("bat"); $("trangthai").textContent = `Lặp ô ${soO(lapA)} → ${soO(lapB)}. Bấm ▶ để tập. Bấm 🔁 lần nữa để bỏ lặp.`; }
     toMau(); return;
   }
   if (dangChoi) return;
@@ -576,9 +578,9 @@ function dung() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) dung(); });
 
 /* ============ Cài đặt bài ============ */
-$("caidat").onclick = () => { dung(); $("cten").value = B.ten; $("cnguon").value = B.nguon; $("cnhip").value = B.nhip; $("cthuoc").checked = !!B.thuoc; $("hopcai").classList.remove("an"); };
+$("caidat").onclick = () => { dung(); $("cten").value = B.ten; $("cnguon").value = B.nguon; $("cnhip").value = B.nhip; $("cthuoc").checked = !!B.thuoc; $("clayda").checked = !!B.layDa; $("hopcai").classList.remove("an"); };
 $("chuy").onclick = () => $("hopcai").classList.add("an");
-$("cok").onclick = async () => { B.ten = $("cten").value.trim() || B.ten; B.nguon = $("cnguon").value; B.nhip = +$("cnhip").value; const vuaThuoc = !B.thuoc && $("cthuoc").checked; B.thuoc = $("cthuoc").checked; await luu(); $("tieude").textContent = B.ten; $("hopcai").classList.add("an"); if (vuaThuoc) toast("🎉🐶 Poppy vỗ tay! Ayden đã thuộc bài " + B.ten, 4000); };
+$("cok").onclick = async () => { B.ten = $("cten").value.trim() || B.ten; B.nguon = $("cnguon").value; B.nhip = +$("cnhip").value; const vuaThuoc = !B.thuoc && $("cthuoc").checked; B.thuoc = $("cthuoc").checked; B.layDa = $("clayda").checked; await luu(); veLop(); $("tieude").textContent = B.ten; $("hopcai").classList.add("an"); if (vuaThuoc) toast("🎉🐶 Poppy vỗ tay! Ayden đã thuộc bài " + B.ten, 4000); };
 $("cxoaxanh").onclick = async () => { B.xong = []; await luu(); toMau(); toast("Đã xóa tô xanh."); };
 async function doanLai(net) {
   for (let i = 0; i < B.soTrang; i++) {
