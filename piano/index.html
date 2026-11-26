@@ -110,6 +110,8 @@ input[type=range]{width:130px}
     <button class="phu nho" id="lap">🔁 Lặp</button>
     <button class="phu nho" id="tangdan" title="Mỗi lần lặp xong tăng 5% tốc độ">📈 Tăng dần</button>
     <button class="phu nho" id="vebut">✏️ Vẽ</button>
+    <button class="phu nho an" id="hoantac">↶ Hoàn tác</button>
+    <button class="phu nho an" id="xoave">🧹 Xóa nét vẽ</button>
     <button class="phu nho" id="suao">✂️ Sửa ô</button>
   </div>
 </div>
@@ -138,6 +140,12 @@ input[type=range]{width:130px}
     <button class="phu nho" id="cxoaxanh">🧽 Xóa tô xanh</button>
   </div>
   <div class="hang" style="margin-top:16px"><button id="cok">Lưu</button><button class="phu" id="chuy">Đóng</button><span style="flex:1"></span><button class="nho" style="background:var(--do)" id="cxoa">Xóa bài</button></div>
+</div></div>
+
+<div id="hopxoave" class="hop an"><div class="the" style="text-align:center">
+  <h2 style="margin-top:0">🧹 Xóa hết nét vẽ của trang này?</h2>
+  <p style="color:#555">Chỉ xóa nét vẽ, bản nhạc vẫn còn nguyên.</p>
+  <div class="hang" style="justify-content:center"><button id="xvco" style="background:var(--do)">Xóa</button><button class="phu" id="xvkhong">Không</button></div>
 </div></div>
 
 <div id="dem" class="dem an"></div>
@@ -533,15 +541,40 @@ async function chamO(n) {
 function datCheDo(m) {
   cheDo = m;
   $("suao").classList.toggle("bat", m === "sua"); $("vebut").classList.toggle("bat", m === "ve");
+  $("xoave").classList.toggle("an", m !== "ve"); $("hoantac").classList.toggle("an", m !== "ve"); capNhatHoanTac();
   document.querySelectorAll("canvas.ve").forEach(c => c.classList.toggle("mo", m === "ve"));
   $("goiy").classList.toggle("an", m !== "sua");
   $("goiy").innerHTML = "✂️ <b>Sửa ô nhịp</b> (người lớn làm): chạm <b style='color:#e5484d'>vạch đỏ</b> để xóa vạch sai, chạm chỗ trống trong khung để thêm vạch. Xong bấm ✂️ lần nữa.";
-  $("trangthai").textContent = m === "ve" ? "✏️ Đang vẽ ghi chú: vẽ bằng ngón tay hoặc bút. Bấm ✏️ lần nữa để thôi vẽ. Bấm giữ ✏️ để xóa nét vẽ trang đang xem." : m === "sua" ? "Đang sửa ô nhịp." : "Chạm ô nhịp để tô xanh khi đánh xong. Bấm ▶ để vạch chạy theo nhịp.";
+  $("trangthai").textContent = m === "ve" ? "✏️ Đang vẽ: vẽ bằng ngón tay hoặc bút. ↶ xóa nét vừa vẽ, 🧹 xóa hết nét vẽ của trang. Bấm ✏️ lần nữa để thôi vẽ." : m === "sua" ? "Đang sửa ô nhịp." : "Chạm ô nhịp để tô xanh khi đánh xong. Bấm ▶ để vạch chạy theo nhịp.";
   veLop();
 }
 $("suao").onclick = () => { dung(); datCheDo(cheDo === "sua" ? "tap" : "sua"); };
 $("vebut").onclick = () => { dung(); datCheDo(cheDo === "ve" ? "tap" : "ve"); };
-let giuVe; $("vebut").onpointerdown = () => { giuVe = setTimeout(() => { const d = trangDangXem(); if (d && confirm("Xóa hết nét vẽ ở trang này?")) { B.trang[+d.dataset.i].ve = []; luu(); veNet(d); } }, 900); };
+// Xóa nét vẽ: nút 🧹 (hỏi Xóa / Không), vẫn giữ cách bấm giữ ✏️ như cũ
+let trangXoa = null;
+function hoiXoaVe() { const d = trangDangXem(); if (!d) return; trangXoa = d; $("hopxoave").classList.remove("an"); }
+$("xoave").onclick = hoiXoaVe;
+$("xvkhong").onclick = () => { trangXoa = null; $("hopxoave").classList.add("an"); };
+$("xvco").onclick = () => {
+  $("hopxoave").classList.add("an");
+  const d = trangXoa; trangXoa = null; if (!d || !B) return;
+  const i = +d.dataset.i; B.trang[i].ve = []; lichSuVe = lichSuVe.filter(h => !(h.id === B.id && h.i === i));
+  luu(); veNet(d); capNhatHoanTac(); toast("Đã xóa nét vẽ của trang này.");
+};
+// Hoàn tác: mỗi lần bấm xóa 1 nét vừa vẽ (theo thứ tự đã vẽ)
+let lichSuVe = [];
+function capNhatHoanTac() { $("hoantac").disabled = !B || !lichSuVe.some(h => h.id === B.id); }
+$("hoantac").onclick = () => {
+  if (!B) return;
+  for (let k = lichSuVe.length - 1; k >= 0; k--) {
+    const h = lichSuVe[k]; if (h.id !== B.id) continue;
+    lichSuVe.splice(k, 1);
+    const t = B.trang[h.i]; if (t && t.ve.length) { t.ve.pop(); luu(); const d = document.querySelector(`.trang[data-i="${h.i}"]`); d && veNet(d); }
+    break;
+  }
+  capNhatHoanTac();
+};
+let giuVe; $("vebut").onpointerdown = () => { giuVe = setTimeout(hoiXoaVe, 900); };
 $("vebut").onpointerup = $("vebut").onpointerleave = () => clearTimeout(giuVe);
 $("ve").onclick = () => { dung(); urls.forEach(u => URL.revokeObjectURL(u)); urls = []; B = null; $("tap").classList.add("an"); $("dk").classList.add("an"); $("nha").classList.remove("an"); $("ve").classList.add("an"); $("caidat").classList.add("an"); $("tieude").textContent = "🎹 Piano của Ayden"; veNha(); };
 function trangDangXem() { let best = null, bd = 1e9; document.querySelectorAll(".trang").forEach(d => { const r = d.getBoundingClientRect(), dd = Math.abs(r.top + r.height / 2 - innerHeight / 2); if (dd < bd) { bd = dd; best = d; } }); return best; }
@@ -557,7 +590,7 @@ function veNet(d) {
     c.onpointerdown = e => { if (cheDo !== "ve") return; c.setPointerCapture(e.pointerId); const r2 = c.getBoundingClientRect(); net = { m: "#d93025", w: 0.004, p: [[(e.clientX - r2.left) / r2.width, (e.clientY - r2.top) / r2.height]] }; };
     c.onpointermove = e => { if (!net) return; const r2 = c.getBoundingClientRect(), p = [(e.clientX - r2.left) / r2.width, (e.clientY - r2.top) / r2.height], q = net.p[net.p.length - 1], x2 = c.getContext("2d");
       x2.strokeStyle = net.m; x2.lineWidth = net.w * c.width; x2.lineCap = "round"; x2.beginPath(); x2.moveTo(q[0] * c.width, q[1] * c.height); x2.lineTo(p[0] * c.width, p[1] * c.height); x2.stroke(); net.p.push(p); };
-    c.onpointerup = c.onpointercancel = () => { if (net && net.p.length > 1) { B.trang[+d.dataset.i].ve.push(net); luu(); } net = null; };
+    c.onpointerup = c.onpointercancel = () => { if (net && net.p.length > 1) { B.trang[+d.dataset.i].ve.push(net); lichSuVe.push({ id: B.id, i: +d.dataset.i }); luu(); capNhatHoanTac(); } net = null; };
   }
 }
 addEventListener("resize", () => { if (B) document.querySelectorAll(".trang").forEach(veNet); });
