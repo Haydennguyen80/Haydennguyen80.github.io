@@ -68,6 +68,7 @@ input[type=range]{width:130px}
 #hopo{position:fixed;z-index:45;background:#fff;border:2px solid var(--xanh);border-radius:16px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:calc(100vw - 16px)}
 #hopo button{min-height:52px;font-size:18px}
 .o{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.chuaco{opacity:.45}
 .thu{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--vien);border-radius:14px;background:#fff;margin-bottom:8px}
 .thu .ten{flex:1;min-width:0}
 .thu .ten b{display:block;font-size:18px}
@@ -116,6 +117,7 @@ input[type=range]{width:130px}
   <div class="tt" id="trangthai">Chạm ô nhịp để tô xanh khi đánh xong. Bấm ▶ để vạch chạy theo nhịp.</div>
   <div class="hang">
     <button id="choi">▶</button>
+    <button id="nghemau" class="chuaco" style="background:var(--xanhla,#34a853)">🎹 Nghe mẫu</button>
     <div class="nhip"><button class="phu nho" id="bpmtru">−</button><b id="bpm">80</b><button class="phu nho" id="bpmcong">+</button></div>
     <label style="font-size:14px">Tốc độ <b id="tocdo">100%</b><br><input type="range" id="tdo" min="50" max="100" step="5" value="100"></label>
     <button class="phu nho" id="go">🥁 Gõ nhịp</button>
@@ -148,6 +150,7 @@ input[type=range]{width:130px}
   <label>Nhịp</label><select id="cnhip"><option value="2">2/4</option><option value="3">3/4</option><option value="4">4/4</option><option value="6">6/8</option></select>
   <label><input type="checkbox" id="clayda"> Bài có ô lấy đà ở đầu (đánh số ô như trên sheet, ô đầu là 0)</label>
   <label><input type="checkbox" id="cthuoc"> 🎉 Bé đã thuộc bài này</label>
+  <label>File nốt (cho 🎹 Nghe mẫu và tempo chuẩn)</label><select id="cfilenot" style="width:100%"><option value="">Tự tìm theo tên bài</option></select>
   <div class="hang" style="margin-top:12px">
     <button class="phu nho" id="cdoan">🔍 Tự đoán lại ô nhịp</button>
     <button class="phu nho" id="cnet">✨ Bật/tắt làm nét</button>
@@ -183,7 +186,7 @@ input[type=range]{width:130px}
 
 <div id="hopo" class="an">
   <div id="hopotieude" style="font-weight:700;margin-bottom:6px">Ô 1</div>
-  <div class="hang"><button id="ochoitu">▶ Chơi từ đây</button><button id="otap" style="background:var(--xanhla,#34a853)">🔁 Tập đoạn này</button><button class="phu nho" id="ohuy">✕</button></div>
+  <div class="hang"><button id="ochoitu">▶ Chơi từ đây</button><button id="onghe" class="an" style="background:var(--xanhla,#34a853)">🎹 Nghe từ đây</button><button id="otap" style="background:var(--xanhla,#34a853)">🔁 Tập đoạn này</button><button class="phu nho" id="ohuy">✕</button></div>
 </div>
 
 <div id="dem" class="dem an"></div>
@@ -523,12 +526,15 @@ async function moBai(id, suaNgay) {
     box.appendChild(d);
     d.querySelector("img").onload = () => { if (B) veNet(d); };
   }
+  banNot = null; capNhatNutMau();
   datCheDo(suaNgay ? "sua" : "tap");
   window.scrollTo(0, 0);
+  napNot();
 }
 function lapDsO() {
   dsO = [];
   B.trang.forEach((t, ti) => t.o.forEach((he, hi) => { for (let k = 0; k + 1 < he.xs.length; k++) dsO.push({ ti, hi, k, he, t }); }));
+  if (typeof banNot !== "undefined") lapBanNot();
 }
 function veLop() {
   lapDsO();
@@ -589,7 +595,7 @@ function datCheDo(m) {
   document.querySelectorAll("canvas.ve").forEach(c => c.classList.toggle("mo", m === "ve"));
   $("goiy").classList.toggle("an", m !== "sua");
   $("goiy").innerHTML = "✂️ <b>Sửa ô nhịp</b> (người lớn làm): chạm <b style='color:#e5484d'>vạch đỏ</b> để xóa vạch sai, chạm chỗ trống trong khung để thêm vạch. Xong bấm ✂️ lần nữa.";
-  $("trangthai").textContent = m === "ve" ? "✏️ Đang vẽ: vẽ bằng ngón tay hoặc bút. ↶ xóa nét vừa vẽ, 🧹 xóa hết nét vẽ của trang. Bấm ✏️ lần nữa để thôi vẽ." : m === "sua" ? "Đang sửa ô nhịp." : "Chạm ô nhịp để tô xanh khi đánh xong. Bấm ▶ để vạch chạy theo nhịp.";
+  $("trangthai").textContent = m === "ve" ? "✏️ Đang vẽ: vẽ bằng ngón tay hoặc bút. ↶ xóa nét vừa vẽ, 🧹 xóa hết nét vẽ của trang. Bấm ✏️ lần nữa để thôi vẽ." : m === "sua" ? "Đang sửa ô nhịp." : chuTap();
   veLop();
 }
 $("suao").onclick = () => { dung(); datCheDo(cheDo === "sua" ? "tap" : "sua"); };
@@ -650,9 +656,9 @@ function tic(t, manh) {
 }
 const tocDo = () => +$("tdo").value / 100;
 const giayMoiPhach = () => 60 / (B.bpm * tocDo()) * (B.nhip === 6 ? 0.5 : 1);
-$("tdo").oninput = () => { $("tocdo").textContent = $("tdo").value + "%"; };
-$("bpmtru").onclick = () => { B.bpm = Math.max(30, B.bpm - 5); $("bpm").textContent = B.bpm; luu(); };
-$("bpmcong").onclick = () => { B.bpm = Math.min(200, B.bpm + 5); $("bpm").textContent = B.bpm; luu(); };
+$("tdo").oninput = () => { $("tocdo").textContent = $("tdo").value + "%"; if (B && cheDo === "tap") $("trangthai").textContent = chuTap(dangChoi); };
+$("bpmtru").onclick = () => { B.bpm = Math.max(30, B.bpm - 5); $("bpm").textContent = B.bpm; luu(); if (cheDo === "tap") $("trangthai").textContent = chuTap(dangChoi); };
+$("bpmcong").onclick = () => { B.bpm = Math.min(200, B.bpm + 5); $("bpm").textContent = B.bpm; luu(); if (cheDo === "tap") $("trangthai").textContent = chuTap(dangChoi); };
 $("go").onclick = () => { goNhip = !goNhip; $("go").classList.toggle("bat", goNhip); };
 $("go").classList.add("bat");
 $("lap").onclick = () => {
@@ -661,10 +667,14 @@ $("lap").onclick = () => {
   dung(); chonLap = 1; $("lap").classList.add("bat"); $("trangthai").textContent = "🔁 Chạm ô ĐẦU của đoạn muốn lặp.";
 };
 $("choi").onclick = () => dangChoi ? dung() : choi();
-function choi() {
+$("nghemau").onclick = () => { if (dangChoi) { dung(); return; } if (!banNot) { toast("Chưa có nốt của bài này, nhờ Bi làm nhé.", 5000); return; } choi(true); };
+async function choi(mau = false) {
   if (!dsO.length) { toast("Bài chưa có ô nhịp. Bấm ✂️ Sửa ô để thêm."); return; }
   if (cheDo !== "tap") datCheDo("tap");
-  amThanh(); dangChoi = true; $("choi").textContent = "⏸";
+  amThanh();
+  if (mau) { try { await napMau(); } catch (e) { console.error(e); toast("Chưa tải được tiếng đàn. Kiểm tra mạng rồi thử lại.", 6000); return; } }
+  if (dangChoi) return;
+  cheDoMau = mau && !!banNot; dangChoi = true; $("choi").textContent = "⏸"; $("trangthai").textContent = chuTap(true);
   const tu = chonDiemChoi(), n = B.nhip === 6 ? 6 : B.nhip, p = giayMoiPhach(), dem = $("dem");
   batDauTu = -1;
   dem.classList.remove("an");
@@ -686,6 +696,8 @@ function chayO(i, tAm) {
   viTri = i; toMau();
   const o = dsO[i], n = B.nhip === 6 ? 6 : B.nhip, p = giayMoiPhach(), L = n * p;
   for (let k = 0; k < n; k++) tic(tAm + k * p, k === 0);
+  const on = cheDoMau ? oNotCho(i) : null;
+  if (on) { const q = giayMoiNotDen(); for (const nt of on.not) danhNot(nt.m, tAm + nt.p * q, nt.d * q, nt.tay); }
   const el = document.querySelector(`.o[data-n="${i}"]`);
   if (el) { const r = el.getBoundingClientRect(); if (r.top < 70 || r.bottom > innerHeight - 160) el.scrollIntoView({ block: "center", behavior: "smooth" }); }
   if (vachEl) vachEl.remove();
@@ -727,12 +739,93 @@ $("ochoitu").onclick = () => {
 };
 $("otap").onclick = () => { dongHopO(); dung(); lapA = oGiu; lapB = -1; chonLap = 2; $("lap").classList.add("bat"); $("trangthai").textContent = `🔁 Tập từ ô ${soO(oGiu)}. Chạm ô CUỐI của đoạn muốn tập.`; toMau(); };
 $("ohuy").onclick = dongHopO;
+$("onghe").onclick = () => {
+  dongHopO(); const n = oGiu;
+  if (lapA >= 0 && (n < lapA || n > lapB)) { lapA = lapB = -1; B.lap = null; luu(); $("lap").classList.remove("bat"); }
+  batDauTu = n; choi(true);
+};
+
+/* ============ Nốt nhạc, tempo chuẩn, máy đánh mẫu ============ */
+let dsNot = null, banNot = null, cheDoMau = false, mauAm = null, mauDangTai = null;
+const dangNguon = new Set();
+const giayMoiNotDen = () => 60 / (B.bpm * tocDo());
+const slugTen = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+async function layDanhSach() {
+  if (dsNot) return dsNot;
+  try { const r = await fetch("not/danh-sach.json", { cache: "no-cache" }); if (r.ok) dsNot = await r.json(); } catch (e) {}
+  return dsNot || [];
+}
+async function timFileNot(b) {
+  const ds = await layDanhSach(), s = b.fileNot || slugTen(b.ten);
+  if (!ds.some(x => x.slug === s)) return null;
+  try { const r = await fetch("not/" + s + ".json"); return r.ok ? await r.json() : null; } catch (e) { return null; }
+}
+function chuTap(dangChay) {
+  if (!B) return "";
+  const tt = dangChay ? (cheDoMau ? "🎹 Máy đang đánh mẫu. Bấm ⏸ để dừng." : "Vạch đang chạy. Bấm ⏸ để dừng.") : "Chạm ô để tô xanh. Bấm giữ ô để chơi từ đó. ▶ vạch chạy, 🎹 nghe máy đánh.";
+  const tp = B.bpmChuan ? ` · Tempo chuẩn ${B.bpmChuan}, bé đang tập ${Math.round(B.bpm * tocDo() / B.bpmChuan * 100)}%` : " · Chưa có tempo chuẩn, nhờ Bi.";
+  return tt + tp;
+}
+// Ghép ô của app với ô trong file nốt theo từng dòng nhạc (trang, dòng), để lệch ở một dòng không làm trôi cả bài.
+// Trong một dòng: ghép lần lượt; app có nhiều ô hơn thì ô thừa im lặng, file có nhiều hơn thì bỏ ô cuối dòng.
+let banNotTheoO = [];
+function lapBanNot() {
+  banNotTheoO = [];
+  if (!banNot) return;
+  if (!banNot.o.length || banNot.o[0].tr === undefined) { banNotTheoO = dsO.map((_, i) => banNot.o[i] || null); return; }
+  const nhom = new Map();
+  for (const x of banNot.o) { const k = x.tr + ":" + x.he; if (!nhom.has(k)) nhom.set(k, []); nhom.get(k).push(x); }
+  const dem = new Map();
+  dsO.forEach((o, i) => { const k = (o.ti + 1) + ":" + o.hi, c = dem.get(k) || 0; dem.set(k, c + 1); banNotTheoO[i] = (nhom.get(k) || [])[c] || null; });
+}
+const oNotCho = i => banNotTheoO[i] || null;
+function capNhatNutMau() { $("nghemau").classList.toggle("chuaco", !banNot); $("onghe").classList.toggle("an", !banNot); }
+async function napNot() {
+  const b = B; if (!b) return;
+  const j = await timFileNot(b);
+  if (b !== B) return;
+  banNot = j; lapBanNot(); capNhatNutMau();
+  if (j && !B.bpmChuan) {
+    B.bpm = B.bpmChuan = j.bpm; B.fileNot = j.slug;
+    B.nhip = j.nhip[0] === 6 && j.nhip[1] === 8 ? 6 : j.nhip[0];
+    await luu(); $("bpm").textContent = B.bpm;
+    toast(`Đã lấy tempo chuẩn ${j.bpm} và nốt nhạc của bài này.`, 4000);
+  }
+  if (j && dsO.length && j.o.length !== dsO.length && !B.daBaoLechO) { B.daBaoLechO = true; luu(); toast(`Số ô nhịp lệch ${Math.abs(j.o.length - dsO.length)} ô so với nốt nhạc. Người lớn kiểm tra ✂️ Sửa ô nhé.`, 7000); }
+  if (cheDo === "tap" && !dangChoi) $("trangthai").textContent = chuTap();
+}
+// Tiếng piano Salamander (CC-BY 3.0): mẫu C, D#, F#, A mỗi quãng tám 1–6 và C7
+const TEN_MAU = []; for (let o = 1; o <= 6; o++) for (const [t, d] of [["C", 0], ["Ds", 3], ["Fs", 6], ["A", 9]]) TEN_MAU.push([t + o, 12 * (o + 1) + d]); TEN_MAU.push(["C7", 96]);
+function napMau() {
+  if (mauAm) return Promise.resolve(mauAm);
+  if (mauDangTai) return mauDangTai;
+  toast("Đang tải tiếng đàn…", 20000);
+  const a = amThanh();
+  mauDangTai = Promise.all(TEN_MAU.map(async ([ten, m]) => {
+    const r = await fetch("am/" + ten + ".mp3"); if (!r.ok) throw new Error("am " + ten);
+    const buf = await r.arrayBuffer();
+    return [m, await new Promise((ok, loi) => a.decodeAudioData(buf, ok, loi))];
+  })).then(ds => { mauAm = ds; toast("Sẵn sàng!", 800); return ds; }).finally(() => { mauDangTai = null; });
+  return mauDangTai;
+}
+function danhNot(m, t, d, tay) {
+  if (!mauAm || !ac) return;
+  let best = mauAm[0]; for (const x of mauAm) if (Math.abs(x[0] - m) < Math.abs(best[0] - m)) best = x;
+  const s = ac.createBufferSource(), g = ac.createGain();
+  s.buffer = best[1]; s.playbackRate.value = Math.pow(2, (m - best[0]) / 12);
+  const to = tay === "T" ? 0.45 : 0.7;
+  g.gain.setValueAtTime(to, t); g.gain.setTargetAtTime(0, t + Math.max(0.05, d), 0.12);
+  s.connect(g).connect(ac.destination); s.start(t); s.stop(t + d + 1);
+  dangNguon.add(s); s.onended = () => dangNguon.delete(s);
+}
 let tangDan = false;
 $("tangdan").onclick = () => { tangDan = !tangDan; $("tangdan").classList.toggle("bat", tangDan); toast(tangDan ? "Mỗi lần lặp xong sẽ nhanh thêm 5%, tới 100%." : "Tắt tăng dần."); };
 function dung() {
   if (!dangChoi) return;
   dangChoi = false; clearTimeout(hen); clearInterval(hen2); cancelAnimationFrame(raf); $("dem").classList.add("an");
   if (amThu) { amThu.pause(); URL.revokeObjectURL(amThu.src); amThu = null; goNhip = goNhipCu; }
+  cheDoMau = false; for (const s of dangNguon) { try { s.stop(); } catch (e) {} } dangNguon.clear();
+  if (cheDo === "tap") $("trangthai").textContent = chuTap();
   $("choi").textContent = "▶"; if (vachEl) { vachEl.remove(); vachEl = null; }
   const s = Math.round((performance.now() - batDau) / 1000); if (batDau && s > 0) congGiay(Math.min(s, 3600)); batDau = 0;
   toMau();
@@ -800,9 +893,11 @@ $("thube").onclick = async () => {
 };
 
 /* ============ Cài đặt bài ============ */
-$("caidat").onclick = () => { dung(); $("cten").value = B.ten; $("cnguon").value = B.nguon; $("cnhip").value = B.nhip; $("cthuoc").checked = !!B.thuoc; $("clayda").checked = !!B.layDa; $("hopcai").classList.remove("an"); };
+$("caidat").onclick = () => { dung(); $("cten").value = B.ten; $("cnguon").value = B.nguon; $("cnhip").value = B.nhip; $("cthuoc").checked = !!B.thuoc; $("clayda").checked = !!B.layDa; $("hopcai").classList.remove("an");
+  layDanhSach().then(ds => { $("cfilenot").innerHTML = `<option value="">Tự tìm theo tên bài</option>` + ds.map(x => `<option value="${esc(x.slug)}">${esc(x.ten)} (tempo ${x.bpm})</option>`).join(""); $("cfilenot").value = B.fileNot && ds.some(x => x.slug === B.fileNot) ? B.fileNot : ""; }); };
 $("chuy").onclick = () => $("hopcai").classList.add("an");
-$("cok").onclick = async () => { B.ten = $("cten").value.trim() || B.ten; B.nguon = $("cnguon").value; B.nhip = +$("cnhip").value; const vuaThuoc = !B.thuoc && $("cthuoc").checked; B.thuoc = $("cthuoc").checked; B.layDa = $("clayda").checked; await luu(); veLop(); $("tieude").textContent = B.ten; $("hopcai").classList.add("an"); if (vuaThuoc) toast("🎉🐶 Poppy vỗ tay! Ayden đã thuộc bài " + B.ten, 4000); };
+$("cok").onclick = async () => { B.ten = $("cten").value.trim() || B.ten; B.nguon = $("cnguon").value; B.nhip = +$("cnhip").value; const vuaThuoc = !B.thuoc && $("cthuoc").checked; B.thuoc = $("cthuoc").checked; B.layDa = $("clayda").checked;
+  const fn = $("cfilenot").value || undefined; if (fn !== B.fileNot) { B.fileNot = fn; delete B.bpmChuan; delete B.daBaoLechO; await luu(); napNot(); } await luu(); veLop(); $("tieude").textContent = B.ten; $("hopcai").classList.add("an"); if (vuaThuoc) toast("🎉🐶 Poppy vỗ tay! Ayden đã thuộc bài " + B.ten, 4000); };
 /* ============ Xếp thứ tự trang ============ */
 let thuTu = [];
 function veXep() {
