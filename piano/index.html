@@ -65,6 +65,9 @@ input[type=range]{width:130px}
 .hop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .hop .the{width:100%;max-width:460px;max-height:90vh;overflow:auto}
 .hop label{display:block;margin:10px 0 4px;font-weight:600}
+#hopo{position:fixed;z-index:45;background:#fff;border:2px solid var(--xanh);border-radius:16px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:calc(100vw - 16px)}
+#hopo button{min-height:52px;font-size:18px}
+.o{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .xep{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--vien);border-radius:14px;background:#fff;margin-bottom:8px}
 .xep img{width:130px;height:160px;object-fit:cover;object-position:top;border:1px solid var(--vien);border-radius:8px;background:#fff}
 .xep b{flex:1;font-size:20px}
@@ -159,6 +162,11 @@ input[type=range]{width:130px}
   <div id="dsxep"></div>
   <div class="hang" style="margin-top:12px"><button id="xepok">Lưu</button><button class="phu" id="xephuy">Hủy</button></div>
 </div></div>
+
+<div id="hopo" class="an">
+  <div id="hopotieude" style="font-weight:700;margin-bottom:6px">Ô 1</div>
+  <div class="hang"><button id="ochoitu">▶ Chơi từ đây</button><button id="otap" style="background:var(--xanhla,#34a853)">🔁 Tập đoạn này</button><button class="phu nho" id="ohuy">✕</button></div>
+</div>
 
 <div id="dem" class="dem an"></div>
 <div id="toast" class="an"></div>
@@ -483,7 +491,8 @@ async function moBai(id, suaNgay) {
   urls.forEach(u => URL.revokeObjectURL(u)); urls = [];
   $("nha").classList.add("an"); $("tap").classList.remove("an"); $("dk").classList.remove("an");
   $("ve").classList.remove("an"); $("caidat").classList.remove("an"); $("tieude").textContent = B.ten;
-  $("bpm").textContent = B.bpm; viTri = -1; lapA = lapB = -1;
+  $("bpm").textContent = B.bpm; viTri = -1; batDauTu = -1; chonLap = 0;
+  lapA = B.lap ? B.lap.a : -1; lapB = B.lap ? B.lap.b : -1; $("lap").classList.toggle("bat", lapA >= 0);
   const box = $("trangs"); box.innerHTML = "";
   for (let i = 0; i < B.soTrang; i++) {
     const t = await DB.get("trang", B.id + ":" + i), blob = (B.lamNet && t.net) || t.goc, u = URL.createObjectURL(blob); urls.push(u);
@@ -522,7 +531,7 @@ function veLop() {
       const e = document.createElement("div"); e.className = "o"; e.dataset.n = n;
       e.style.left = px(o.he.xs[o.k] + 2); e.style.width = px(o.he.xs[o.k + 1] - o.he.xs[o.k] - 4); e.style.top = py(o.he.top); e.style.height = py(o.he.bot - o.he.top);
       e.innerHTML = `<span class="n">${soO(n)}</span>`;
-      e.onclick = () => chamO(n);
+      ganBamGiu(e, n);
       lop.appendChild(e);
     });
     veNet(d);
@@ -543,7 +552,7 @@ async function luu() { await DB.put("bai", B); }
 async function chamO(n) {
   if (chonLap) {
     if (chonLap === 1) { lapA = n; lapB = -1; chonLap = 2; $("trangthai").textContent = `Lặp từ ô ${soO(n)}. Chạm ô CUỐI của đoạn lặp.`; }
-    else { lapB = Math.max(n, lapA); lapA = Math.min(n, lapA); chonLap = 0; $("lap").classList.add("bat"); $("trangthai").textContent = `Lặp ô ${soO(lapA)} → ${soO(lapB)}. Bấm ▶ để tập. Bấm 🔁 lần nữa để bỏ lặp.`; }
+    else { lapB = Math.max(n, lapA); lapA = Math.min(n, lapA); chonLap = 0; B.lap = { a: lapA, b: lapB }; luu(); $("lap").classList.add("bat"); $("trangthai").textContent = `Tập đoạn ô ${soO(lapA)} → ${soO(lapB)}. Bấm ▶ để chơi. Chơi xong bấm ▶ lại để tập tiếp. Bấm 🔁 để bỏ đoạn.`; }
     toMau(); return;
   }
   if (dangChoi) return;
@@ -625,7 +634,7 @@ $("bpmcong").onclick = () => { B.bpm = Math.min(200, B.bpm + 5); $("bpm").textCo
 $("go").onclick = () => { goNhip = !goNhip; $("go").classList.toggle("bat", goNhip); };
 $("go").classList.add("bat");
 $("lap").onclick = () => {
-  if (lapA >= 0 || chonLap) { lapA = lapB = -1; chonLap = 0; $("lap").classList.remove("bat"); $("trangthai").textContent = "Đã bỏ lặp."; toMau(); return; }
+  if (lapA >= 0 || chonLap) { lapA = lapB = -1; chonLap = 0; if (B.lap) { B.lap = null; luu(); } $("lap").classList.remove("bat"); $("trangthai").textContent = "Đã bỏ đoạn tập, chơi cả bài."; toMau(); return; }
   if (cheDo !== "tap") datCheDo("tap");
   dung(); chonLap = 1; $("lap").classList.add("bat"); $("trangthai").textContent = "🔁 Chạm ô ĐẦU của đoạn muốn lặp.";
 };
@@ -634,7 +643,8 @@ function choi() {
   if (!dsO.length) { toast("Bài chưa có ô nhịp. Bấm ✂️ Sửa ô để thêm."); return; }
   if (cheDo !== "tap") datCheDo("tap");
   amThanh(); dangChoi = true; $("choi").textContent = "⏸";
-  const tu = lapA >= 0 ? lapA : 0, n = B.nhip === 6 ? 6 : B.nhip, p = giayMoiPhach(), dem = $("dem");
+  const tu = chonDiemChoi(), n = B.nhip === 6 ? 6 : B.nhip, p = giayMoiPhach(), dem = $("dem");
+  batDauTu = -1;
   dem.classList.remove("an");
   const t0 = ac.currentTime + 0.1;
   for (let k = 0; k < n; k++) tic(t0 + k * p, k === 0);
@@ -667,6 +677,34 @@ function chayO(i, tAm) {
   buoc();
   hen = setTimeout(() => chayO(i + 1, tAm + L), L * 1000);
 }
+/* ============ Bấm giữ ô nhịp: Chơi từ đây / Tập đoạn này ============ */
+let batDauTu = -1, vuaGiu = false, oGiu = -1;
+function chonDiemChoi() { if (batDauTu >= 0) return batDauTu; if (lapA >= 0) return lapA; return 0; }
+function ganBamGiu(e, n) {
+  let h = null, x0 = 0, y0 = 0;
+  e.onpointerdown = ev => { vuaGiu = false; if (cheDo !== "tap" || chonLap) return; x0 = ev.clientX; y0 = ev.clientY; clearTimeout(h); h = setTimeout(() => { h = null; vuaGiu = true; moHopO(e, n); }, 500); };
+  e.onpointermove = ev => { if (h && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) { clearTimeout(h); h = null; } };
+  e.onpointerup = e.onpointercancel = e.onpointerleave = () => { clearTimeout(h); h = null; };
+  e.oncontextmenu = ev => ev.preventDefault();
+  e.onclick = () => { if (vuaGiu) { vuaGiu = false; return; } chamO(n); };
+}
+function moHopO(e, n) {
+  dung(); oGiu = n; const r = e.getBoundingClientRect(), h = $("hopo");
+  $("hopotieude").textContent = "Ô " + soO(n);
+  h.classList.remove("an");
+  const w = h.offsetWidth, hh = h.offsetHeight;
+  h.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+  h.style.top = (r.bottom + 8 + hh < innerHeight - 150 ? r.bottom + 8 : Math.max(70, r.top - hh - 8)) + "px";
+}
+const dongHopO = () => $("hopo").classList.add("an");
+document.addEventListener("pointerdown", ev => { if (!$("hopo").classList.contains("an") && !$("hopo").contains(ev.target)) dongHopO(); }, true);
+$("ochoitu").onclick = () => {
+  dongHopO(); const n = oGiu;
+  if (lapA >= 0 && (n < lapA || n > lapB)) { lapA = lapB = -1; B.lap = null; luu(); $("lap").classList.remove("bat"); toast("Đã bỏ đoạn tập, chơi từ ô " + soO(n) + "."); }
+  batDauTu = n; choi();
+};
+$("otap").onclick = () => { dongHopO(); dung(); lapA = oGiu; lapB = -1; chonLap = 2; $("lap").classList.add("bat"); $("trangthai").textContent = `🔁 Tập từ ô ${soO(oGiu)}. Chạm ô CUỐI của đoạn muốn tập.`; toMau(); };
+$("ohuy").onclick = dongHopO;
 let tangDan = false;
 $("tangdan").onclick = () => { tangDan = !tangDan; $("tangdan").classList.toggle("bat", tangDan); toast(tangDan ? "Mỗi lần lặp xong sẽ nhanh thêm 5%, tới 100%." : "Tắt tăng dần."); };
 function dung() {
