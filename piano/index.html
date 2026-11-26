@@ -65,6 +65,10 @@ input[type=range]{width:130px}
 .hop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .hop .the{width:100%;max-width:460px;max-height:90vh;overflow:auto}
 .hop label{display:block;margin:10px 0 4px;font-weight:600}
+.xep{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--vien);border-radius:14px;background:#fff;margin-bottom:8px}
+.xep img{width:130px;height:160px;object-fit:cover;object-position:top;border:1px solid var(--vien);border-radius:8px;background:#fff}
+.xep b{flex:1;font-size:20px}
+.xep button{font-size:24px;min-width:56px;min-height:52px}
 .goiy{background:#fff7e3;border-radius:12px;padding:8px 12px;margin:8px auto;max-width:1100px;font-size:15px}
 .dem{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:120px;font-weight:800;color:var(--xanh);pointer-events:none;z-index:40;text-shadow:0 4px 20px #fff}
 #toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;z-index:60;font-size:16px;max-width:90vw}
@@ -113,6 +117,7 @@ input[type=range]{width:130px}
     <button class="phu nho an" id="hoantac">↶ Hoàn tác</button>
     <button class="phu nho an" id="xoave">🧹 Xóa nét vẽ</button>
     <button class="phu nho" id="suao">✂️ Sửa ô</button>
+    <button class="phu nho" id="xeptrang">📑 Xếp trang</button>
   </div>
 </div>
 
@@ -146,6 +151,13 @@ input[type=range]{width:130px}
   <h2 style="margin-top:0">🧹 Xóa hết nét vẽ của trang này?</h2>
   <p style="color:#555">Chỉ xóa nét vẽ, bản nhạc vẫn còn nguyên.</p>
   <div class="hang" style="justify-content:center"><button id="xvco" style="background:var(--do)">Xóa</button><button class="phu" id="xvkhong">Không</button></div>
+</div></div>
+
+<div id="hopxep" class="hop an"><div class="the">
+  <h2 style="margin-top:0">📑 Xếp thứ tự trang</h2>
+  <p style="color:#555;margin-top:0">Bấm ▲ để đưa trang lên trước, ▼ để đưa xuống sau.</p>
+  <div id="dsxep"></div>
+  <div class="hang" style="margin-top:12px"><button id="xepok">Lưu</button><button class="phu" id="xephuy">Hủy</button></div>
 </div></div>
 
 <div id="dem" class="dem an"></div>
@@ -427,7 +439,8 @@ const demO = b => b.trang.reduce((s, t) => s + t.o.reduce((a, he) => a + he.xs.l
 let fileCho = [];
 $("them").onclick = () => $("chonfile").click();
 $("chonfile").onchange = () => {
-  fileCho = [...$("chonfile").files]; $("chonfile").value = "";
+  // Xếp ảnh theo tên file (IMG_1001, IMG_1002…) để trang đúng thứ tự chụp; sai thì bấm 📑 Xếp trang
+  fileCho = [...$("chonfile").files].sort((a, b) => a.name.localeCompare(b.name, "vi", { numeric: true })); $("chonfile").value = "";
   if (!fileCho.length) return;
   $("tten").value = fileCho[0].name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
   $("tnet").checked = !fileCho.some(f => /pdf/i.test(f.type) || /\.pdf$/i.test(f.name));
@@ -669,7 +682,44 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) dung(
 $("caidat").onclick = () => { dung(); $("cten").value = B.ten; $("cnguon").value = B.nguon; $("cnhip").value = B.nhip; $("cthuoc").checked = !!B.thuoc; $("clayda").checked = !!B.layDa; $("hopcai").classList.remove("an"); };
 $("chuy").onclick = () => $("hopcai").classList.add("an");
 $("cok").onclick = async () => { B.ten = $("cten").value.trim() || B.ten; B.nguon = $("cnguon").value; B.nhip = +$("cnhip").value; const vuaThuoc = !B.thuoc && $("cthuoc").checked; B.thuoc = $("cthuoc").checked; B.layDa = $("clayda").checked; await luu(); veLop(); $("tieude").textContent = B.ten; $("hopcai").classList.add("an"); if (vuaThuoc) toast("🎉🐶 Poppy vỗ tay! Ayden đã thuộc bài " + B.ten, 4000); };
-$("cxoaxanh").onclick = async () => { B.xong = []; await luu(); toMau(); toast("Đã xóa tô xanh."); };
+/* ============ Xếp thứ tự trang ============ */
+let thuTu = [];
+function veXep() {
+  const anh = i => { const im = document.querySelector(`.trang[data-i="${i}"] img`); return im ? im.src : ""; };
+  $("dsxep").innerHTML = "";
+  thuTu.forEach((i, vt) => {
+    const e = document.createElement("div"); e.className = "xep";
+    e.innerHTML = `<img src="${anh(i)}" alt=""><b>Trang ${vt + 1}</b><button class="phu len" ${vt ? "" : "disabled"}>▲</button><button class="phu xuong" ${vt < thuTu.length - 1 ? "" : "disabled"}>▼</button>`;
+    e.querySelector(".len").onclick = () => { [thuTu[vt - 1], thuTu[vt]] = [thuTu[vt], thuTu[vt - 1]]; veXep(); };
+    e.querySelector(".xuong").onclick = () => { [thuTu[vt + 1], thuTu[vt]] = [thuTu[vt], thuTu[vt + 1]]; veXep(); };
+    $("dsxep").appendChild(e);
+  });
+}
+$("xeptrang").onclick = () => {
+  if (!B) return; dung(); if (cheDo !== "tap") datCheDo("tap");
+  if (B.soTrang < 2) { toast("Bài này chỉ có 1 trang."); return; }
+  thuTu = B.trang.map((_, i) => i); veXep(); $("hopxep").classList.remove("an");
+};
+$("xephuy").onclick = () => $("hopxep").classList.add("an");
+$("xepok").onclick = async () => {
+  $("hopxep").classList.add("an");
+  if (thuTu.every((v, i) => v === i)) return;
+  try {
+    $("xepok").disabled = true; toast("Đang xếp lại trang…", 60000);
+    // giữ ô đã tô xanh: nhớ theo (trang, hệ, ô) rồi đánh số lại
+    lapDsO(); const xanh = new Set(B.xong.map(n => dsO[n] && `${dsO[n].ti}:${dsO[n].hi}:${dsO[n].k}`).filter(Boolean));
+    const anh = []; for (const i of thuTu) anh.push(await DB.get("trang", B.id + ":" + i));
+    for (let m = 0; m < anh.length; m++) await DB.put("trang", anh[m], B.id + ":" + m);
+    B.trang = thuTu.map(i => B.trang[i]);
+    const moi = new Map(thuTu.map((cu, m) => [cu, m]));
+    const xanhMoi = new Set([...xanh].map(s => { const [ti, hi, k] = s.split(":"); return `${moi.get(+ti)}:${hi}:${k}`; }));
+    lapDsO(); B.xong = dsO.map((o, n) => xanhMoi.has(`${o.ti}:${o.hi}:${o.k}`) ? n : -1).filter(n => n >= 0);
+    lichSuVe = lichSuVe.filter(h => h.id !== B.id);
+    await luu(); await moBai(B.id); toast("Đã xếp lại thứ tự trang.");
+  } catch (e) { console.error(e); toast(loiDeHieu(e), 8000); }
+  $("xepok").disabled = false;
+};
+$("cxoaxanh").onclick =async () => { B.xong = []; await luu(); toMau(); toast("Đã xóa tô xanh."); };
 async function doanLai(net) {
   for (let i = 0; i < B.soTrang; i++) {
     toast(`Đang xử lý trang ${i + 1}/${B.soTrang}…`, 60000);
