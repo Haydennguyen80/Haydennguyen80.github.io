@@ -158,12 +158,20 @@ const DB = (() => {
         d.createObjectStore("trang");
         d.createObjectStore("kv");
       };
-      r.onsuccess = () => ok(r.result);
-      r.onerror = () => loi(r.error);
+      r.onsuccess = () => {
+        const d = r.result;
+        // Safari có thể đóng kết nối (trang xuống nền, thiếu bộ nhớ): bỏ kết nối cũ để lần sau mở lại
+        d.onclose = () => { if (dbp === p) dbp = null; };
+        d.onversionchange = () => { d.close(); if (dbp === p) dbp = null; };
+        ok(d);
+      };
+      r.onerror = () => { if (dbp === p) dbp = null; loi(r.error); };
+      r.onblocked = () => { if (dbp === p) dbp = null; loi(new Error("blocked")); };
     });
+    const p = dbp;
     return dbp;
   }
-  async function tx(store, mode, fn) {
+  async function tx1(store, mode, fn) {
     const d = await mo();
     return new Promise((ok, loi) => {
       const t = d.transaction(store, mode), s = t.objectStore(store);
@@ -171,7 +179,23 @@ const DB = (() => {
       Promise.resolve(fn(s)).then(v => { kq = v; });
       t.oncomplete = () => ok(kq);
       t.onerror = () => loi(t.error);
+      t.onabort = () => loi(t.error || new Error("abort"));
     });
+  }
+  // Kết nối đã đóng thì mở lại rồi thử lại 1 lần
+  async function tx(store, mode, fn) {
+    try { return await tx1(store, mode, fn); }
+    catch (e) {
+      const ten = (e && e.name) || "", tin = (e && e.message) || "";
+      if (ten === "QuotaExceededError") throw e;
+      if (ten === "InvalidStateError" || /closing|closed|lost|abort|blocked/i.test(tin) || ten === "UnknownError" || ten === "AbortError") {
+        try { const d = await dbp; d && d.close(); } catch (x) {}
+        dbp = null;
+        await new Promise(r => setTimeout(r, 300));
+        return await tx1(store, mode, fn);
+      }
+      throw e;
+    }
   }
   const req = r => new Promise((ok, loi) => { r.onsuccess = () => ok(r.result); r.onerror = () => loi(r.error); });
   return {
@@ -298,9 +322,20 @@ function napPdfJs() {
 }
 const RONG = 1400;
 const toBlob = c => new Promise(ok => c.toBlob(ok, "image/png"));
-function moAnh(blob) { return new Promise((ok, loi) => { const i = new Image(); i.onload = () => ok(i); i.onerror = loi; i.src = URL.createObjectURL(blob); }); }
-async function fileSangTrang(files, onTienDo) {
-  const out = [];
+const toJpg = c => new Promise(ok => c.toBlob(b => ok(b), "image/jpeg", 0.85));
+// Giải phóng bộ nhớ canvas ngay (Safari iPad giới hạn bộ nhớ canvas)
+const boCanvas = c => { c.width = c.height = 1; };
+function moAnh(blob) {
+  return new Promise((ok, loi) => {
+    const i = new Image(), u = URL.createObjectURL(blob);
+    i.onload = () => { URL.revokeObjectURL(u); ok(i); };
+    i.onerror = () => { URL.revokeObjectURL(u); loi(new Error("anh")); };
+    i.src = u;
+  });
+}
+// Đọc từng trang một và gọi moiTrang(blob) ngay, không giữ cả 5 ảnh trong bộ nhớ cùng lúc
+async function docTungTrang(files, onTienDo, moiTrang) {
+  let n = 0;
   for (const f of files) {
     if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
       const lib = await napPdfJs(), pdf = await lib.getDocument({ data: await f.arrayBuffer() }).promise;
@@ -310,21 +345,35 @@ async function fileSangTrang(files, onTienDo) {
         const c = document.createElement("canvas"); c.width = Math.round(v.width); c.height = Math.round(v.height);
         const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
         await pg.render({ canvasContext: x, viewport: v }).promise;
-        out.push(await toBlob(c));
+        const b = await toBlob(c); boCanvas(c); pg.cleanup();
+        await moiTrang(b, n++);
       }
+      pdf.destroy();
     } else {
-      onTienDo && onTienDo(`Đọc ảnh ${f.name}…`);
-      const img = await moAnh(f);
-      out.push(await toBlob(veLen(img, Math.min(RONG, Math.max(img.naturalWidth, 1000)))));
+      onTienDo && onTienDo(`Đọc ảnh ${n + 1}/${files.length}…`);
+      const img = await moAnh(f), c = veLen(img, Math.min(RONG, Math.max(img.naturalWidth, 1000)));
+      img.src = "";
+      const b = await toJpg(c); boCanvas(c);
+      await moiTrang(b, n++);
     }
   }
-  return out;
+  return n;
+}
+function loiDeHieu(e) {
+  const ten = (e && e.name) || "", tin = (e && e.message) || "";
+  if (ten === "QuotaExceededError" || /quota/i.test(tin)) return "Máy hết chỗ lưu. Xóa bớt bài cũ rồi thử lại nhé.";
+  if (tin === "anh") return "Không mở được ảnh. Chọn lại ảnh (JPG hoặc PNG) rồi thử lại nhé.";
+  if (/PDF/.test(tin)) return tin;
+  return "Chưa lưu được bài. Đóng các tab khác của app (và Safari đang mở nhiều trang), rồi bấm Thêm lại nhé.";
 }
 async function xuLyTrang(blob, net) {
   const img = await moAnh(blob), c = veLen(img, img.naturalWidth);
+  img.src = "";
   if (net) lamNet(c);
   const o = doanONhip(c);
-  return { anh: net ? await toBlob(c) : null, o, w: c.width, h: c.height };
+  const kq = { anh: net ? await toBlob(c) : null, o, w: c.width, h: c.height };
+  boCanvas(c);
+  return kq;
 }
 
 /* ============ Thống kê, huy hiệu Poppy ============ */
@@ -381,21 +430,27 @@ $("thuy").onclick = () => $("hopthem").classList.add("an");
 $("tok").onclick = async () => {
   $("tok").disabled = true;
   try {
-    const net = $("tnet").checked, blobs = await fileSangTrang(fileCho, t => toast(t, 60000));
-    const id = "b" + Date.now(), trang = [];
-    for (let i = 0; i < blobs.length; i++) {
-      toast(`Tìm ô nhịp trang ${i + 1}/${blobs.length}…`, 60000);
-      await new Promise(r => setTimeout(r, 30));
-      const x = await xuLyTrang(blobs[i], net);
-      await DB.put("trang", { goc: blobs[i], net: x.anh }, id + ":" + i);
-      trang.push({ o: x.o, w: x.w, h: x.h, ve: [] });
+    const net = $("tnet").checked, id = "b" + Date.now(), trang = [];
+    try {
+      await docTungTrang(fileCho, t => toast(t, 60000), async (blob, i) => {
+        toast(`Tìm ô nhịp trang ${i + 1}…`, 60000);
+        await new Promise(r => setTimeout(r, 30));
+        const x = await xuLyTrang(blob, net);
+        await DB.put("trang", { goc: blob, net: x.anh }, id + ":" + i);
+        trang.push({ o: x.o, w: x.w, h: x.h, ve: [] });
+      });
+      if (!trang.length) throw new Error("anh");
+      const bai = { id, ten: $("tten").value.trim() || "Bài mới", nguon: $("tnguon").value, nhip: +$("tnhip").value, bpm: +$("tbpm").value || 80, lamNet: net, them: Date.now(), mo: Date.now(), dang: true, thuoc: false, soTrang: trang.length, trang, xong: [] };
+      await DB.put("bai", bai);
+      $("hopthem").classList.add("an");
+      toast(`Đã thêm "${bai.ten}": ${demO(bai)} ô nhịp. Người lớn xem lại khung ô nhịp nhé.`, 5000);
+      await moBai(id, true);
+    } catch (e) {
+      console.error(e);
+      for (let i = 0; i < trang.length + 1; i++) { try { await DB.del("trang", id + ":" + i); } catch (x) {} }
+      throw e;
     }
-    const bai = { id, ten: $("tten").value.trim() || "Bài mới", nguon: $("tnguon").value, nhip: +$("tnhip").value, bpm: +$("tbpm").value || 80, lamNet: net, them: Date.now(), mo: Date.now(), dang: true, thuoc: false, soTrang: blobs.length, trang, xong: [] };
-    await DB.put("bai", bai);
-    $("hopthem").classList.add("an");
-    toast(`Đã thêm "${bai.ten}": ${demO(bai)} ô nhịp. Người lớn xem lại khung ô nhịp nhé.`, 5000);
-    await moBai(id, true);
-  } catch (e) { toast("Lỗi: " + e.message, 6000); }
+  } catch (e) { toast(loiDeHieu(e), 8000); }
   $("tok").disabled = false;
 };
 
@@ -614,7 +669,7 @@ $("chonsaoluu").onchange = async () => {
     for (const b of d.bai) await DB.put("bai", b);
     if (d.tk) await DB.put("kv", d.tk, "tk");
     toast(`Đã mở lại ${d.bai.length} bài.`); veNha();
-  } catch (e) { toast("Lỗi: " + e.message, 5000); }
+  } catch (e) { console.error(e); toast(loiDeHieu(e), 8000); }
 };
 
 $("sapxep").onchange = veNha;
