@@ -68,6 +68,11 @@ input[type=range]{width:130px}
 #hopo{position:fixed;z-index:45;background:#fff;border:2px solid var(--xanh);border-radius:16px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:calc(100vw - 16px)}
 #hopo button{min-height:52px;font-size:18px}
 .o{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.thu{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--vien);border-radius:14px;background:#fff;margin-bottom:8px}
+.thu .ten{flex:1;min-width:0}
+.thu .ten b{display:block;font-size:18px}
+.thu .ten small{color:#777}
+.thu button{min-width:52px;min-height:52px;font-size:20px}
 .xep{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--vien);border-radius:14px;background:#fff;margin-bottom:8px}
 .xep img{width:130px;height:160px;object-fit:cover;object-position:top;border:1px solid var(--vien);border-radius:8px;background:#fff}
 .xep b{flex:1;font-size:20px}
@@ -121,6 +126,7 @@ input[type=range]{width:130px}
     <button class="phu nho an" id="xoave">🧹 Xóa nét vẽ</button>
     <button class="phu nho" id="suao">✂️ Sửa ô</button>
     <button class="phu nho" id="xeptrang">📑 Xếp trang</button>
+    <button class="phu nho" id="thuam">🎙️ Thu âm</button>
   </div>
 </div>
 
@@ -163,6 +169,18 @@ input[type=range]{width:130px}
   <div class="hang" style="margin-top:12px"><button id="xepok">Lưu</button><button class="phu" id="xephuy">Hủy</button></div>
 </div></div>
 
+<div id="hopthu" class="hop an"><div class="the">
+  <h2 style="margin-top:0">🎙️ Thu âm</h2>
+  <div class="hang">
+    <button id="thube" style="background:var(--do)">🎙️ Thu bé đánh</button>
+    <button class="phu" id="themco">📂 Thêm bản cô đánh</button>
+  </div>
+  <p style="color:#555;font-size:15px">Bản thu chỉ lưu trên máy này. Bấm ▶ để nghe, vạch chạy theo nhịp từ chỗ đang chọn.</p>
+  <div id="dsthu"></div>
+  <div class="hang" style="margin-top:12px"><button class="phu" id="dongthu">Đóng</button></div>
+  <input type="file" id="chonthu" accept="audio/*,video/*" class="an">
+</div></div>
+
 <div id="hopo" class="an">
   <div id="hopotieude" style="font-weight:700;margin-bottom:6px">Ô 1</div>
   <div class="hang"><button id="ochoitu">▶ Chơi từ đây</button><button id="otap" style="background:var(--xanhla,#34a853)">🔁 Tập đoạn này</button><button class="phu nho" id="ohuy">✕</button></div>
@@ -179,12 +197,14 @@ const DB = (() => {
   function mo() {
     if (dbp) return dbp;
     dbp = new Promise((ok, loi) => {
-      const r = indexedDB.open("piano-ayden", 1);
+      const r = indexedDB.open("piano-ayden", 2);
       r.onupgradeneeded = () => {
-        const d = r.result;
-        d.createObjectStore("bai", { keyPath: "id" });
-        d.createObjectStore("trang");
-        d.createObjectStore("kv");
+        // chỉ tạo kho còn thiếu: máy đã có bài (bản 1) vẫn giữ nguyên
+        const d = r.result, co = n => d.objectStoreNames.contains(n);
+        if (!co("bai")) d.createObjectStore("bai", { keyPath: "id" });
+        if (!co("trang")) d.createObjectStore("trang");
+        if (!co("kv")) d.createObjectStore("kv");
+        if (!co("thuam")) d.createObjectStore("thuam", { keyPath: "id" }).createIndex("bai", "bai");
       };
       r.onsuccess = () => {
         const d = r.result;
@@ -231,6 +251,7 @@ const DB = (() => {
     all: s => tx(s, "readonly", st => req(st.getAll())),
     put: (s, v, k) => tx(s, "readwrite", st => req(k === undefined ? st.put(v) : st.put(v, k))),
     del: (s, k) => tx(s, "readwrite", st => req(st.delete(k))),
+    thuCuaBai: baiId => tx("thuam", "readonly", st => req(st.index("bai").getAll(baiId))),
   };
 })();
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
@@ -486,6 +507,7 @@ $("tok").onclick = async () => {
 /* ============ Trang tập ============ */
 let B = null, dsO = [], urls = [], cheDo = "tap", dangChoi = false, viTri = -1, lapA = -1, lapB = -1, chonLap = 0;
 async function moBai(id, suaNgay) {
+  dung(); dungThu(); $("hopthu").classList.add("an");
   B = await DB.get("bai", id); if (!B) return;
   B.mo = Date.now(); await DB.put("bai", B);
   urls.forEach(u => URL.revokeObjectURL(u)); urls = [];
@@ -598,7 +620,7 @@ $("hoantac").onclick = () => {
 };
 let giuVe; $("vebut").onpointerdown = () => { giuVe = setTimeout(hoiXoaVe, 900); };
 $("vebut").onpointerup = $("vebut").onpointerleave = () => clearTimeout(giuVe);
-$("ve").onclick = () => { dung(); urls.forEach(u => URL.revokeObjectURL(u)); urls = []; B = null; $("tap").classList.add("an"); $("dk").classList.add("an"); $("nha").classList.remove("an"); $("ve").classList.add("an"); $("caidat").classList.add("an"); $("tieude").textContent = "🎹 Piano của Ayden"; veNha(); };
+$("ve").onclick = () => { dung(); dungThu(); $("hopthu").classList.add("an"); urls.forEach(u => URL.revokeObjectURL(u)); urls = []; B = null; $("tap").classList.add("an"); $("dk").classList.add("an"); $("nha").classList.remove("an"); $("ve").classList.add("an"); $("caidat").classList.add("an"); $("tieude").textContent = "🎹 Piano của Ayden"; veNha(); };
 function trangDangXem() { let best = null, bd = 1e9; document.querySelectorAll(".trang").forEach(d => { const r = d.getBoundingClientRect(), dd = Math.abs(r.top + r.height / 2 - innerHeight / 2); if (dd < bd) { bd = dd; best = d; } }); return best; }
 
 /* ============ Vẽ ghi chú ============ */
@@ -710,11 +732,72 @@ $("tangdan").onclick = () => { tangDan = !tangDan; $("tangdan").classList.toggle
 function dung() {
   if (!dangChoi) return;
   dangChoi = false; clearTimeout(hen); clearInterval(hen2); cancelAnimationFrame(raf); $("dem").classList.add("an");
+  if (amThu) { amThu.pause(); URL.revokeObjectURL(amThu.src); amThu = null; goNhip = goNhipCu; }
   $("choi").textContent = "▶"; if (vachEl) { vachEl.remove(); vachEl = null; }
   const s = Math.round((performance.now() - batDau) / 1000); if (batDau && s > 0) congGiay(Math.min(s, 3600)); batDau = 0;
   toMau();
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) dung(); });
+
+/* ============ Thu âm: bé tự thu, thêm bản cô đánh ============ */
+let amThu = null, goNhipCu = true, ghi = null, ghiDem = null;
+const dangThu = () => !!(ghi && ghi.state === "recording");
+const dinhGiay = s => Math.floor(s / 60) + ":" + String(Math.round(s % 60)).padStart(2, "0");
+async function veDsThu() {
+  if (!B) return;
+  const ds = (await DB.thuCuaBai(B.id)).sort((a, b) => b.luc - a.luc);
+  $("dsthu").innerHTML = ds.length ? "" : `<p style="color:#777">Chưa có bản thu nào.</p>`;
+  for (const t of ds) {
+    const e = document.createElement("div"); e.className = "thu";
+    e.innerHTML = `<span style="font-size:26px">${t.loai === "co" ? "👩‍🏫" : "🧒"}</span><div class="ten"><b>${t.loai === "co" ? "Cô đánh" : "Bé đánh"}</b><small>${new Date(t.luc).toLocaleString("vi-VN")}${t.giay ? " · " + dinhGiay(t.giay) : ""}</small></div><button class="nghe">▶</button><button class="phu xoa">🗑️</button>`;
+    e.querySelector(".nghe").onclick = () => ngheBanThu(t);
+    e.querySelector(".xoa").onclick = async () => { if (!confirm(`Xóa bản "${t.loai === "co" ? "Cô đánh" : "Bé đánh"}" này?`)) return; await DB.del("thuam", t.id); veDsThu(); };
+    $("dsthu").appendChild(e);
+  }
+}
+async function luuBanThu(loai, blob, giay) {
+  const t = { id: "t" + Date.now(), bai: B.id, loai, ten: loai === "co" ? "Cô đánh" : "Bé đánh", luc: Date.now(), blob, giay: giay || 0 };
+  await DB.put("thuam", t); await veDsThu(); return t;
+}
+function ngheBanThu(t) {
+  dung(); $("hopthu").classList.add("an");
+  if (cheDo !== "tap") datCheDo("tap");
+  amThanh(); amThu = new Audio(URL.createObjectURL(t.blob));
+  amThu.onended = () => dung();
+  amThu.play().catch(() => { toast("Không phát được bản thu này."); dung(); });
+  goNhipCu = goNhip; goNhip = false; dangChoi = true; $("choi").textContent = "⏸";
+  $("trangthai").textContent = `🎧 Đang nghe: ${t.ten}. Bấm ⏸ để dừng.`;
+  if (dsO.length) { batDau = performance.now(); const tu = chonDiemChoi(); batDauTu = -1; chayO(tu, ac.currentTime); }
+}
+function dungThu() { if (dangThu()) ghi.stop(); }
+$("thuam").onclick = () => { if (!B) return; dung(); veDsThu(); $("hopthu").classList.remove("an"); };
+$("dongthu").onclick = () => { dungThu(); $("hopthu").classList.add("an"); };
+$("themco").onclick = () => $("chonthu").click();
+$("chonthu").onchange = async () => {
+  const f = $("chonthu").files[0]; $("chonthu").value = ""; if (!f) return;
+  try { await luuBanThu("co", f, 0); toast("Đã thêm bản cô đánh."); } catch (e) { console.error(e); toast(loiDeHieu(e), 8000); }
+};
+$("thube").onclick = async () => {
+  if (dangThu()) { ghi.stop(); return; }
+  if (!window.MediaRecorder || !navigator.mediaDevices) { toast("Máy này chưa thu âm được trong app.", 6000); return; }
+  let st;
+  try { st = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { toast("Cần cho phép micro: vào Cài đặt > Safari > Micro, chọn Cho phép.", 8000); return; }
+  const kieu = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find(k => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(k));
+  const manh = [], t0 = Date.now();
+  ghi = new MediaRecorder(st, kieu ? { mimeType: kieu } : undefined);
+  ghi.ondataavailable = e => { if (e.data && e.data.size) manh.push(e.data); };
+  ghi.onstop = async () => {
+    clearInterval(ghiDem); st.getTracks().forEach(x => x.stop());
+    $("thube").textContent = "🎙️ Thu bé đánh";
+    const giay = (Date.now() - t0) / 1000, blob = new Blob(manh, { type: ghi.mimeType || kieu || "audio/mp4" }); ghi = null;
+    if (blob.size < 500 || !B) return;
+    try { await luuBanThu("be", blob, giay); toast("Đã lưu bản bé đánh. Bấm ▶ để nghe lại."); } catch (e) { console.error(e); toast(loiDeHieu(e), 8000); }
+  };
+  ghi.start(1000);
+  $("thube").textContent = "⏹ Dừng 0:00";
+  ghiDem = setInterval(() => { $("thube").textContent = "⏹ Dừng " + dinhGiay((Date.now() - t0) / 1000); }, 500);
+};
 
 /* ============ Cài đặt bài ============ */
 $("caidat").onclick = () => { dung(); $("cten").value = B.ten; $("cnguon").value = B.nguon; $("cnhip").value = B.nhip; $("cthuoc").checked = !!B.thuoc; $("clayda").checked = !!B.layDa; $("hopcai").classList.remove("an"); };
@@ -769,7 +852,7 @@ async function doanLai(net) {
 }
 $("cdoan").onclick = () => { if (confirm("Tự đoán lại ô nhịp? Phần đã sửa tay và tô xanh sẽ mất.")) doanLai(B.lamNet); };
 $("cnet").onclick = () => { if (confirm((B.lamNet ? "Tắt" : "Bật") + " làm nét? App sẽ đoán lại ô nhịp.")) doanLai(!B.lamNet); };
-$("cxoa").onclick = async () => { if (!confirm(`Xóa hẳn bài "${B.ten}"?`)) return; for (let i = 0; i < B.soTrang; i++) await DB.del("trang", B.id + ":" + i); await DB.del("bai", B.id); $("hopcai").classList.add("an"); $("ve").onclick(); };
+$("cxoa").onclick = async () => { if (!confirm(`Xóa hẳn bài "${B.ten}"?`)) return; for (let i = 0; i < B.soTrang; i++) await DB.del("trang", B.id + ":" + i); for (const t of await DB.thuCuaBai(B.id)) await DB.del("thuam", t.id); await DB.del("bai", B.id); $("hopcai").classList.add("an"); $("ve").onclick(); };
 
 /* ============ Sao lưu ============ */
 const sangData = b => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
